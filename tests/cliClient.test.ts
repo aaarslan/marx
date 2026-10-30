@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { CxCliClient, resultFromCli } from '../src/main/cxone/cli';
 import { DEFAULT_SETTINGS } from '../src/shared/types';
 import { normalizeFinding } from '../src/main/cxone/normalize';
 import type { ScanJobState } from '../src/shared/types';
+import { CLI_CAPABILITY_COMMANDS } from '../src/main/cliCapabilities';
 import { resolveCli, runCliProcess } from '../src/main/cliProcess';
 
 vi.mock('../src/main/cliProcess', async (original) => ({ ...await original<typeof import('../src/main/cliProcess')>(), resolveCli: vi.fn(async () => '/approved/cx'), runCliProcess: vi.fn() }));
@@ -13,13 +15,17 @@ const project = { ID: 'p1', Name: 'ui-project', MainBranch: 'main' };
 const scan = { ID: 's1', ProjectID: 'p1', ProjectName: 'ui-project', Branch: 'main', Status: 'Queued' };
 const client = () => new CxCliClient({ executable: '', configPath: '', authMode: 'cli' });
 const job = (): ScanJobState => ({ id: 'j1', projectId: 'p1', projectName: 'ui-project', folderPath: '/projects/ui', branch: 'main', options: { ...DEFAULT_SETTINGS.defaults, excludes: [], tags: {}, branch: 'main' }, status: 'Unknown', progress: { phase: 'idle' }, startedAt: Date.now() });
-beforeEach(() => { vi.clearAllMocks(); });
+beforeEach(() => {
+  vi.restoreAllMocks();
+  run.mockReset();
+  vi.spyOn(CxCliClient.prototype, 'preflight').mockResolvedValue({ version: '2.3.69', commands: Object.fromEntries(CLI_CAPABILITY_COMMANDS.map((entry) => [entry.args.join(' ') || 'cx', new Set<string>([...entry.flags, 'base-branch', 'tags', 'file-filter-ext'])])) });
+});
 
 describe('Checkmarx CLI adapter', () => {
   it('uses CLI configuration without requiring or writing credentials', async () => {
-    run.mockResolvedValueOnce('2.3.69').mockResolvedValueOnce('Authenticated').mockResolvedValueOnce(JSON.stringify([project]));
+    run.mockResolvedValueOnce('Authenticated').mockResolvedValueOnce(JSON.stringify([project]));
     expect(await client().testConnection()).toMatchObject({ ok: true, cliVersion: '2.3.69', cliPath: '/approved/cx' });
-    expect(run.mock.calls.map(([options]) => options.args.filter((arg) => !arg.startsWith('--')).slice(0, 2))).toEqual([['version'], ['auth', 'validate'], ['project', 'list']]);
+    expect(run.mock.calls.map(([options]) => options.args.filter((arg) => !arg.startsWith('--')).slice(0, 2))).toEqual([['auth', 'validate'], ['project', 'list']]);
     expect(run.mock.calls[0][0].env?.CX_APIKEY).toBe(process.env.CX_APIKEY);
   });
 
@@ -61,6 +67,48 @@ describe('Checkmarx CLI adapter', () => {
     run.mockReset().mockResolvedValueOnce(JSON.stringify([project])).mockRejectedValueOnce(new Error('connection lost'));
     await expect(client().createScan(job())).rejects.toThrow('connection lost');
     expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects an existing name in new-project mode before submission', async () => {
+    run.mockResolvedValueOnce(JSON.stringify([project]));
+    await expect(client().createScan({ ...job(), projectId: undefined })).rejects.toThrow('already exists');
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('stops an incompatible CLI before any authenticated invocation', async () => {
+    vi.mocked(CxCliClient.prototype.preflight).mockRejectedValueOnce(new Error('Missing required capability. No upload was started.'));
+    await expect(client().createScan(job())).rejects.toThrow('No upload');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('scopes mappings to configuration bytes and never exposes credentials in the identity', async () => {
+    const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'marx-config-scope-'));
+    try {
+      const configPath = path.join(folder, 'config.yaml');
+      await fs.writeFile(configPath, 'tenant: first\napikey: synthetic-secret\n');
+      const cli = new CxCliClient({ executable: '/approved/cx', configPath, authMode: 'cli' });
+      const first = await cli.connectionId();
+      expect(first).toMatch(/^[a-f0-9]{64}$/);
+      expect(await cli.connectionId()).toBe(first);
+      await fs.writeFile(configPath, 'tenant: second\napikey: synthetic-secret\n');
+      expect(await cli.connectionId()).not.toBe(first);
+      await expect(cli.createScan({ ...job(), connectionId: first })).rejects.toThrow('configuration changed');
+      expect(run).not.toHaveBeenCalled();
+    } finally { await fs.rm(folder, { recursive: true, force: true }); }
+  });
+
+  it('checks configuration again after lookup and blocks a profile change before upload', async () => {
+    const cli = client();
+    vi.spyOn(cli, 'connectionId').mockResolvedValueOnce('first').mockResolvedValueOnce('changed');
+    run.mockResolvedValueOnce(JSON.stringify([project]));
+    await expect(cli.createScan({ ...job(), connectionId: 'first' })).rejects.toThrow('configuration changed');
+    expect(run).toHaveBeenCalledOnce();
+    expect(run.mock.calls[0][0].args.slice(0, 2)).toEqual(['project', 'list']);
+  });
+
+  it('rejects scan metadata for a different ID', async () => {
+    run.mockResolvedValueOnce(JSON.stringify({ ...scan, ID: 'wrong-scan' }));
+    await expect(client().getScan('s1')).rejects.toThrow('different scan');
   });
 
   it('paginates projects and rejects overlapping pages', async () => {

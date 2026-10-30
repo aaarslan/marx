@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { IPC } from '@shared/ipc';
@@ -13,6 +13,7 @@ import type {
   TriageRequest,
   TestConnectionResult
 } from '@shared/types';
+import { MAX_PROMPT_EXPORT_BYTES } from '@shared/remediation';
 import { CxCliClient } from './cxone/cli';
 import { normalizeFinding } from './cxone/normalize';
 import { getApiKey, loadSettings, saveSettings, setApiKey as persistApiKey } from './settings';
@@ -20,6 +21,7 @@ import { getGitInfo, listSubProjects } from './gitInfo';
 import { ScanRunner } from './scanRunner';
 import { BatchRunner } from './batchRunner';
 import { SourceFolders } from './sourceFolders';
+import { RepositoryBindings } from './repositoryBindings';
 import { readSourceSnippet } from './sourceSnippet';
 import { buildCsv, buildJson, safeFileName, type ExportPayload } from './exportFindings';
 
@@ -64,6 +66,8 @@ export function registerIpcHandlers(ctx: IpcContext): void {
 
   const folders = new SourceFolders(loadSettings().recentFolders);
   const jobPhase = new Map<string, string>();
+  const bindings = new RepositoryBindings(path.join(app.getPath('userData'), 'repository-bindings.json'));
+  const mappedJobs = new Set<string>();
 
   const jobs = new Map<string, ScanJobState>();
   let cachedClient: CxCliClient | null = null;
@@ -71,7 +75,12 @@ export function registerIpcHandlers(ctx: IpcContext): void {
 
   const runner = new ScanRunner(client, {
     onJobUpdated: (job) => {
-      if (job.finishedAt) jobs.delete(job.id);
+      if (job.progress.phase === 'queued' && job.projectId && job.connectionId && !mappedJobs.has(job.id)) {
+        mappedJobs.add(job.id);
+        try { bindings.save({ folderPath: job.folderPath, projectId: job.projectId, projectName: job.projectName, connectionId: job.connectionId }); }
+        catch (error) { pushEvent({ kind: 'log', jobId: job.id, line: `Could not save repository mapping: ${error instanceof Error ? error.message : String(error)}` }); }
+      }
+      if (job.finishedAt) { mappedJobs.delete(job.id); jobs.delete(job.id); }
       else if (!jobs.has(job.id)) jobs.set(job.id, job);
       // macOS notification when a scan settles (completed / failed / canceled)
       const prev = jobPhase.get(job.id);
@@ -160,8 +169,11 @@ export function registerIpcHandlers(ctx: IpcContext): void {
 
   handle(IPC.authorizeFolder, (folder: string) => folders.grant(folder));
 
-  handle(IPC.readSourceFile, async (folder: string, relativePath: string, line?: number) => {
-    return readSourceSnippet(await folders.require(folder), relativePath, line);
+  handle(IPC.readSourceFile, async (folder: string, relativePath: string, line?: number, projectId?: string) => {
+    const canonical = await folders.require(folder);
+    const binding = bindings.get(canonical, await client().connectionId());
+    if (!projectId || binding?.projectId !== projectId) throw new Error('Link this repository to the selected Checkmarx project before reading source.');
+    return readSourceSnippet(canonical, relativePath, line);
   });
 
   handle(IPC.gitInfo, async (folder: string): Promise<GitInfo> => getGitInfo(await folders.require(folder)));
@@ -177,6 +189,26 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   });
 
   // ---- projects ------------------------------------------------------------
+  handle(IPC.bindingGet, async (folder: string) => bindings.get(await folders.require(folder), await client().connectionId()));
+  handle(IPC.bindingSave, async (folder: string, projectId: string) => {
+    const folderPath = await folders.require(folder);
+    const selected = client();
+    const connectionId = await selected.connectionId();
+    const project = await selected.getProject(projectId);
+    if (selected !== client() || connectionId !== await selected.connectionId()) throw new Error('CLI configuration changed. Choose the project again.');
+    recordRecentFolder(folderPath);
+    return bindings.save({ folderPath, projectId: project.id, projectName: project.name, connectionId });
+  });
+
+  const validateMapping = async (folder: string, projectId?: string, projectName?: string) => {
+    const connectionId = await client().connectionId();
+    if (projectId) {
+      const binding = bindings.get(folder, connectionId);
+      if (binding?.projectId !== projectId || binding.projectName !== projectName) throw new Error('Confirm the repository-to-project mapping before scanning.');
+    }
+    return connectionId;
+  };
+
   handle(IPC.projectsList, async (): Promise<ProjectInfo[]> => {
     const { projects } = await client().listProjects();
     return projects.map((p) => ({
@@ -191,7 +223,9 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   handle(IPC.scanRun, async (input: { folderPath: string; projectName: string; projectId?: string; options: ScanOptions }) => {
     input.folderPath = await folders.require(input.folderPath);
     recordRecentFolder(input.folderPath);
+    const connectionId = await validateMapping(input.folderPath, input.projectId, input.projectName);
     const job = runner.newJob(input);
+    job.connectionId = connectionId;
     jobs.set(job.id, job);
     void runner.run(job); // progress flows via events; don't block the round-trip
     return job;
@@ -211,7 +245,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
       for (const i of input.items) {
         const folderPath = await folders.require(i.folderPath);
         const git = await getGitInfo(folderPath);
-        inputs.push({ ...i, folderPath, options: { ...input.options, branch: git.branch || input.options.branch } });
+        inputs.push({ ...i, folderPath, connectionId: await validateMapping(folderPath, i.projectId, i.projectName), options: { ...input.options, branch: git.branch || input.options.branch } });
       }
       void b.runAll(inputs, input.concurrency);
       return b.getJobs();
@@ -253,7 +287,10 @@ export function registerIpcHandlers(ctx: IpcContext): void {
       const order = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, INFO: 1 } as const;
       return order[b.severity] - order[a.severity];
     });
-    return { findings, totalCount: raw.totalCount, truncated: raw.truncated };
+    return { findings, totalCount: raw.totalCount, truncated: raw.truncated, scan: {
+      id: scan.id, projectId: scan.projectId ?? '', projectName: scan.projectName ?? '', branch: scan.branch ?? '',
+      status: scan.status as ScanHistoryItem['status'], createdAt: scan.createdAt ?? '', updatedAt: scan.updatedAt ?? ''
+    } };
   });
 
   handle(IPC.resultsTriage, async (req: TriageRequest) => {
@@ -266,6 +303,30 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   });
 
   // ---- export ---------------------------------------------------------------
+  const requirePrompt = (text: string) => {
+    if (typeof text !== 'string' || !text.trim()) throw new Error('The remediation prompt is empty.');
+    if (Buffer.byteLength(text, 'utf8') > MAX_PROMPT_EXPORT_BYTES) throw new Error('This prompt exceeds 8 MiB. Select fewer findings and try again.');
+    return text;
+  };
+  handle(IPC.remediationCopy, (text: string) => { clipboard.writeText(requirePrompt(text)); });
+  let savingPrompt = false;
+  handle(IPC.remediationSave, async (input: { text: string; suggestedName: string }): Promise<string | null> => {
+    if (savingPrompt) throw new Error('A prompt save dialog is already open.');
+    const text = requirePrompt(input.text);
+    if (typeof input.suggestedName !== 'string') throw new Error('Choose a valid prompt filename.');
+    savingPrompt = true;
+    try {
+      const result = await dialog.showSaveDialog(ctx.getWindow()!, {
+        title: 'Save remediation prompt',
+        defaultPath: path.join(app.getPath('downloads'), `${safeFileName(input.suggestedName)}.md`),
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      });
+      if (result.canceled || !result.filePath) return null;
+      await fs.promises.writeFile(result.filePath, text, { encoding: 'utf8', mode: 0o600 });
+      return result.filePath;
+    } finally { savingPrompt = false; }
+  });
+
   handle(IPC.resultsExport, async (payload: ExportPayload): Promise<string> => {
     const stamp = new Date().toISOString().replace(/[:.T]/g, '-');
     const name = `marx-${safeFileName(payload.label)}-${stamp}.${payload.format}`;

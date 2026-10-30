@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0
+
+- Check required CLI commands and flags locally before authentication or scan upload, including optional flags selected for the scan.
+- Require protected OS storage for Marx-managed keys. Block legacy plaintext and unreadable keys without modifying them; support explicit replacement or removal.
+- Save canonical repository-to-project mappings scoped to CLI configuration. Remove folder-name inference, block implicit reuse of existing project names, and show exact targets for batch scans.
+- Require explicit comparison baselines. Default to the same branch, opt into other branches, validate baseline metadata, and clear comparisons when their scope changes.
+
+## 0.7.0
+
+- Add a local remediation-prompt builder for GitHub Copilot and other coding assistants.
+- Select exact severities, current results filters, all loaded findings or a single finding, with structured evidence and source-flow context.
+- Preview and copy numbered batches, add project-specific instructions, or save the full handoff as Markdown.
+- Keep partial results and demo data explicit; never silently drop findings to fit a prompt.
+- Inset dropdown chevrons consistently across the application while retaining native keyboard behavior and forced-color support.
+
+
 ## 0.6.0
 
 - Run the installed official Checkmarx CLI for scans, projects, history, reports and triage.

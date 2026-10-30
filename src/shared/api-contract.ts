@@ -5,6 +5,7 @@ import type {
   Finding,
   GitInfo,
   ProjectInfo,
+  RepositoryBinding,
   ResultsPage,
   ScanEvent,
   ScanHistoryItem,
@@ -39,11 +40,15 @@ export interface MarxApi {
   };
   fs: {
     pathForFile(file: File): Promise<string>;
-    readSourceFile(folder: string, relPath: string, line?: number): Promise<SourceSnippet>;
+    readSourceFile(folder: string, relPath: string, line?: number, projectId?: string): Promise<SourceSnippet>;
   };
   git: {
     info(folder: string): Promise<GitInfo>;
     listSubProjects(parent: string): Promise<string[]>;
+  };
+  bindings: {
+    get(folder: string): Promise<RepositoryBinding | null>;
+    save(folder: string, projectId: string): Promise<RepositoryBinding>;
   };
   projects: {
     list(): Promise<ProjectInfo[]>;
@@ -70,6 +75,10 @@ export interface MarxApi {
     triage(req: TriageRequest): Promise<boolean>;
     /** Write findings to ~/Downloads and reveal in Finder; returns the file path */
     export(format: 'csv' | 'json', label: string, findings: Finding[]): Promise<string>;
+  };
+  remediation: {
+    copy(text: string): Promise<void>;
+    save(input: { text: string; suggestedName: string }): Promise<string | null>;
   };
   shell: {
     openExternal(url: string): Promise<void>;
