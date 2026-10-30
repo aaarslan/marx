@@ -16,6 +16,7 @@ export function ScanView() {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
   const [projectId, setProjectId] = useState<string>('');
+  const [boundProjectId, setBoundProjectId] = useState('');
   const [projectName, setProjectName] = useState<string>('');
 
   const [error, setError] = useState<string | null>(null);
@@ -58,9 +59,7 @@ export function ScanView() {
         .list()
         .then((ps) => {
           setProjects(ps);
-          if (ps.length > 0) {
-            setProjectId((prev) => prev || ps[0].id);
-          } else {
+          if (ps.length === 0) {
             setProjectMode('new');
           }
         })
@@ -82,14 +81,17 @@ export function ScanView() {
     setGit(info);
     setOptions((o) => ({ ...o, branch: info?.branch ?? 'master' }));
     setProjectName((prev) => prev || info?.repoName || folderName(path) || 'project');
-    // preselect existing project with the same name
-    const match = projects.find(
-      (p) => p.name.toLowerCase() === (info?.repoName ?? '').toLowerCase()
-    );
-    if (match) {
-      setProjectMode('existing');
-      setProjectId(match.id);
-    }
+    setProjectId('');
+    setBoundProjectId('');
+    try {
+      const binding = await api.bindings.get(path);
+      if (request !== folderRequest.current) return;
+      if (binding) {
+        setProjectMode('existing');
+        setProjectId(binding.projectId);
+        setBoundProjectId(binding.projectId);
+      }
+    } catch (e) { if (request === folderRequest.current) setError(e instanceof Error ? e.message : String(e)); }
   };
 
   const canRun =
@@ -108,6 +110,10 @@ export function ScanView() {
     setSubmitting(true);
     setError(null);
     try {
+    if (projectMode === 'existing') {
+      await api.bindings.save(folder, projectId);
+      setBoundProjectId(projectId);
+    }
     const job = await api.scan.run({
       folderPath: folder,
       projectName: projectMode === 'new' ? projectName.trim() : projects.find((p) => p.id === projectId)?.name ?? projectName,
@@ -125,8 +131,6 @@ export function ScanView() {
     setView('results');
   };
 
-  // ── story check: full SAST+SCA, then auto-open results diffed against the
-  //    last completed scan of this project, with a pass/fail verdict ──
   const storyJobId = useRef<string | null>(null);
   const runStoryCheck = async () => {
     if (!folder || !canRun || running || submitLock.current) return;
@@ -134,6 +138,10 @@ export function ScanView() {
     setSubmitting(true);
     setError(null);
     try {
+    if (projectMode === 'existing') {
+      await api.bindings.save(folder, projectId);
+      setBoundProjectId(projectId);
+    }
     const job = await api.scan.run({
       folderPath: folder,
       projectName:
@@ -144,7 +152,7 @@ export function ScanView() {
       options: {
         ...options,
         scanners: Array.from(new Set([...options.scanners, 'sast' as ScannerType, 'sca' as ScannerType])),
-        sastIncremental: false // full scan — the story branch is compared client-side
+        sastIncremental: false
       }
     });
     storyJobId.current = job.id;
@@ -240,7 +248,7 @@ export function ScanView() {
             <div className="grid-2">
               {projectMode === 'existing' ? (
                 <label className="field">Checkmarx One project
-                  <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                  <select aria-label="Checkmarx One project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                     <option value="" disabled>{projects.length ? 'Choose a project' : 'No projects loaded'}</option>
                     {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
@@ -256,6 +264,9 @@ export function ScanView() {
             </div>
           </div>
 
+          <p className="faint" role="status">{projectMode === 'new'
+            ? 'A new Checkmarx project will be created. Existing names must be selected explicitly.'
+            : projectId ? `${boundProjectId === projectId ? 'Saved mapping' : 'Run scan will save this mapping'}: ${folder} → ${projects.find((p) => p.id === projectId)?.name ?? projectId} (${projectId}).` : 'Choose the Checkmarx project for this repository. Folder names never select a project.'}</p>
           <div className="card">
             <ScanOptionsEditor
               options={options}
@@ -272,7 +283,7 @@ export function ScanView() {
               className="btn"
               disabled={!canRun || running || submitting}
               onClick={() => void runStoryCheck()}
-              title="Full SAST + SCA, then auto-compares against the last completed scan of this project and shows a pass/fail verdict — the pre-CI check for your story branch"
+              title="Run full SAST + SCA, then choose a baseline explicitly in Results"
             >
               <Zap size={14} />
               Story check

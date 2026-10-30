@@ -1,9 +1,11 @@
 import fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import type { ScanJobState, Settings, TestConnectionResult, TriageRequest } from '@shared/types';
 import { DEFAULT_EXCLUDES } from '@shared/types';
 import type { CxProject, CxResult, CxScan, CxScanSummary } from './client';
+import { inspectCliCapabilities, requireScanCapabilities } from '../cliCapabilities';
 import { parseCliJson, resolveCli, runCliProcess } from '../cliProcess';
 
 export interface CliConfig {
@@ -117,6 +119,23 @@ export class CxCliClient {
     }
   }
 
+  async connectionId(): Promise<string> {
+    const configPath = this.config.configPath || this.env.CX_CONFIG_FILE_PATH || path.join(this.env.HOME || os.homedir(), '.checkmarx', 'checkmarxcli.yaml');
+    let config = Buffer.alloc(0);
+    try {
+      const handle = await fs.open(configPath, 'r');
+      try {
+        if ((await handle.stat()).size > 1024 * 1024) throw new Error('CLI configuration exceeds 1 MiB.');
+        config = await handle.readFile();
+      } finally { await handle.close(); }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || this.config.configPath) throw error;
+    }
+    const context = JSON.stringify([await this.executable, path.resolve(configPath), this.config.authMode,
+      Object.entries(this.env).filter(([key]) => key.startsWith('CX_')).sort(([a], [b]) => a.localeCompare(b))]);
+    return createHash('sha256').update(context).update(config).digest('hex');
+  }
+
   private async command(args: string[], options: { signal?: AbortSignal; onLine?: (line: string) => void; timeoutMs?: number; cwd?: string } = {}): Promise<string> {
     return runCliProcess({
       executable: await this.executable,
@@ -129,11 +148,21 @@ export class CxCliClient {
     return parseCliJson(await this.command(args, { signal }));
   }
 
+  async preflight(signal?: AbortSignal) {
+    return inspectCliCapabilities(await this.executable, this.env, runCliProcess, signal);
+  }
+
+  async getProject(projectId: string, signal?: AbortSignal): Promise<CxProject> {
+    const project = projectFromCli(await this.json(['project', 'show', `--project-id=${projectId}`, '--format=json'], signal));
+    if (project.id !== projectId) throw new Error('The CLI returned a different project. Refresh the project list.');
+    return project;
+  }
+
   async testConnection(): Promise<TestConnectionResult> {
-    const version = (await this.command(['version'])).trim();
+    const { version } = await this.preflight();
     await this.command(['auth', 'validate']);
     await this.listProjects(1);
-    return { ok: true, message: `Checkmarx CLI ${version}: authenticated and project access verified.`, cliPath: await this.executable, cliVersion: version };
+    return { ok: true, message: `Checkmarx CLI ${version}: required CLI capabilities, authentication and project access verified.`, cliPath: await this.executable, cliVersion: version };
   }
 
   async listProjects(limit = 1000, signal?: AbortSignal): Promise<{ projects: CxProject[]; totalCount: number; truncated: boolean }> {
@@ -157,6 +186,9 @@ export class CxCliClient {
 
   async createScan(job: ScanJobState, signal?: AbortSignal, events: { onLine?: (line: string) => void; onSubmitted?: (scan: CxScan) => void; onStarting?: () => void } = {}): Promise<CxScan> {
     const args = buildScanArgs(job);
+    const capabilities = await this.preflight(signal);
+    requireScanCapabilities(capabilities, args);
+    if (job.connectionId && job.connectionId !== await this.connectionId()) throw new Error('CLI configuration changed. Review the repository mapping before scanning. No upload was started.');
     const expectedProjectId = job.projectId;
     const matches = await this.json(['project', 'list', '--format=json', `--filter=${csvValue(`name=${job.projectName}`)},limit=1000`], signal);
     if (!Array.isArray(matches) || matches.length >= 1000) throw new Error('The project lookup is incomplete. Use a unique project name.');
@@ -164,7 +196,9 @@ export class CxCliClient {
     if (exact.length > 1 || (job.projectId && (exact.length !== 1 || exact[0].id !== job.projectId))) {
       throw new Error('The selected project does not resolve uniquely by name in the CLI. Refresh projects and select it again.');
     }
+    if (!expectedProjectId && exact.length) throw new Error('A project with this name already exists. Select and bind that existing project explicitly before scanning.');
     signal?.throwIfAborted();
+    if (job.connectionId && job.connectionId !== await this.connectionId()) throw new Error('CLI configuration changed. Review the repository mapping before scanning. No upload was started.');
     events.onStarting?.();
     const output = await this.command(args, { signal, onLine: (line) => {
       if (line.startsWith('{')) {
@@ -185,7 +219,9 @@ export class CxCliClient {
   }
 
   async getScan(scanId: string, signal?: AbortSignal): Promise<CxScan> {
-    return scanFromCli(await this.json(['scan', 'show', `--scan-id=${scanId}`, '--format=json'], signal));
+    const scan = scanFromCli(await this.json(['scan', 'show', `--scan-id=${scanId}`, '--format=json'], signal));
+    if (scan.id !== scanId) throw new Error('The CLI returned a different scan. Refresh the scan list.');
+    return scan;
   }
 
   async listScans(params: { limit?: number; projectId?: string } = {}): Promise<{ scans: CxScan[]; totalCount: number }> {

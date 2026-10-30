@@ -1,7 +1,7 @@
 {
   "name": "marx",
   "productName": "Marx",
-  "version": "0.6.0",
+  "version": "0.8.0",
   "description": "A desktop client for Checkmarx One SAST and SCA scans",
   "main": "./out/main/index.js",
   "author": "Marx contributors",
@@ -12,7 +12,7 @@
     "test": "bun --bun vitest run",
     "verify:cli": "bun run build && bun --bun electron scripts/verify-cli.cjs",
     "start": "bun --bun electron-vite preview",
-    "build": "bun --bun electron-vite build",
+    "build": "bun run clean:dist && bun --bun electron-vite build",
     "dist": "bun run build && bun --bun electron-builder --publish never",
     "dist:dir": "bun run build && bun --bun electron-builder --dir --publish never",
     "screenshot": "bun run build && bun --bun electron scripts/capture-screenshot.cjs",
@@ -20,7 +20,8 @@
     "dist:mac": "bun run build && bun --bun electron-builder --mac --publish never",
     "dist:win": "bun run build && bun --bun electron-builder --win --x64 --publish never",
     "dist:win:dir": "bun run build && bun --bun electron-builder --win --x64 --dir --publish never",
-    "dist:win:arm64": "bun run build && bun --bun electron-builder --win --arm64 --publish never"
+    "dist:win:arm64": "bun run build && bun --bun electron-builder --win --arm64 --publish never",
+    "clean:dist": "bun scripts/clean-dist.cjs"
   },
   "dependencies": {},
   "devDependencies": {

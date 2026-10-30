@@ -2,7 +2,7 @@ import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useRef, useState } from 'react';
 import { Layers, Play, Square } from 'lucide-react';
-import type { ScanJobState, ScanOptions } from '@shared/types';
+import type { RepositoryBinding, ScanJobState, ScanOptions } from '@shared/types';
 import { api } from '../api';
 import { useApp } from '../store';
 import { Banner, StatusBadge, Toggle } from '../components/ui';
@@ -15,6 +15,7 @@ export function BatchView() {
   const [parent, setParent] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bindings, setBindings] = useState<Record<string, RepositoryBinding>>({});
   const [namePrefix, setNamePrefix] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +40,13 @@ export function BatchView() {
     try {
       const subs = await api.git.listSubProjects(path);
       if (request !== folderRequest.current) return;
+      const saved: Record<string, RepositoryBinding> = {};
+      for (const sub of subs) {
+        const binding = await api.bindings.get(sub);
+        if (binding) saved[sub] = binding;
+        if (request !== folderRequest.current) return;
+      }
+      setBindings(saved);
       setParent(path);
       setCandidates(subs);
       setSelected(new Set(subs));
@@ -58,7 +66,8 @@ export function BatchView() {
     setError(null);
     const items = [...selected].map((folderPath) => ({
       folderPath,
-      projectName: `${namePrefix}${folderName(folderPath)}`
+      projectId: bindings[folderPath]?.projectId,
+      projectName: bindings[folderPath]?.projectName ?? `${namePrefix}${folderName(folderPath)}`
     }));
     try { await api.scan.runBatch({ items, options, concurrency }); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
@@ -85,6 +94,7 @@ export function BatchView() {
 
       {parent && (
         <>
+          <p className="faint">Saved mappings use the exact project ID. Other folders create new projects; existing names require a mapping in Scan first.</p>
           <div className="section-title">
             Projects found ({selected.size}/{candidates.length} selected)
           </div>
@@ -105,7 +115,7 @@ export function BatchView() {
                   }}
                 />
                 <span className="mono" style={{ fontSize: 12 }}>{folderName(c)}</span>
-                <span className="faint mono" style={{ fontSize: 10.5 }}>{c}</span>
+                <span className="faint mono" style={{ fontSize: 10.5 }}>{c} → {bindings[c] ? `${bindings[c].projectName} (${bindings[c].projectId})` : `Create ${namePrefix}${folderName(c)}`}</span>
               </label>
             ))}
           </div>

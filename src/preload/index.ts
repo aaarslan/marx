@@ -5,6 +5,7 @@ import type {
   Finding,
   GitInfo,
   ProjectInfo,
+  RepositoryBinding,
   ResultsPage,
   ScanEvent,
   ScanHistoryItem,
@@ -40,12 +41,16 @@ const api = {
       const path = webUtils.getPathForFile(file);
       return path ? call<string>(IPC.authorizeFolder, path) : Promise.resolve('');
     },
-    readSourceFile: (folder: string, relPath: string, line?: number) =>
-      call<SourceSnippet>(IPC.readSourceFile, folder, relPath, line)
+    readSourceFile: (folder: string, relPath: string, line?: number, projectId?: string) =>
+      call<SourceSnippet>(IPC.readSourceFile, folder, relPath, line, projectId)
   },
   git: {
     info: (folder: string) => call<GitInfo>(IPC.gitInfo, folder),
     listSubProjects: (parent: string) => call<string[]>(IPC.listSubfolders, parent)
+  },
+  bindings: {
+    get: (folder: string) => call<RepositoryBinding | null>(IPC.bindingGet, folder),
+    save: (folder: string, projectId: string) => call<RepositoryBinding>(IPC.bindingSave, folder, projectId)
   },
   projects: {
     list: () => call<ProjectInfo[]>(IPC.projectsList)
@@ -68,6 +73,10 @@ const api = {
     triage: (req: TriageRequest) => call<boolean>(IPC.resultsTriage, req),
     export: (format: 'csv' | 'json', label: string, findings: Finding[]) =>
       call<string>(IPC.resultsExport, { format, label, findings })
+  },
+  remediation: {
+    copy: (text: string) => call<void>(IPC.remediationCopy, text),
+    save: (input: { text: string; suggestedName: string }) => call<string | null>(IPC.remediationSave, input)
   },
   shell: {
     openExternal: (url: string) => call<void>(IPC.openExternal, url)

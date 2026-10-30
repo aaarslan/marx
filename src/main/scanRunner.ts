@@ -14,6 +14,7 @@ export interface RunnerEvents {
 }
 
 export interface RunJobInput {
+  connectionId?: string;
   folderPath: string;
   projectName: string;
   projectId?: string;
@@ -35,7 +36,7 @@ export class ScanRunner {
   newJob(input: RunJobInput): ScanJobState {
     return {
       id: randomUUID(), folderPath: input.folderPath, projectName: input.projectName,
-      projectId: input.projectId, branch: input.options.branch, options: input.options,
+      connectionId: input.connectionId, projectId: input.projectId, branch: input.options.branch, options: input.options,
       progress: { phase: 'idle' }, status: 'Unknown', startedAt: Date.now()
     };
   }

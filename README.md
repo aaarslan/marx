@@ -7,7 +7,7 @@
 
 Scan local projects with SAST and SCA, explore findings, and compare changes before you push.
 
-![Version](https://img.shields.io/badge/version-0.6.0-ff864d)
+![Version](https://img.shields.io/badge/version-0.8.0-ff864d)
 ![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-17181c?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-x64_%26_ARM64-17181c?logo=windows&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-1.4.4-17181c?logo=bun&logoColor=white)
@@ -53,7 +53,7 @@ bun run dev
 
 1. Open **Settings**, select the same **CLI executable** that works in your terminal (or leave it blank for PATH discovery), keep **Use the CLI’s existing configuration**, and choose **Test CLI connection**. If your command uses a custom configuration file, enter its absolute path. Alternatively, choose **Use an API key saved in Marx**, save your key and connection settings, then test the CLI connection.
 2. Open **Scan** and choose a project folder. Check the detected branch, project and exclusions.
-3. Choose **Run scan**, or **Story check** for a full scan followed by a baseline comparison.
+3. Choose the exact Checkmarx project. **Run scan** saves the repository mapping and starts the scan. **Story check** runs a full scan and opens Results, where you choose a baseline explicitly.
 4. Open **Results** to inspect, compare, triage or export findings.
 
 **Try it without credentials:** open Results and choose **Load demo results**. Sample findings use the normal filters and detail view; demo triage is read-only.
@@ -81,6 +81,14 @@ Windows installers are unsigned. Windows may display an unknown-publisher or Sma
 | `⌘⇧R` | `Ctrl+Shift+R` | Reload the window |
 | `Esc` | `Esc` | Return from a finding to the results list |
 
+## Fix findings with your coding assistant
+
+In **Results**, choose **Fix with AI**. Select exact severity levels (Critical and High are selected initially), choose all loaded findings, the current results filters, or the finding you are inspecting, and preview the prompt. Choose **Copy prompt** and paste into Copilot with the affected repository open. **Other coding assistant** provides a provider-neutral template.
+
+Prompts include finding identities, CVE/CWE references, dependency versions and recommendations, triage state, locations and full SAST flows. Large selections become numbered batches with independent context. Copy each batch or save all batches as Markdown. Incomplete scans and demo evidence remain clearly labeled.
+
+Prompt generation is local and requires no LLM API key. Marx does not send prompts to an assistant or apply fixes automatically. Your coding assistant makes changes in your repository; use a fresh Marx scan to confirm the outcome. See [remediation prompts](docs/remediation-prompts.md) for the format and template extension point.
+
 ## How it works
 
 ```text
@@ -93,15 +101,21 @@ Marx controls → official cx CLI → Checkmarx One scan
 
 Default exclusions omit `.git`, `node_modules` and common build output. Review exclusions before scanning; they can be customized. The CLI handles source packaging and upload. Marx reads JSON reports from a private temporary directory and removes those reports after reading them. Exclusions are translated into CLI filters; default exclusions can be removed explicitly with `!name`.
 
-The **Story check** runs a full scan of the working folder, including uncommitted files, and compares it with an earlier completed scan of the same project. Its default gate flags new High/Critical findings. Incomplete results do not produce a verdict.
+The **Story check** runs a full scan of the working folder, including uncommitted files. In Results, explicitly select an earlier completed scan of the same project as the baseline. Candidates default to the same branch; enable **Show other branches** to compare across branches deliberately. Its default gate flags new High/Critical findings. Incomplete results do not produce a verdict. These comparisons describe finding changes; they do not establish exploitability or remediation correctness.
 
 See [CLI contracts](docs/api-contracts.md) for command and report formats and [limitations](docs/limitations.md) for current boundaries.
+
+## Scan safeguards
+
+Before authentication in the connection test and before every scan submission, Marx checks local CLI help for required commands and flags. Unsupported capabilities produce an actionable error before upload. This verifies command availability, not tenant permissions or server compatibility.
+
+Repository mappings use the canonical folder path, exact project ID and a fingerprint of CLI configuration and environment. Changed configuration requires confirming the mapping again. Folder names never select existing projects or source folders. Batch scans reuse saved mappings; unbound folders create new projects, and existing names are blocked until explicitly mapped in Scan. The CLI resolves the selected name back to its expected ID before submission.
 
 ## Privacy and credentials
 
 The official CLI sends source archives and the metadata needed to run a scan to your Checkmarx One tenant and its upload endpoint. Marx does not include analytics or a separate application backend.
 
-Settings and the credential file live in Electron’s per-user application-data directory. When Marx-managed authentication is selected, the saved key is passed only in the child process environment, never in command arguments. Marx does not modify the CLI’s existing credential configuration. Credentials use Electron `safeStorage` encryption backed by macOS Keychain or Windows DPAPI when available. If OS encryption is unavailable, the current fallback stores the key as plaintext. See [Security](SECURITY.md) for details.
+Settings and the credential file live in Electron’s per-user application-data directory. When Marx-managed authentication is selected, the saved key is passed only in the child process environment, never in command arguments. Marx does not modify the CLI’s existing credential configuration. Marx-managed keys require Electron `safeStorage` encryption backed by macOS Keychain or Windows DPAPI. If protected storage is unavailable, saving and reading keys is blocked; use native CLI authentication. Legacy plaintext or unreadable keys remain untouched until you explicitly replace or remove them in Settings. See [Security](SECURITY.md) for details.
 
 ## Development
 
@@ -112,8 +126,9 @@ The app uses Electron, React, TypeScript and Zustand. Bun handles installation, 
 | `bun run dev` | Launch the development app |
 | `bun run typecheck` | Check main/preload and renderer TypeScript projects |
 | `bun run test` | Run the local Vitest suite |
-| `bun run build` | Compile the application |
+| `bun run build` | Remove previous `dist/` artifacts and compile the application |
 | `bun run start` | Preview an existing build |
+| `bun run clean:dist` | Remove all distribution artifacts |
 | `bun run dist` | Package for the current host platform |
 | `bun run dist:dir` | Build an unpacked app for the current host |
 | `bun run dist:mac` | Build the ad-hoc-signed macOS ARM64 DMG and ZIP |
@@ -122,6 +137,8 @@ The app uses Electron, React, TypeScript and Zustand. Bun handles installation, 
 | `bun run dist:win:dir` | Build an unpacked Windows x64 app |
 | `bun run screenshot` | Capture the real demo UI with a disposable profile |
 | `bun run audit` | Check dependencies for known security advisories |
+
+Every build removes the entire previous `dist/` directory before compilation, including installers and unpacked apps for other platforms. All packaging commands inherit this cleanup, so only artifacts from the latest packaging run remain. Verification and screenshot commands also call `build` and clear `dist/`. Source files, configuration and installed applications are unaffected.
 
 ```text
 src/main/           Electron lifecycle, IPC, scan runners and CLI adapter

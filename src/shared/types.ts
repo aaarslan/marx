@@ -24,6 +24,8 @@ export type ResultState =
 export type ResultStatus = 'NEW' | 'RECURRENT' | 'FIXED' | 'UNCHANGED';
 
 export interface Settings {
+  credentialStorageAvailable: boolean;
+  hasStoredApiKey: boolean;
   cliPath: string;
   cliConfigPath: string;
   cliAuthMode: 'cli' | 'marx';
@@ -104,6 +106,7 @@ export const emptySeverityCounts = (): SeverityCounts => ({
 });
 
 export interface ScanJobState {
+  connectionId?: string;
   batchId?: string;
   /** local job id */
   id: string;
@@ -121,6 +124,13 @@ export interface ScanJobState {
   summary?: SeverityCounts;
   startedAt: number;
   finishedAt?: number;
+}
+
+export interface RepositoryBinding {
+  folderPath: string;
+  projectId: string;
+  projectName: string;
+  connectionId: string;
 }
 
 export interface ProjectInfo {
@@ -191,6 +201,7 @@ export interface Finding {
 }
 
 export interface ResultsPage {
+  scan?: ScanHistoryItem;
   truncated?: boolean;
   findings: Finding[];
   totalCount: number;
@@ -253,6 +264,8 @@ export const DEFAULT_EXCLUDES = [
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
+  credentialStorageAvailable: false,
+  hasStoredApiKey: false,
   cliPath: '',
   cliConfigPath: '',
   cliAuthMode: 'cli',

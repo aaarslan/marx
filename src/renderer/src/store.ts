@@ -20,7 +20,6 @@ interface AppState {
   menuActionId: number;
   /** bumped whenever a job settles, so history views can refetch */
   historyVersion: number;
-  /** when set, Results auto-selects a baseline diff for the next selected scan */
   pendingAutoBaseline: boolean;
 
   setView: (v: View) => void;

@@ -15,6 +15,8 @@ export const IPC = {
   listSubfolders: 'fs:list-subfolders',
   // projects
   projectsList: 'projects:list',
+  bindingGet: 'bindings:get',
+  bindingSave: 'bindings:save',
   // scans
   scanRun: 'scan:run',
   scanRunBatch: 'scan:run-batch',
@@ -28,6 +30,8 @@ export const IPC = {
   resultsGet: 'results:get',
   resultsTriage: 'results:triage',
   resultsExport: 'results:export',
+  remediationCopy: 'remediation:copy',
+  remediationSave: 'remediation:save',
   // push events
   scanEvent: 'scan:event',
   menuAction: 'menu:action'

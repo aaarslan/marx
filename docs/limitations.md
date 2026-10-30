@@ -17,10 +17,11 @@ Treat these as unverified integration paths, not as passed checks.
 
 ## Data and workflow bounds
 
-- **CLI required:** Marx uses an installed official `cx` executable. It does not bundle, download or update it. CLI 2.3.69 was checked locally; older versions may lack required flags. An unsupported command fails visibly without falling back to direct HTTP.
+- **CLI required:** Marx uses an installed official `cx` executable. It does not bundle, download or update it. CLI 2.3.69 was checked locally; older versions may lack required flags. Local capability preflight checks required command help and scan flags before authentication in the connection test and before source submission. An unsupported command fails visibly without falling back to direct HTTP. Capability checks cannot prove tenant compatibility.
 - **Uploads:** packaging, upload limits and multipart handling belong to the selected CLI. Source still leaves the laptop for Checkmarx One analysis.
 - **Environment:** desktop apps may not inherit variables exported only in an interactive shell. Select the working CLI executable and, where needed, its explicit configuration file. Marx inherits its launch environment and does not source shell startup files.
 - **Results:** at most 5,000 findings are loaded. The UI warns when results are incomplete, exports contain only loaded findings, and diff/verdict are suppressed for incomplete data.
+- **Mappings and comparisons:** canonical folder mappings are scoped to a fingerprint of CLI configuration and environment, not a server-issued tenant identity. Project IDs are validated by lookup before upload. Settings changes invalidate mappings. Baselines require explicit selection, an earlier completed scan of the same project, and same-branch scope unless other branches are enabled. This does not prove equivalent engine coverage or that absent findings were remediated.
 - **Projects:** the picker loads up to 1,000 projects. Submission performs a name-filtered lookup and blocks ambiguous or mismatched existing selections because the CLI creates scans by project name. Project creation is handled by the CLI.
 - **Unknown submission outcomes:** a canceled, failed or timed-out submission may already have been accepted remotely. Marx does not retry scan submissions and disables the CLI’s network retry for them. If no scan ID was captured, reconcile in Checkmarx One before retrying.
 - **Cancellation:** Marx terminates the local command and, when a scan ID is known, requests remote cancellation through the CLI. Killing a local process alone does not prove remote cancellation. Cancellation failures are shown explicitly. An empty project or accepted scan can remain if the command stops before returning its ID.
@@ -41,4 +42,4 @@ Treat these as unverified integration paths, not as passed checks.
 
 ## Security boundaries
 
-Credentials use OS-backed encryption when available; the plaintext fallback and local file permissions are documented in [SECURITY.md](../SECURITY.md). React inline styles currently require a CSP exception for inline styles. No claim of zero vulnerabilities or a completed security certification is made.
+Marx-managed credentials require OS-backed encryption. Plaintext fallback is disabled, and legacy or unreadable keys are preserved but blocked. Storage and local file permissions are documented in [SECURITY.md](../SECURITY.md). React inline styles currently require a CSP exception for inline styles. No claim of zero vulnerabilities or a completed security certification is made.

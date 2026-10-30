@@ -131,6 +131,8 @@ export function SettingsView() {
         </div>
       </div>
 
+      {!settings.credentialStorageAvailable && <Banner kind="warn">Protected credential storage is unavailable. Use the CLI’s existing configuration. Marx will not save or read a plaintext API key; any existing key file is left unchanged.</Banner>}
+
       {cliAuthMode === 'marx' && <>
       <div className="card">
         <div className="section-title" style={{ marginTop: 0 }}>
@@ -145,20 +147,28 @@ export function SettingsView() {
                 aria-label="Checkmarx API key"
                 autoComplete="off"
                 spellCheck={false}
-                disabled={savingKey}
+                disabled={savingKey || !settings.credentialStorageAvailable}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={settings.hasApiKey ? '••••••••••••  (enter a new key to replace)' : 'Paste your Checkmarx One API key'}
                 style={{ flex: 1 }}
               />
-              <button className="btn" disabled={!apiKey.trim() || savingKey || saving || testing} onClick={() => void saveKey()}>
+              <button className="btn" disabled={!apiKey.trim() || !settings.credentialStorageAvailable || savingKey || saving || testing} onClick={() => void saveKey()}>
                 {savingKey ? <Spinner size={12} /> : null}{savingKey ? 'Saving…' : 'Save key'}
               </button>
             </div>
             <span className="faint">
-              Generate a key in Checkmarx One → Settings → API keys. Credentials use your operating system’s protected storage when available.
+              Generate a key in Checkmarx One → Settings → API keys. Keys saved in Marx require your operating system’s protected storage.
             </span>
           </label>
+
+          {settings.hasStoredApiKey && <button className="btn small" disabled={savingKey || saving || testing} onClick={async () => {
+            setSavingKey(true);
+            setSaveError(null);
+            try { await api.settings.setApiKey(''); await init(); setTestResult(null); }
+            catch (error) { setSaveError(error instanceof Error ? error.message : String(error)); }
+            finally { setSavingKey(false); }
+          }}>Remove saved key</button>}
 
           <details className="advanced-connection">
             <summary>Advanced connection settings</summary>
