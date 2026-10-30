@@ -1,3 +1,4 @@
+import { hasScanCredentials } from '@shared/types';
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, History as HistoryIcon, RefreshCw } from 'lucide-react';
 import type { ScanHistoryItem } from '@shared/types';
@@ -12,7 +13,7 @@ export function HistoryView() {
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
-    if (!settings?.hasApiKey) return;
+    if (!hasScanCredentials(settings)) return;
     setLoading(true);
     setError(null);
     api.scan
@@ -23,9 +24,9 @@ export function HistoryView() {
   };
 
   // refresh when scans settle (new completions appear automatically)
-  useEffect(load, [settings?.hasApiKey, historyVersion]);
+  useEffect(load, [settings?.cliAuthMode, settings?.hasApiKey, settings?.cliPath, settings?.cliConfigPath, historyVersion]);
 
-  if (!settings?.hasApiKey) {
+  if (!hasScanCredentials(settings)) {
     return (
       <>
         <div className="page-eyebrow">Scan activity</div><h1 className="page-title">History</h1>

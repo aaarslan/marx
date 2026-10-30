@@ -8,6 +8,7 @@ export const IPC = {
   testConnection: 'settings:test-connection',
   // dialogs / fs
   selectFolder: 'dialog:select-folder',
+  selectCli: 'dialog:select-cli',
   readSourceFile: 'fs:read-source-file',
   authorizeFolder: 'fs:authorize-folder',
   gitInfo: 'git:info',

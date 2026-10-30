@@ -176,7 +176,7 @@ export function ScanOptionsEditor({
         />
       </label>
       <div className="faint" style={{ fontSize: 11 }}>
-        Always excluded: .git, node_modules, dist, build, coverage and other build noise.
+        Excluded by default: .git, node_modules, dist, build, coverage and other build noise. Use !name above to re-include a default.
       </div>
 
       <div className="section-title">Tags</div>
@@ -204,9 +204,7 @@ export function ScanOptionsEditor({
 }
 
 const PHASES: { id: string; label: string }[] = [
-  { id: 'resolving-project', label: 'Project' },
-  { id: 'zipping', label: 'Zip' },
-  { id: 'uploading', label: 'Upload' },
+  { id: 'submitting', label: 'CLI submission' },
   { id: 'queued', label: 'Queue' },
   { id: 'running', label: 'Scan' },
   { id: 'fetching-results', label: 'Results' }

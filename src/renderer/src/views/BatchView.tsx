@@ -1,3 +1,4 @@
+import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useRef, useState } from 'react';
 import { Layers, Play, Square } from 'lucide-react';
@@ -75,7 +76,7 @@ export function BatchView() {
         Checkmarx One project, in parallel.
       </p>
 
-      {!settings?.hasApiKey && (
+      {!hasScanCredentials(settings) && (
         <Banner kind="warn" action={<button className="btn small" onClick={() => setView('settings')}>Set up connection</button>}>Connect your account to scan multiple projects. You can choose folders first.</Banner>
       )}
 
@@ -146,7 +147,7 @@ export function BatchView() {
           <div className="row" style={{ margin: '16px 0' }}>
             <button
               className="btn primary"
-              disabled={!settings?.hasApiKey || selected.size === 0 || running || submitting}
+              disabled={!hasScanCredentials(settings) || selected.size === 0 || running || submitting}
               onClick={() => void runAll()}
             >
               <Play size={14} />

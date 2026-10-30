@@ -10,8 +10,9 @@ Security fixes target the latest version. A clean dependency audit does not esta
 
 ## Data handling
 
-- Source selected for a scan is archived locally and uploaded to Checkmarx One through a presigned endpoint. Default exclusions can be overridden; review the files you intend to send.
+- The selected official Checkmarx CLI archives source locally and uploads it to Checkmarx One. Marx does not upload source through its own HTTP implementation. Default exclusions can be overridden; review the files you intend to send.
 - Archives use private temporary files and are cleaned up when a job settles.
+- CLI processes are launched with separate arguments and no shell. Native CLI configuration is the default; optional Marx-managed keys are passed through the child environment. Marx does not rewrite the CLI configuration. Known environment secrets, JWTs and signed upload URL parameters are redacted from captured CLI output; logs and reports can still contain source and finding information.
 - Settings are stored under Electron's per-user application-data directory. The API key is stored in a separate credential file, encrypted with Electron `safeStorage` when OS encryption is available.
 - On macOS, `safeStorage` uses Keychain-backed encryption; on Windows it uses DPAPI. If encryption is unavailable, the current fallback stores the credential as plaintext. Files request mode `0600` on POSIX systems; Windows protection depends on the user-profile directory ACLs.
 - The renderer uses context isolation, a sandboxed preload and no Node integration. Main-process source access requires a selected or previously authorized folder, and snippet reads enforce path containment and size limits.

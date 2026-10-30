@@ -35,6 +35,7 @@ export interface MarxApi {
   };
   dialog: {
     selectFolder(): Promise<string | null>;
+    selectCli(): Promise<string | null>;
   };
   fs: {
     pathForFile(file: File): Promise<string>;

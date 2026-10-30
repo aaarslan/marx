@@ -32,7 +32,8 @@ const api = {
     testConnection: () => call<TestConnectionResult>(IPC.testConnection)
   },
   dialog: {
-    selectFolder: () => call<string | null>(IPC.selectFolder)
+    selectFolder: () => call<string | null>(IPC.selectFolder),
+    selectCli: () => call<string | null>(IPC.selectCli)
   },
   fs: {
     pathForFile: (file: File) => {

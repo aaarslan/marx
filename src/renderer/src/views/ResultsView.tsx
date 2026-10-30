@@ -1,3 +1,4 @@
+import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -72,14 +73,14 @@ export function ResultsView() {
   const hasFilters = Boolean(search || sevFilter.size || stateFilter !== 'ALL' || typeFilter !== 'ALL' || changeFilter !== 'ALL');
 
   useEffect(() => {
-    if (!settings?.hasApiKey) return;
+    if (!hasScanCredentials(settings)) return;
     let current = true;
     setHistoryLoading(true);
     api.scan.history().then((items) => { if (current) setHistory(items); })
       .catch((e) => { if (current) setError(e.message); })
       .finally(() => { if (current) setHistoryLoading(false); });
     return () => { current = false; };
-  }, [settings?.hasApiKey, historyVersion]);
+  }, [settings?.cliAuthMode, settings?.hasApiKey, settings?.cliPath, settings?.cliConfigPath, historyVersion]);
 
   useEffect(() => {
     const changedScan = loadedScan.current !== selectedScanId;
@@ -284,7 +285,7 @@ export function ResultsView() {
 
       {/* toolbar */}
       <div className="toolbar">
-        {settings?.hasApiKey && (
+        {hasScanCredentials(settings) && (
           <select
             aria-label="Scan"
             value={selectedScanId ?? ''}
@@ -385,13 +386,13 @@ export function ResultsView() {
         )}
       </div>
 
-      {(demo || !settings?.hasApiKey) && (
+      {(demo || !hasScanCredentials(settings) || !selectedScanId) && (
         <Banner
           kind="info"
           action={
             <div className="row">
-              <button className="btn small" onClick={() => { setDemo(!demo); setSelectedId(null); clearFilters(); }}>{demo ? 'Close demo' : 'Load demo results'}</button>
-              {!settings?.hasApiKey && <button className="btn small" onClick={() => setView('settings')}>Connect account</button>}
+              <button className="btn small" onClick={() => { setDemo(!demo); setSelectedId(null); setError(null); clearFilters(); }}>{demo ? 'Close demo' : 'Load demo results'}</button>
+              {!hasScanCredentials(settings) && <button className="btn small" onClick={() => setView('settings')}>Connect account</button>}
             </div>
           }
         >
@@ -520,9 +521,9 @@ export function ResultsView() {
       {!activePage && !loading && !error && (
         <Empty
           icon={<ListChecks size={38} strokeWidth={1.2} />}
-          title={settings?.hasApiKey ? "Choose a scan to explore" : "Your findings, in focus"}
-          hint={settings?.hasApiKey ? "Select a completed scan above, or start a new scan of your project." : "Search, filter, and follow vulnerabilities back to their source. Start with a sample scan to explore the workflow."}
-          action={<button className="btn" onClick={() => settings?.hasApiKey ? setView('scan') : (setDemo(true), clearFilters())}>{settings?.hasApiKey ? 'Start a scan' : 'Explore demo scan'}</button>}
+          title={hasScanCredentials(settings) ? "Choose a scan to explore" : "Your findings, in focus"}
+          hint={hasScanCredentials(settings) ? "Select a completed scan above, or start a new scan of your project." : "Search, filter, and follow vulnerabilities back to their source. Start with a sample scan to explore the workflow."}
+          action={<button className="btn" onClick={() => hasScanCredentials(settings) ? setView('scan') : (setDemo(true), clearFilters())}>{hasScanCredentials(settings) ? 'Start a scan' : 'Explore demo scan'}</button>}
         />
       )}
     </>

@@ -84,6 +84,7 @@ export function normalizeFinding(raw: CxResult, scanId: string, projectId: strin
     flow,
     packageName: data.packageIdentifier?.name,
     packageVersion: data.packageIdentifier?.version,
+    packageManager: data.packageIdentifier?.packageManager,
     recommendedVersion: data.recommendedVersion,
     isDirectDependency: data.scaPackageData?.isDirectDependency,
     fixLink: data.scaPackageData?.fixLink,
