@@ -5,7 +5,6 @@
   --accent-hover: #ffa176;
   --accent-soft: rgba(255, 134, 77, 0.11);
 
-  --bg: rgba(23, 24, 28, 0.94);
   --bg-solid: #17181c;
   --surface: rgba(255, 255, 255, 0.045);
   --surface-hover: rgba(255, 255, 255, 0.08);
@@ -53,7 +52,7 @@ body {
   font-size: 13px;
   line-height: 1.5;
   color: var(--text);
-  background: transparent;
+  background: var(--bg-solid);
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
@@ -68,8 +67,7 @@ body {
   display: flex;
   height: 100vh;
   padding-top: 38px; /* traffic lights */
-  background: var(--bg);
-  backdrop-filter: blur(28px) saturate(1.6);
+  background: var(--bg-solid);
 }
 
 .sidebar {
@@ -640,7 +638,9 @@ textarea::placeholder {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--text-dim);
-  max-height: 130px;
+  height: 130px;
+  overflow: auto;
+  overflow-anchor: none;
   overflow-wrap: anywhere;
   user-select: text;
   line-height: 1.55;

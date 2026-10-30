@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -31,7 +32,16 @@ interface Snippet {
 }
 
 export function ResultsView() {
-  const { settings, selectedScanId, linkedFolder, setSelectedScan, historyVersion, pendingAutoBaseline, clearAutoBaseline, setView } = useApp();
+  const { settings, selectedScanId, linkedFolder, setSelectedScan, historyVersion, pendingAutoBaseline, clearAutoBaseline, setView } = useApp(useShallow((state) => ({
+    settings: state.settings,
+    selectedScanId: state.selectedScanId,
+    linkedFolder: state.linkedFolder,
+    setSelectedScan: state.setSelectedScan,
+    historyVersion: state.historyVersion,
+    pendingAutoBaseline: state.pendingAutoBaseline,
+    clearAutoBaseline: state.clearAutoBaseline,
+    setView: state.setView
+  })));
 
   const loadedScan = useRef<string | null>(null);
   const baselineRequest = useRef(0);

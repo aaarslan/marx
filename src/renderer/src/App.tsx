@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
 import React, { lazy, Suspense, useEffect } from 'react';
 import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
@@ -19,7 +20,13 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function App() {
-  const { view, setView, init, triggerMenuAction, settings } = useApp();
+  const { view, setView, init, triggerMenuAction, settings } = useApp(useShallow((state) => ({
+    view: state.view,
+    setView: state.setView,
+    init: state.init,
+    triggerMenuAction: state.triggerMenuAction,
+    settings: state.settings
+  })));
 
   useEffect(() => {
     void init();

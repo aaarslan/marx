@@ -1,7 +1,7 @@
 {
   "name": "marx",
   "productName": "Marx",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "A desktop client for Checkmarx One SAST and SCA scans",
   "main": "./out/main/index.js",
   "author": "Marx contributors",

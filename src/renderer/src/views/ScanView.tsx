@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -9,7 +10,16 @@ import { Banner } from '../components/ui';
 import { Dropzone, ProgressCard, ScanOptionsEditor } from '../components/ScanOptions';
 
 export function ScanView() {
-  const { settings, jobs, logs, applyEvent, setSelectedScan, setView, menuAction, menuActionId, init } = useApp();
+  const { settings, jobs, applyEvent, setSelectedScan, setView, menuAction, menuActionId, init } = useApp(useShallow((state) => ({
+    settings: state.settings,
+    jobs: state.jobs,
+    applyEvent: state.applyEvent,
+    setSelectedScan: state.setSelectedScan,
+    setView: state.setView,
+    menuAction: state.menuAction,
+    menuActionId: state.menuActionId,
+    init: state.init
+  })));
 
   const [folder, setFolder] = useState<string | null>(null);
   const [git, setGit] = useState<GitInfo | null>(null);
@@ -302,17 +312,21 @@ export function ScanView() {
                 onCancel={() => void api.scan.cancelJob(currentJob).catch(() => undefined)}
                 onViewResults={() => viewResults(currentJob)}
               />
-              {(logs[currentJob.id]?.length ?? 0) > 0 && (
-                <div className="log-box">
-                  {(logs[currentJob.id] ?? []).slice(-12).map((line, i) => (
-                    <div key={i}>{line}</div>
-                  ))}
-                </div>
-              )}
+              <ScanLog jobId={currentJob.id} />
             </>
           )}
         </>
       )}
     </>
+  );
+}
+
+function ScanLog({ jobId }: { jobId: string }) {
+  const lines = useApp((state) => state.logs[jobId]);
+  if (!lines?.length) return null;
+  return (
+    <div className="log-box" role="region" aria-label="Scan log" tabIndex={0}>
+      {lines.slice(-12).map((line, index) => <div key={index}>{line}</div>)}
+    </div>
   );
 }

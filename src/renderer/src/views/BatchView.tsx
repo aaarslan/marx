@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useRef, useState } from 'react';
@@ -9,7 +10,13 @@ import { Banner, StatusBadge, Toggle } from '../components/ui';
 import { Dropzone, ScanOptionsEditor, SeveritySummaryCounts } from '../components/ScanOptions';
 
 export function BatchView() {
-  const { settings, jobs: allJobs, batchId, setView, setSelectedScan } = useApp();
+  const { settings, jobs: allJobs, batchId, setView, setSelectedScan } = useApp(useShallow((state) => ({
+    settings: state.settings,
+    jobs: state.jobs,
+    batchId: state.batchId,
+    setView: state.setView,
+    setSelectedScan: state.setSelectedScan
+  })));
   const jobs = allJobs.filter((job) => batchId !== null && job.batchId === batchId);
 
   const [parent, setParent] = useState<string | null>(null);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+
+- Isolate scan logs from application-shell and unrelated-view updates to avoid continuous whole-application renders during scans.
+- Use an opaque macOS window and solid application background instead of native vibrancy and full-window blur.
+- Keep the live log in a fixed-height scrollable panel to prevent overflow and layout movement.
+- Verify sustained CLI output preserves focus, scroll position, live elapsed time and navigation without rerendering the application shell.
+
 ## 0.8.0
 
 - Check required CLI commands and flags locally before authentication or scan upload, including optional flags selected for the scan.

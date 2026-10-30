@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, History as HistoryIcon, RefreshCw } from 'lucide-react';
@@ -7,7 +8,12 @@ import { useApp } from '../store';
 import { Banner, Empty, StatusBadge, timeAgo } from '../components/ui';
 
 export function HistoryView() {
-  const { settings, setSelectedScan, setView, historyVersion } = useApp();
+  const { settings, setSelectedScan, setView, historyVersion } = useApp(useShallow((state) => ({
+    settings: state.settings,
+    setSelectedScan: state.setSelectedScan,
+    setView: state.setView,
+    historyVersion: state.historyVersion
+  })));
   const [items, setItems] = useState<ScanHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
