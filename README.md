@@ -7,7 +7,7 @@
 
 Scan local projects with SAST and SCA, explore findings, and compare changes before you push.
 
-![Version](https://img.shields.io/badge/version-0.8.0-ff864d)
+![Version](https://img.shields.io/badge/version-0.8.1-ff864d)
 ![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-17181c?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-x64_%26_ARM64-17181c?logo=windows&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-1.4.4-17181c?logo=bun&logoColor=white)

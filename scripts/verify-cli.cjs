@@ -11,6 +11,7 @@ const source = path.join(folder, 'source with spaces');
 const executable = path.join(folder, 'cx');
 const receipt = path.join(folder, 'calls.jsonl');
 const obsolete = path.join(folder, 'obsolete');
+const holdSubmission = path.join(folder, 'hold-submission');
 const config = path.join(folder, 'cli-config.yaml');
 fs.writeFileSync(config, 'tenant: synthetic-fixture\n');
 fs.mkdirSync(profile);
@@ -38,7 +39,14 @@ else if (args[0] === 'scan' && args[1] === 'create') {
   if (!fs.existsSync(path.join(value('file-source'), 'index.js'))) process.exit(2);
   if (value('project-name') === 'failure') { console.error('Synthetic upload rejected (401)'); process.exit(1); }
   console.error('CLI preparing and uploading synthetic source');
-  console.log(JSON.stringify(scan));
+  if (fs.existsSync(${JSON.stringify(holdSubmission)})) {
+    let count = 0;
+    const timer = setInterval(() => {
+      if (++count > 200) { console.error('Synthetic submission hold timed out'); process.exit(1); }
+      console.error('Synthetic live progress ' + count);
+      if (!fs.existsSync(${JSON.stringify(holdSubmission)})) { clearInterval(timer); console.log(JSON.stringify(scan)); }
+    }, 50);
+  } else console.log(JSON.stringify(scan));
 }
 else if (args[0] === 'scan' && args[1] === 'list') console.log(JSON.stringify([scan, { ...scan, ID: 'baseline', CreatedAt: '2026-10-29T12:00:00Z' }, { ...scan, ID: 'cross-branch', Branch: 'feature', CreatedAt: '2026-10-28T12:00:00Z' }, { ...scan, ID: 'wrong-project', ProjectID: 'p2', CreatedAt: '2026-10-27T12:00:00Z' }]));
 else if (args[0] === 'scan' && args[1] === 'show') console.log(JSON.stringify(value('scan-id') === 's1' ? scan : { ...scan, ID: value('scan-id'), Branch: value('scan-id') === 'cross-branch' ? 'feature' : 'main', CreatedAt: '2026-10-28T12:00:00Z' }));
@@ -77,6 +85,26 @@ app.whenReady().then(async () => {
   try {
     contents.setBackgroundThrottling(false);
     await waitFor(contents, 'Boolean(document.querySelector(".nav-item"))');
+    contents.debugger.attach('1.3');
+    await contents.debugger.sendCommand('Page.enable');
+    await contents.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: `
+      window.scanRenderCounts = { shell: 0, commits: 0 };
+      window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+        supportsFiber: true,
+        inject: () => 1,
+        onCommitFiberRoot: (_id, root) => {
+          window.scanRenderCounts.commits++;
+          let fiber = root.current.child;
+          while (fiber && fiber.tag !== 0) fiber = fiber.child;
+          if (fiber && (fiber.flags & 1)) window.scanRenderCounts.shell++;
+        },
+        onCommitFiberUnmount: () => {}
+      };
+    ` });
+    contents.reload();
+    await waitFor(contents, 'Boolean(document.querySelector(".nav-item")) && window.scanRenderCounts?.commits > 0');
+    assert.equal(win.getBackgroundColor().toLowerCase(), '#17181c');
+    assert.equal(await contents.executeJavaScript('getComputedStyle(document.querySelector(".app")).backdropFilter'), 'none');
     await contents.executeJavaScript(`window.acceptanceSource = ${JSON.stringify(fs.realpathSync(source))}; window.acceptanceEvents = []; window.marx.onScanEvent(event => window.acceptanceEvents.push(event)); void 0;`);
     const settings = await contents.executeJavaScript('window.marx.settings.get()');
     assert.equal(settings.hasApiKey, false);
@@ -176,7 +204,38 @@ app.whenReady().then(async () => {
       assert.equal(await contents.executeJavaScript('document.documentElement.scrollWidth <= document.documentElement.clientWidth'), true);
       fs.writeFileSync(path.join(folder, `mapping-${width}.png`), (await contents.capturePage()).toPNG());
     }
+    fs.writeFileSync(holdSubmission, 'hold');
     await contents.executeJavaScript('Array.from(document.querySelectorAll("button")).find(button => button.textContent.includes("Run scan") && !button.disabled).click()');
+    await waitFor(contents, 'document.querySelector(".log-box")?.textContent.includes("Synthetic live progress 3")');
+    const liveLayout = await contents.executeJavaScript(`(() => {
+      const panel = document.querySelector('.progress-card');
+      const main = document.querySelector('main');
+      main.scrollTop += panel.getBoundingClientRect().top - main.getBoundingClientRect().top - main.clientHeight / 3;
+      window.scanFocusElement = document.querySelector('input[value="master"]');
+      window.scanFocusElement.focus({ preventScroll: true });
+      window.scanRenderCounts.shell = 0;
+      return { height: document.querySelector('.log-box').getBoundingClientRect().height, scroll: document.querySelector('main').scrollTop, elapsed: panel.querySelector('.row .faint.mono:last-child').textContent };
+    })()`);
+    await waitFor(contents, 'document.querySelector(".log-box")?.textContent.includes("Synthetic live progress 25")');
+    const liveShellRenders = await contents.executeJavaScript('window.scanRenderCounts.shell');
+    console.log(JSON.stringify({ liveShellRenders }));
+    assert.equal(liveShellRenders, 0, 'CLI logs must not rerender the application shell');
+    const liveAfter = await contents.executeJavaScript(`({ height: document.querySelector('.log-box').getBoundingClientRect().height, scroll: document.querySelector('main').scrollTop, elapsed: document.querySelector('.progress-card .row .faint.mono:last-child').textContent, focusPreserved: document.activeElement === window.scanFocusElement, scrolls: document.querySelector('.log-box').scrollHeight > document.querySelector('.log-box').clientHeight })`);
+    assert.equal(liveAfter.height, liveLayout.height);
+    assert.equal(liveAfter.scroll, liveLayout.scroll);
+    assert.equal(liveAfter.focusPreserved, true);
+    assert.equal(liveAfter.scrolls, true);
+    assert.notEqual(liveAfter.elapsed, liveLayout.elapsed);
+    fs.writeFileSync(path.join(folder, 'live-scan.png'), (await contents.capturePage()).toPNG());
+    await contents.executeJavaScript(`Array.from(document.querySelectorAll('.nav-item')).find(button => button.textContent.trim() === 'Settings').click()`);
+    await waitFor(contents, 'Boolean(document.querySelector("input[aria-label=\\"CLI executable\\"]"))');
+    await contents.executeJavaScript('document.querySelector("input[aria-label=\\"CLI executable\\"]").focus(); window.scanRenderCounts.shell = 0');
+    await waitFor(contents, 'document.querySelector(".log-box")?.textContent.includes("Synthetic live progress 50")');
+    assert.equal(await contents.executeJavaScript('window.scanRenderCounts.shell'), 0);
+    assert.equal(await contents.executeJavaScript('document.activeElement === document.querySelector("input[aria-label=\\"CLI executable\\"]")'), true);
+    await contents.executeJavaScript(`Array.from(document.querySelectorAll('.nav-item')).find(button => button.textContent.trim() === 'Scan').click()`);
+    fs.rmSync(holdSubmission);
+
     await waitFor(contents, 'window.acceptanceEvents.some(event => event.kind === "job-updated" && event.job.progress.phase === "completed")');
     const events = await contents.executeJavaScript('window.acceptanceEvents');
     const completed = events.find((event) => event.kind === 'job-updated' && event.job.progress.phase === 'completed').job;
@@ -257,10 +316,10 @@ app.whenReady().then(async () => {
     await contents.executeJavaScript('Array.from(document.querySelectorAll("button")).find(button => button.textContent.trim() === "source with spaces").click()');
     await waitFor(contents, 'document.querySelector("select[aria-label=\\"Checkmarx One project\\"]")?.value === "p1"');
     assert.equal(await contents.executeJavaScript('document.body.textContent.includes("Saved mapping:")'), true);
-    console.log(JSON.stringify({ result: 'passed', evidence: folder, checks: ['native CLI configuration without Marx API key', 'CLI capability preflight and obsolete CLI blocked before authentication/upload', 'explicit project mapping, configuration invalidation, protected source access and reload restoration', 'explicit baseline, branch opt-in and reset', 'CLI connection test', 'settings at 1280 and 960 pixels', 'demo remains available with CLI authentication', 'remediation severity selection, preview, copy and Markdown save', 'dropdown inset and remediation dialog at desktop and narrow widths', 'Escape and focus return', 'multi-batch navigation, copy and complete Markdown export', 'filtered and individual finding scope, generic assistant', 'empty/oversized copy rejection, canceled and duplicate saves', 'GUI folder selection and scan button', 'subprocess scan and progress', 'summary and findings rendered', 'single submission', 'CLI failure and uncertain-outcome message'] }, null, 2));
+    console.log(JSON.stringify({ result: 'passed', evidence: folder, checks: ['opaque macOS window and application background without full-window blur', 'native CLI configuration without Marx API key', 'CLI capability preflight and obsolete CLI blocked before authentication/upload', 'explicit project mapping, configuration invalidation, protected source access and reload restoration', 'explicit baseline, branch opt-in and reset', 'CLI connection test', 'settings at 1280 and 960 pixels', 'demo remains available with CLI authentication', 'remediation severity selection, preview, copy and Markdown save', 'dropdown inset and remediation dialog at desktop and narrow widths', 'Escape and focus return', 'multi-batch navigation, copy and complete Markdown export', 'filtered and individual finding scope, generic assistant', 'empty/oversized copy rejection, canceled and duplicate saves', 'GUI folder selection and scan button', 'sustained CLI output without application-shell rerenders, focus loss or scroll jumps', 'bounded scrolling log, live timer and navigation during scanning', 'subprocess scan and progress', 'summary and findings rendered', 'single submission', 'CLI failure and uncertain-outcome message'] }, null, 2));
   } catch (error) {
     console.error(error);
-    try { console.error((await contents.executeJavaScript('document.body.innerText')).slice(-6000)); } catch {}
+    try { console.error(await contents.executeJavaScript('JSON.stringify(window.scanRenderCounts)')); console.error((await contents.executeJavaScript('document.body.innerText')).slice(-6000)); } catch {}
     process.exitCode = 1;
     console.error(`Evidence retained at ${folder}`);
   } finally {

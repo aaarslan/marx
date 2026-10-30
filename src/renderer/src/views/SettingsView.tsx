@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, KeyRound, Plug } from 'lucide-react';
 import type { ScanDefaults, Settings, TestConnectionResult } from '@shared/types';
@@ -6,7 +7,10 @@ import { useApp } from '../store';
 import { Banner, Spinner, Toggle } from '../components/ui';
 
 export function SettingsView() {
-  const { settings, init } = useApp();
+  const { settings, init } = useApp(useShallow((state) => ({
+    settings: state.settings,
+    init: state.init
+  })));
   const [cliPath, setCliPath] = useState('');
   const [cliConfigPath, setCliConfigPath] = useState('');
   const [cliAuthMode, setCliAuthMode] = useState<Settings['cliAuthMode']>('cli');

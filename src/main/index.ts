@@ -30,13 +30,11 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 640,
     show: false,
+    backgroundColor: '#17181c',
     ...(isMac ? {
       titleBarStyle: 'hiddenInset',
-      trafficLightPosition: { x: 16, y: 16 },
-      vibrancy: 'under-window',
-      visualEffectState: 'active',
-      backgroundColor: '#00000000'
-    } as const : { backgroundColor: '#17181c' }),
+      trafficLightPosition: { x: 16, y: 16 }
+    } as const : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: true,
