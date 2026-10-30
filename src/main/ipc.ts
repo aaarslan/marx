@@ -13,7 +13,7 @@ import type {
   TriageRequest,
   TestConnectionResult
 } from '@shared/types';
-import { CxOneApiError, CxOneClient } from './cxone/client';
+import { CxCliClient } from './cxone/cli';
 import { normalizeFinding } from './cxone/normalize';
 import { getApiKey, loadSettings, saveSettings, setApiKey as persistApiKey } from './settings';
 import { getGitInfo, listSubProjects } from './gitInfo';
@@ -48,17 +48,13 @@ function recordRecentFolder(folder: string): void {
   saveSettings({ recentFolders: next });
 }
 
-export function getClient(): CxOneClient {
+export function getClient(): CxCliClient {
   const settings = loadSettings();
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new CxOneApiError(
-      'No API key configured. Add your Checkmarx One API key in Settings first.',
-      401,
-      'settings'
-    );
-  }
-  return new CxOneClient({ apiKey, baseUrl: settings.baseUrl, tenant: settings.tenant });
+  return new CxCliClient({
+    executable: settings.cliPath, configPath: settings.cliConfigPath, authMode: settings.cliAuthMode,
+    apiKey: settings.cliAuthMode === 'marx' ? getApiKey() : undefined,
+    baseUrl: settings.baseUrl, tenant: settings.tenant
+  });
 }
 
 export function registerIpcHandlers(ctx: IpcContext): void {
@@ -70,7 +66,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   const jobPhase = new Map<string, string>();
 
   const jobs = new Map<string, ScanJobState>();
-  let cachedClient: CxOneClient | null = null;
+  let cachedClient: CxCliClient | null = null;
   const client = () => cachedClient ??= getClient();
 
   const runner = new ScanRunner(client, {
@@ -129,7 +125,15 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   handle(IPC.settingsGet, () => loadSettings());
   handle(IPC.settingsSave, (settings: Partial<Settings>) => {
     cachedClient = null;
-    return saveSettings({ baseUrl: settings.baseUrl ?? loadSettings().baseUrl, tenant: settings.tenant ?? loadSettings().tenant, defaults: settings.defaults ?? loadSettings().defaults });
+    const current = loadSettings();
+    return saveSettings({
+      cliPath: settings.cliPath ?? current.cliPath,
+      cliConfigPath: settings.cliConfigPath ?? current.cliConfigPath,
+      cliAuthMode: settings.cliAuthMode ?? current.cliAuthMode,
+      baseUrl: settings.baseUrl ?? current.baseUrl,
+      tenant: settings.tenant ?? current.tenant,
+      defaults: settings.defaults ?? current.defaults
+    });
   });
   handle(IPC.settingsSetApiKey, (key: string) => {
     persistApiKey(key);
@@ -137,11 +141,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
     return loadSettings();
   });
   handle(IPC.testConnection, async (): Promise<TestConnectionResult> => {
-    const apiClient = client();
-    const { apiBase, authEndpoint } = await apiClient.testConnection();
-    // a cheap authorized call proves the whole chain
-    await apiClient.listProjects(1);
-    return { ok: true, message: 'Connected', apiBase, authEndpoint };
+    return client().testConnection();
   });
 
   // ---- dialogs / fs --------------------------------------------------------
@@ -151,6 +151,11 @@ export function registerIpcHandlers(ctx: IpcContext): void {
       properties: ['openDirectory', 'createDirectory']
     });
     return result.canceled ? null : await folders.grant(result.filePaths[0]);
+  });
+
+  handle(IPC.selectCli, async (): Promise<string | null> => {
+    const result = await dialog.showOpenDialog(ctx.getWindow()!, { properties: ['openFile'], title: 'Select the official Checkmarx CLI executable' });
+    return result.canceled ? null : result.filePaths[0];
   });
 
   handle(IPC.authorizeFolder, (folder: string) => folders.grant(folder));
@@ -252,31 +257,12 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   });
 
   handle(IPC.resultsTriage, async (req: TriageRequest) => {
-    const { finding, state, severity, comment } = req;
+    const { comment } = req;
     if (!comment.trim()) {
       throw new Error('A comment is required when changing a result state.');
     }
-    const apiClient = client();
-    if (finding.type === 'sca') {
-      if (!finding.packageName) throw new Error('SCA finding has no package name — cannot triage.');
-      await apiClient.triageSca({
-        packageName: finding.packageName,
-        packageVersion: finding.packageVersion ?? '',
-        vulnerabilityId: finding.cve ?? finding.id,
-        projectIds: [finding.projectId],
-        actions: [{ ActionType: 'ChangeState', Value: state, Comment: comment }]
-      });
-      } else {
-        // sast / kics / other scanners use similarity-id predicates
-        await apiClient.triageSast({
-          similarityId: finding.similarityId,
-          projectId: finding.projectId,
-          state,
-          severity: severity ?? finding.severity,
-          comment
-        });
-      }
-      return true;
+    await client().triage(req);
+    return true;
   });
 
   // ---- export ---------------------------------------------------------------

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- Run the installed official Checkmarx CLI for scans, projects, history, reports and triage.
+- Add CLI executable discovery, a file picker, explicit configuration-file selection and CLI connection testing.
+- Use existing CLI authentication by default, with optional Marx-managed API-key forwarding through the child environment.
+- Show CLI submission and live output, bound subprocess resources, and report uncertain remote submission or cancellation outcomes.
+- Preserve scan options, exclusions, batch scanning, story checks and structured findings.
+- Add CLI process/adapter tests and an isolated Electron acceptance harness.
+
 ## 0.5.0 — 2026-10-29
 
 - Add unsigned Windows x64 and ARM64 NSIS installers, native window chrome, platform shortcuts and Windows folder-name handling.

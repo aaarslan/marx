@@ -6,7 +6,7 @@ Marx is a young client. Local unit tests, mock transports and sample-data UI che
 
 The following still require a real API key and tenant:
 
-- Authentication and discovered endpoint persistence.
+- CLI authentication and organization-specific proxy/certificate configuration.
 - Complete SAST/SCA scan submission, execution and notification delivery/click behavior.
 - Live result fetching, SAST/SCA triage and story-check comparison.
 - Scan-summary counts compared with the web UI, including omitted-zero or nested-engine payloads.
@@ -17,12 +17,17 @@ Treat these as unverified integration paths, not as passed checks.
 
 ## Data and workflow bounds
 
-- **Uploads:** one presigned PUT, capped at approximately 900 MiB. Multipart uploads are not implemented.
+- **CLI required:** Marx uses an installed official `cx` executable. It does not bundle, download or update it. CLI 2.3.69 was checked locally; older versions may lack required flags. An unsupported command fails visibly without falling back to direct HTTP.
+- **Uploads:** packaging, upload limits and multipart handling belong to the selected CLI. Source still leaves the laptop for Checkmarx One analysis.
+- **Environment:** desktop apps may not inherit variables exported only in an interactive shell. Select the working CLI executable and, where needed, its explicit configuration file. Marx inherits its launch environment and does not source shell startup files.
 - **Results:** at most 5,000 findings are loaded. The UI warns when results are incomplete, exports contain only loaded findings, and diff/verdict are suppressed for incomplete data.
-- **Projects:** discovery currently loads up to 1,000 projects. Automatic creation is blocked if the list is incomplete and no matching project was found. Projects beyond the cap need a future paginated picker or a verified server-side lookup.
-- **Unknown submission outcomes:** a timed-out scan or project creation request may already have been accepted remotely. Do not automatically retry a mutation whose outcome is unknown; reconcile it in Checkmarx One first.
-- **Cancellation:** canceling after a project-creation request has been dispatched can leave an empty remote project.
+- **Projects:** the picker loads up to 1,000 projects. Submission performs a name-filtered lookup and blocks ambiguous or mismatched existing selections because the CLI creates scans by project name. Project creation is handled by the CLI.
+- **Unknown submission outcomes:** a canceled, failed or timed-out submission may already have been accepted remotely. Marx does not retry scan submissions and disables the CLI’s network retry for them. If no scan ID was captured, reconcile in Checkmarx One before retrying.
+- **Cancellation:** Marx terminates the local command and, when a scan ID is known, requests remote cancellation through the CLI. Killing a local process alone does not prove remote cancellation. Cancellation failures are shown explicitly. An empty project or accepted scan can remain if the command stops before returning its ID.
 - **Superseded fetches:** stale renderer results are ignored, but a superseded main-process result fetch is not currently canceled. Fetch concurrency is bounded per operation rather than globally across rapid navigation.
+- **Monitoring:** local CLI-capacity failures have bounded retries. Unrecognized statuses are sampled three times; persistent unknowns or exhausted monitoring requests stop local monitoring with remote status Unknown, rather than claiming the remote scan failed. Summary command failures are logged and do not turn a remotely completed scan into a failed scan.
+- **Process/report limits:** at most eight active scan jobs and twelve simultaneous CLI processes; excess operations fail as busy. Commands have timeouts, stdout/stderr capture is capped at 32 MiB, and reports larger than 64 MiB are not loaded. Reports are deleted after reading. A scan submission can run for up to 30 minutes, monitoring for up to 24 hours, and a report command for up to 10 minutes.
+- **SCA triage:** the CLI requires package name, version, manager and vulnerability ID. Incomplete metadata blocks triage and directs users to Checkmarx One.
 - **Session retention:** renderer job history and per-job logs are retained for the app session. Logs are capped per job; long unattended sessions have not been fully qualified.
 
 ## Platform and accessibility

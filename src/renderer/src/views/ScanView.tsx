@@ -1,3 +1,4 @@
+import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Zap, FolderOpen, Settings2, ShieldCheck } from 'lucide-react';
@@ -52,7 +53,7 @@ export function ScanView() {
   }, [defaults]);
 
   useEffect(() => {
-    if (settings?.hasApiKey) {
+    if (hasScanCredentials(settings)) {
       api.projects
         .list()
         .then((ps) => {
@@ -63,9 +64,9 @@ export function ScanView() {
             setProjectMode('new');
           }
         })
-        .catch(() => setProjects([]));
+        .catch((error) => { setProjects([]); setError(error instanceof Error ? error.message : String(error)); });
     }
-  }, [settings?.hasApiKey]);
+  }, [settings?.cliAuthMode, settings?.hasApiKey, settings?.cliPath, settings?.cliConfigPath]);
 
   const folderRequest = useRef(0);
   const pickFolder = async (path: string) => {
@@ -95,7 +96,7 @@ export function ScanView() {
     Boolean(folder) &&
     options.scanners.length > 0 &&
     (projectMode === 'new' ? projectName.trim().length > 0 : Boolean(projectId)) &&
-    Boolean(settings?.hasApiKey);
+    Boolean(hasScanCredentials(settings));
 
   const running =
     currentJob != null &&
@@ -182,10 +183,10 @@ export function ScanView() {
 <div className="page-eyebrow">Source security</div>
       <h1 className="page-title">Scan a project</h1>
       <p className="page-sub">
-        Find vulnerabilities before your next pull request. Choose a folder to run SAST and SCA with Checkmarx One.
+        Choose a folder and Marx runs the official Checkmarx CLI for you. Source is uploaded to Checkmarx One for analysis.
       </p>
 
-      {!settings?.hasApiKey && (
+      {!hasScanCredentials(settings) && (
         <Banner kind="warn" action={<button className="btn small" onClick={() => setView('settings')}>Set up connection</button>}>
           Connect your Checkmarx One account to run a scan. You can choose a source folder first.
         </Banner>
@@ -276,7 +277,7 @@ export function ScanView() {
               <Zap size={14} />
               Story check
             </button>
-            {!settings?.hasApiKey && <span className="faint">Connect your account in Settings to start.</span>}
+            {!hasScanCredentials(settings) && <span className="faint">Connect your account in Settings to start.</span>}
             {!options.sastIncremental && options.scanners.includes('sast') && (
               <span className="faint">full SAST scan — first scan on a project should be full</span>
             )}

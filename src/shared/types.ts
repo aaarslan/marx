@@ -24,6 +24,9 @@ export type ResultState =
 export type ResultStatus = 'NEW' | 'RECURRENT' | 'FIXED' | 'UNCHANGED';
 
 export interface Settings {
+  cliPath: string;
+  cliConfigPath: string;
+  cliAuthMode: 'cli' | 'marx';
   /** Optional explicit AST base URL, e.g. https://<tenant>.ast.checkmarx.net.
    *  When empty, derived from the access token's ast-base-url claim. */
   baseUrl: string;
@@ -63,6 +66,7 @@ export interface ScanOptions {
 
 export type ScanPhase =
   | 'idle'
+  | 'submitting'
   | 'resolving-project'
   | 'zipping'
   | 'uploading'
@@ -178,6 +182,7 @@ export interface Finding {
   /** SCA extras */
   packageName?: string;
   packageVersion?: string;
+  packageManager?: string;
   recommendedVersion?: string;
   isDirectDependency?: boolean;
   fixLink?: string;
@@ -199,6 +204,8 @@ export interface TriageRequest {
 }
 
 export interface TestConnectionResult {
+  cliPath?: string;
+  cliVersion?: string;
   ok: boolean;
   message: string;
   apiBase?: string;
@@ -246,6 +253,9 @@ export const DEFAULT_EXCLUDES = [
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
+  cliPath: '',
+  cliConfigPath: '',
+  cliAuthMode: 'cli',
   baseUrl: '',
   tenant: '',
   hasApiKey: false,
@@ -260,3 +270,7 @@ export const DEFAULT_SETTINGS: Settings = {
     batchConcurrency: 2
   }
 };
+
+export function hasScanCredentials(settings: Settings | null | undefined): settings is Settings {
+  return Boolean(settings && (settings.cliAuthMode === 'cli' || settings.hasApiKey));
+}

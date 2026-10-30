@@ -477,7 +477,7 @@ export interface CxResult {
     nodes?: CxResultNode[];
     // SCA
     scaType?: string;
-    packageIdentifier?: { name?: string; version?: string };
+    packageIdentifier?: { name?: string; version?: string; packageManager?: string };
     recommendedVersion?: string;
     scaPackageData?: {
       isDirectDependency?: boolean;

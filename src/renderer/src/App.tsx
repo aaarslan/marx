@@ -1,3 +1,4 @@
+import { hasScanCredentials } from '@shared/types';
 import React, { lazy, Suspense, useEffect } from 'react';
 import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
 import { useApp, type View } from './store';
@@ -60,9 +61,9 @@ export function App() {
             </button>
           ))}
           <div className="nav-spacer" />
-          <button className="connection-status" aria-label={settings?.hasApiKey ? 'Manage connection' : 'Set up connection'} title="Connection settings" onClick={() => setView('settings')}>
-            <span className={`connection-dot ${settings?.hasApiKey ? 'configured' : ''}`} />
-            <span>{settings?.hasApiKey ? 'API key saved' : 'Set up connection'}<small>{settings?.hasApiKey ? 'Manage access and defaults' : 'Connect to start scanning'}</small></span>
+          <button className="connection-status" aria-label={hasScanCredentials(settings) ? 'Manage connection' : 'Set up connection'} title="Connection settings" onClick={() => setView('settings')}>
+            <span className={`connection-dot ${hasScanCredentials(settings) ? 'configured' : ''}`} />
+            <span>{hasScanCredentials(settings) ? 'Checkmarx CLI' : 'Set up connection'}<small>{hasScanCredentials(settings) ? 'Manage CLI and defaults' : 'Connect to start scanning'}</small></span>
             <SettingsIcon size={14} aria-hidden="true" />
           </button>
         </aside>

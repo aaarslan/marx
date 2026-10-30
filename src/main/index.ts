@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, shell } from 'electron';
 import path from 'node:path';
 import { registerIpcHandlers } from './ipc';
+import { stopCliProcesses } from './cliProcess';
 
 if (process.env.MARX_USER_DATA_DIR) app.setPath('userData', process.env.MARX_USER_DATA_DIR);
 
@@ -138,6 +139,8 @@ app.whenReady().then(() => {
     else focusWindow();
   });
 });
+
+app.on('before-quit', stopCliProcesses);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

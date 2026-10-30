@@ -1,80 +1,44 @@
-# Checkmarx One API contracts
+# Checkmarx One CLI contracts
 
-Marx talks directly to Checkmarx One. These implementation notes replace the development research dump and preserve the contracts covered by the tests.
+Marx runs the official installed `cx` executable. Production IPC handlers use `src/main/cxone/cli.ts`; they do not instantiate the legacy HTTP client or call the custom ZIP/upload functions. The legacy HTTP helpers remain as reference and test coverage, and are excluded from the built main-process bundle.
 
-Request shapes were checked against the official [Checkmarx AST CLI](https://github.com/Checkmarx/ast-cli) source on October 29, 2026. That research used upstream `main` and did not record an immutable commit. Recheck the official source before changing a contract; do not treat these notes as a substitute for real tenant validation.
+The checked baseline is official [CLI release 2.3.69](https://github.com/Checkmarx/ast-cli/releases/tag/2.3.69). Its macOS universal archive SHA-256 is `3f7314f9a8c766e11bac53705573472fd356ded7fe58036ed702a54a82a4303d`, matching the release checksums. Source formats were inspected at upstream commit `df0e6114d8cfc29848b8f3fb9ed54a51ddcc27e9`. The real binary’s version and help commands were run locally; authenticated tenant execution remains unverified.
 
-## Authentication
+## Execution and authentication
 
-The API key is exchanged as a refresh token at the token endpoint derived from its JWT `aud` claim. The form-encoded request uses:
+- Resolve an explicit absolute executable path first, or discover `cx` / `cx.exe` from absolute PATH entries. macOS discovery also checks Homebrew locations. A configured-path failure never selects another executable.
+- Launch with argument arrays and `shell: false`; the source directory is an absolute `--file-source` value. Commands run from the user home directory, avoiding executable or configuration lookup from the scanned project.
+- Native mode inherits the CLI’s configuration and launch environment. An optional absolute `--config-file-path` selects an existing CLI configuration file.
+- Marx-managed mode supplies `CX_APIKEY`, optionally `CX_BASE_URI` and `CX_TENANT`, only to the child environment. No key is added to argv or written to CLI configuration.
+- Connection testing runs `version`, `auth validate`, and a one-project list query. Successful authentication alone does not establish upload permission.
 
-| Field | Value |
+## Commands
+
+| Operation | CLI command and structured output |
 | --- | --- |
-| `grant_type` | `refresh_token` |
-| `client_id` | JWT `azp` claim, with the supported default when absent |
-| `refresh_token` | The supplied API key |
+| Projects | `project list --format=json --filter=limit=100,offset=0,sort=name`, paged to 1,000 |
+| Submission | `scan create --file-source=<folder> --project-name=<name> --branch=<branch> --scan-types=sast,sca --async --scan-info-format=json --retry=0` |
+| Monitoring | `scan show --scan-id=<id> --format=json`, every five seconds |
+| History | `scan list --format=json --filter=limit=50,sort=-created_at` |
+| Cancellation | `scan cancel --scan-id=<id> --retry=0` |
+| Findings | `results show --scan-id=<id> --report-format=json --output-name=report --output-path=<private temporary directory>` |
+| Counts | The same report command with `--report-format=summaryJSON` |
+| Triage | `triage update` with project, scanner, state, comment and scanner-specific identity flags; `--retry=0` |
 
-The access token supplies `ast-base-url` for API discovery. Settings allow explicit connection overrides. Token refresh is shared between concurrent operations; a 401 is retried only once.
+Submission explicitly maps SAST preset, incremental/full mode, optional base branch, SCA Exploitable Path, and scan tags. Marx’s effective default and custom exclusions use `--skip-default-filter` plus CLI file filters. Basename patterns use `--file-filter`; path patterns use `--file-filter-ext`. `.git` is also covered by `--exclude-git-folder` when it is in the effective exclusion list. Commas and newlines in exclusion patterns are rejected because those CLI options use comma delimiters. Colons, commas and newlines inside tag names or values are rejected before submission because the CLI would otherwise truncate or split them.
 
-Implementation: `src/main/cxone/jwt.ts` and `src/main/cxone/client.ts`. Tests: `tests/jwt.test.ts` and `tests/client.test.ts`.
+The CLI selects projects by name. Before submission Marx runs a name-filtered lookup, rejects duplicate exact names or a mismatch with the selected project ID, and validates the returned project ID. If a name-resolution race submits to an unexpected project, Marx requests cancellation of that exact newly returned scan and reports the mismatch. CLI creation of a new project remains a remote mutation.
 
-## Projects and upload
+## JSON output
 
-- `GET api/projects?limit=…&offset=…&sort=name` returns project pages and a total count when available.
-- `POST api/projects` uses `{name, mainBranch?, tags?}`. The scanner only creates a project after a complete lookup establishes absence. A positive name match can be reused even from a capped list.
-- `POST api/uploads` returns a presigned URL.
-- `PUT` to that URL sends raw ZIP bytes and a content length. The Checkmarx authorization header is not sent to the upload endpoint.
+Project and scan commands return views with fields such as `ID`, `Name`, `ProjectID`, `ProjectName`, `Status`, `Branch`, `CreatedAt` and `MainBranch`. The adapter accepts their lower-case API equivalents too. Metadata parsing tolerates diagnostic text surrounding a JSON document.
 
-Local completeness metadata is not part of the server response contract. Missing totals, partial pages and malformed listings must not silently establish that a project does not exist.
+The `json` findings report supplies `results`, `totalCount` and `scanID`. The CLI’s null result slice is accepted as empty only when the explicit total is zero. Reports without an explicit valid total or with a mismatched scan ID are rejected. Marx displays at most 5,000 findings and preserves truncation metadata. SCA report string identifiers and string locations are adapted to the existing findings model; exact name/version metadata comes from matching dependency-path entries. Missing metadata does not establish triage eligibility.
 
-Implementation: `src/main/cxone/client.ts` and `src/main/scanRunner.ts`. Tests: `tests/projects.test.ts` and `tests/review.test.ts`.
+The `summaryJSON` report supplies `CriticalIssues`, `HighIssues`, `MediumIssues`, `LowIssues` and `InfoIssues`. Every count must be a nonnegative integer; an unavailable or unrecognized report remains unavailable rather than displaying zero vulnerabilities.
 
-## Scan creation
+## Cancellation and failure
 
-`POST api/scans` uses this structure for local-folder scans:
+Commands have bounded timeouts, captured output and concurrency. Monitoring retries local capacity failures at most five times with exponential backoff and jitter (under one minute of backoff). An initial New status is treated as queued; three consecutive unknown statuses stop local monitoring without claiming a remote failure. Cancellation sends SIGTERM, followed by SIGKILL after three seconds if necessary. The runner remembers submitted scan identity and uses the CLI to request remote cancellation when known. An interrupted submission without an ID is reported as an unknown remote outcome. Scan creation and triage are never automatically retried by Marx; submission passes `--retry=0` to the CLI too.
 
-```json
-{
-  "type": "upload",
-  "handler": {
-    "branch": "main",
-    "uploadUrl": "<presigned upload URL>"
-  },
-  "project": { "id": "<project ID>" },
-  "config": [
-    {
-      "type": "sast",
-      "value": {
-        "presetName": "Checkmarx Default",
-        "incremental": "false"
-      }
-    },
-    { "type": "sca", "value": {} }
-  ]
-}
-```
-
-Scanner entries are included only when selected. The SAST incremental value is a string. Incremental scans can include `baseBranch`. SCA Exploitable Path uses the case-sensitive key `ExploitablePath` with value `"true"`. Nonempty scan tags are sent at the top level.
-
-Implementation: `buildScanRequest` in `src/main/scanRunner.ts`. Tests: `tests/scanRunner.test.ts`.
-
-## Polling, results and cancellation
-
-- `GET api/scans/{id}` supplies status and queue information. Known terminal statuses include Completed, Partial, Failed and Canceled.
-- `PATCH api/scans/{id}` uses `{ "status": "Canceled" }`.
-- `GET api/results?scan-id=…&limit=…&offset=…` supplies paged findings.
-- `GET api/scan-summary?scan-id=…` is best-effort. Unknown summary shapes remain unavailable rather than displaying reassuring zero counts.
-
-SAST attack flows are read from `data.nodes`. SCA normalization handles dependency/package metadata and location entries. Actual tenant summary and SCA location payloads still need comparison with the Checkmarx One web UI.
-
-Implementation: `src/main/cxone/normalize.ts`, `src/main/cxone/client.ts` and `src/main/scanRunner.ts`.
-
-## Triage
-
-- SAST predicates go to `POST api/sast-results-predicates` as an array.
-- SCA updates go to `POST api/sca/management-of-risk/package-vulnerabilities` as a single object.
-- Result identity, project, state, severity and comment fields must preserve the endpoint-specific model. The UI requires a comment before submitting a change.
-
-Implementation: the triage methods in `src/main/cxone/client.ts`, with IPC mapping in `src/main/ipc.ts`.
-
-No credentials or real tenant payloads are included in these notes or the test fixtures.
+`tests/cliProcess.test.ts` exercises actual local child processes; `tests/cliClient.test.ts` checks commands and report handling with a mocked process transport. `bun run verify:cli` exercises the built Electron application with an isolated synthetic CLI, source folder and user-data profile. These checks make no live tenant calls and do not prove your organization’s upload permissions.
