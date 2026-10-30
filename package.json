@@ -1,0 +1,57 @@
+{
+  "name": "marx",
+  "productName": "Marx",
+  "version": "0.5.0",
+  "description": "A desktop client for Checkmarx One SAST and SCA scans",
+  "main": "./out/main/index.js",
+  "author": "Marx contributors",
+  "license": "MIT",
+  "scripts": {
+    "dev": "bun --bun electron-vite dev",
+    "typecheck": "bun --bun tsc --noEmit -p tsconfig.node.json && bun --bun tsc --noEmit -p tsconfig.web.json",
+    "test": "bun --bun vitest run",
+    "start": "bun --bun electron-vite preview",
+    "build": "bun --bun electron-vite build",
+    "dist": "bun run build && bun --bun electron-builder --publish never",
+    "dist:dir": "bun run build && bun --bun electron-builder --dir --publish never",
+    "screenshot": "bun run build && bun --bun electron scripts/capture-screenshot.cjs",
+    "audit": "bun audit",
+    "dist:mac": "bun run build && bun --bun electron-builder --mac --publish never",
+    "dist:win": "bun run build && bun --bun electron-builder --win --x64 --publish never",
+    "dist:win:dir": "bun run build && bun --bun electron-builder --win --x64 --dir --publish never",
+    "dist:win:arm64": "bun run build && bun --bun electron-builder --win --arm64 --publish never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/archiver": "8.0.0",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "archiver": "8.0.0",
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
+    "lucide-react": "1.64.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5",
+    "zustand": "5.0.16"
+  },
+  "packageManager": "bun@1.4.4",
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "private": true,
+  "keywords": [
+    "checkmarx",
+    "sast",
+    "sca",
+    "electron",
+    "macos",
+    "security",
+    "windows"
+  ]
+}
