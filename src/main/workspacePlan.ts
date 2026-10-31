@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import picomatch from 'picomatch';
 import type { WorkspacePlan, WorkspaceProject } from '@shared/workspace';
 
 const exec = promisify(execFile);
@@ -98,7 +99,7 @@ function contained(root: string, folder: string): string | null {
 export function discoverWorkspace(root: string): WorkspacePlan {
   const rootPath = fs.realpathSync(root);
   const warnings: string[] = [];
-  const selectors: { exclude: boolean; pattern: string }[] = [];
+  const selectors: { exclude: boolean; matches: (value: string) => boolean }[] = [];
   for (const entry of patterns(rootPath, warnings)) {
     const exclude = entry.startsWith('!');
     const value = (exclude ? entry.slice(1) : entry).replace(/^\.\//, '').replace(/\/$/, '');
@@ -108,7 +109,7 @@ export function discoverWorkspace(root: string): WorkspacePlan {
     }
     for (const item of expand(value, warnings)) {
       if (selectors.length >= MAX_SELECTORS) break;
-      selectors.push({ exclude, pattern: item });
+      selectors.push({ exclude, matches: picomatch(item, { nonegate: true, windows: false, strictSlashes: true }) });
     }
     if (selectors.length >= MAX_SELECTORS) { warnings.push('Discovery reached its 1,000 expanded-pattern limit. Review missing packages manually.'); break; }
   }
@@ -136,8 +137,8 @@ export function discoverWorkspace(root: string): WorkspacePlan {
     } catch { warnings.push('Some workspace directories could not be read. Review the discovered folders.'); }
     finally { directory?.closeSync(); }
     const relative = path.relative(rootPath, canonical).split(path.sep).join('/');
-    const included = selectors.some((selector) => !selector.exclude && path.matchesGlob(relative, selector.pattern));
-    const excluded = selectors.some((selector) => selector.exclude && path.matchesGlob(relative, selector.pattern));
+    const included = selectors.some((selector) => !selector.exclude && selector.matches(relative));
+    const excluded = selectors.some((selector) => selector.exclude && selector.matches(relative));
     const isProject = entries.some((entry) => (entry.isFile() && (MARKERS.has(entry.name) || entry.name.endsWith('.csproj'))) || (entry.name === '.git' && !entry.isSymbolicLink() && (entry.isFile() || entry.isDirectory())));
     if (current.depth > 0 && !excluded && (included || current.depth === 1) && isProject) folders.add(canonical);
     if (current.depth > 0 && !selectors.length) continue;

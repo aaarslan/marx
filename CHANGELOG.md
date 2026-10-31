@@ -11,6 +11,7 @@
 - Discover nested npm/Yarn/pnpm workspaces, suggest affected packages, configure exact project mappings and per-item options in Batch, and page project-scoped history.
 - Import complete CLI reports within the existing size bound, parse report JSON in a worker, schedule CLI work centrally, and cancel superseded imports safely.
 - Export official SARIF and complete remediation bundles. Remove unused HTTP, JWT and ZIP implementations and their obsolete dependencies/tests.
+- Replace npm minimatch implementations with Picomatch in workspace discovery and packaging, migrate ASAR crawling to fdir, preserve literal mapped/unpacked filenames, enforce archive link containment, and add reproducible packaging contract checks.
 
 ## 0.8.1
 
