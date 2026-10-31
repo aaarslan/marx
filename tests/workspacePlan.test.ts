@@ -41,6 +41,20 @@ describe('workspace plans', () => {
     expect(discoverWorkspace(folder).projects.map((item) => item.name)).toEqual(['one', 'two']);
   });
 
+  it('matches bounded workspace selectors with braces, globstars and case-sensitive exclusions', () => {
+    const folder = root();
+    write(folder, 'package.json', JSON.stringify({ workspaces: ['!packages/**/libx', 'packages/**/lib?', 'apps/{api,web}/packages/*'] }));
+    pkg(folder, 'packages/liba', 'root-library');
+    pkg(folder, 'packages/nested/libb', 'nested-library');
+    pkg(folder, 'packages/nested/libx', 'excluded');
+    pkg(folder, 'packages/nested/LibC', 'wrong-case');
+    pkg(folder, 'apps/api/packages/shared', 'api-shared');
+    pkg(folder, 'apps/web/packages/shared', 'web-shared');
+    pkg(folder, 'apps/api/packages/shared/deeper', 'too-deep');
+    pkg(folder, 'apps/mobile/packages/shared', 'unselected');
+    expect(discoverWorkspace(folder).projects.map((item) => item.name).sort()).toEqual(['api-shared', 'nested-library', 'root-library', 'web-shared']);
+  });
+
   it('marks changed packages and transitive dependents, then all projects for shared changes', async () => {
     const folder = root();
     write(folder, 'package.json', JSON.stringify({ workspaces: ['packages/*'] }));

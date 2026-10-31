@@ -11,6 +11,7 @@
     "typecheck": "bun --bun tsc --noEmit -p tsconfig.node.json && bun --bun tsc --noEmit -p tsconfig.web.json",
     "test": "bun --bun vitest run",
     "verify:cli": "bun run build && bun --bun electron scripts/verify-cli.cjs",
+    "verify:packaging": "bun scripts/verify-packaging.cjs",
     "start": "bun --bun electron-vite preview",
     "build": "bun run clean:dist && bun --bun electron-vite build",
     "dist": "bun run build && bun --bun electron-builder --publish never",
@@ -26,6 +27,7 @@
   "dependencies": {},
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@types/picomatch": "4.0.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
@@ -33,12 +35,49 @@
     "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",
     "lucide-react": "1.64.0",
+    "picomatch": "4.0.7",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5",
     "zustand": "5.0.16"
+  },
+  "overrides": {
+    "@electron/asar>glob": "npm:fdir@6.5.0",
+    "@electron/asar>minimatch": "npm:picomatch@4.0.7",
+    "@electron/universal>minimatch": "npm:picomatch@4.0.7",
+    "app-builder-lib>ejs": "5.0.2",
+    "app-builder-lib>minimatch": "npm:picomatch@4.0.7",
+    "dir-compare>minimatch": "npm:picomatch@4.0.7"
+  },
+  "packageExtensions": {
+    "@electron/asar@3.4.1": {
+      "dependencies": {
+        "fdir": "6.5.0",
+        "picomatch": "4.0.7"
+      }
+    },
+    "@electron/universal@2.0.3": {
+      "dependencies": {
+        "picomatch": "4.0.7"
+      }
+    },
+    "app-builder-lib@26.18.0": {
+      "dependencies": {
+        "picomatch": "4.0.7"
+      },
+      "peerDependenciesMeta": {
+        "electron-builder-squirrel-windows": {
+          "optional": true
+        }
+      }
+    },
+    "dir-compare@4.2.0": {
+      "dependencies": {
+        "picomatch": "4.0.7"
+      }
+    }
   },
   "packageManager": "bun@1.4.4",
   "engines": {
@@ -53,5 +92,11 @@
     "macos",
     "security",
     "windows"
-  ]
+  ],
+  "patchedDependencies": {
+    "app-builder-lib@26.18.0": "patches/app-builder-lib@26.18.0.patch",
+    "@electron/asar@3.4.1": "patches/@electron%2Fasar@3.4.1.patch",
+    "@electron/universal@2.0.3": "patches/@electron%2Funiversal@2.0.3.patch",
+    "dir-compare@4.2.0": "patches/dir-compare@4.2.0.patch"
+  }
 }

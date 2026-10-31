@@ -135,6 +135,7 @@ The app uses Electron, React, TypeScript and Zustand. Bun handles installation, 
 | `bun run dev` | Launch the development app |
 | `bun run typecheck` | Check main/preload and renderer TypeScript projects |
 | `bun run test` | Run the local Vitest suite |
+| `bun run verify:packaging` | Check dependency replacements, file selection and ASAR behavior |
 | `bun run build` | Remove previous `dist/` artifacts and compile the application |
 | `bun run start` | Preview an existing build |
 | `bun run clean:dist` | Remove all distribution artifacts |
