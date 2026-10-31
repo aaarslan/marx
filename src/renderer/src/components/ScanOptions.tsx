@@ -1,5 +1,5 @@
 import { folderName } from '@shared/path';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FolderOpen, UploadCloud, Check, ArrowUpRight } from 'lucide-react';
 import type { ScanJobState, ScanOptions, ScannerType } from '@shared/types';
 import { SEVERITY_COLOR } from '@shared/severity';
@@ -15,10 +15,14 @@ export function Dropzone({
   onPick: (path: string) => void;
   hint: string;
 }) {
+  const target = useRef<HTMLButtonElement>(null);
+  useEffect(() => api.onFolderDrop(folder => { if (target.current?.getClientRects().length) {setDropError(null);onPick(folder);} }), [onPick]);
   const [over, setOver] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
   return (
     <button
+      ref={target}
+      data-file-drop-target
       type="button"
       className={`dropzone ${over ? 'over' : ''} ${folder ? 'has-folder' : ''}`}
       aria-label={folder ? `Change project folder: ${folder}` : 'Choose a project folder'}
@@ -33,10 +37,7 @@ export function Dropzone({
         e.preventDefault();
         setOver(false);
         setDropError(null);
-        const file = e.dataTransfer.files[0];
-        try {
-          if (file) { const path = await api.fs.pathForFile(file); if (path) onPick(path); }
-        } catch (error) { setDropError(error instanceof Error ? error.message : String(error)); }
+
       }}
     >
       <span className="dropzone-topline"><span>{folder ? 'Source folder' : 'Local source'}</span><kbd>{commandKey}O</kbd></span>

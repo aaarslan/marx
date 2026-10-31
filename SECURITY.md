@@ -13,9 +13,9 @@ Security fixes target the latest version. A clean dependency audit does not esta
 - The selected official Checkmarx CLI archives source locally and uploads it to Checkmarx One. Marx does not upload source through its own HTTP implementation. Default exclusions can be overridden; review the files you intend to send.
 - Source archive handling belongs to the selected CLI. Marx's JSON and SARIF reports use private temporary directories and are removed after reading.
 - CLI processes are launched with separate arguments and no shell. Native CLI configuration is the default; optional Marx-managed keys are passed through the child environment. Marx does not rewrite the CLI configuration. Known environment secrets, JWTs and signed upload URL parameters are redacted from captured CLI output; logs and reports can still contain source and finding information.
-- Settings are stored under Electron's per-user application-data directory. The API key is stored in a separate credential file, encrypted with Electron `safeStorage`. Protected OS storage is required for Marx-managed credentials.
-- On macOS, `safeStorage` uses Keychain-backed encryption; on Windows it uses DPAPI. If protected encryption is unavailable, Marx refuses to save or decrypt credentials. Legacy plaintext and unreadable key files are preserved and blocked until explicitly replaced or removed. Native CLI authentication remains available. Files request mode `0600` on POSIX systems; Windows protection depends on the user-profile directory ACLs.
-- The renderer uses context isolation, a sandboxed preload and no Node integration. Main-process source access requires a selected or previously authorized folder, and snippet reads require a matching repository-to-project mapping and enforce path containment and size limits.
+- Settings use the per-user `MarxWails` application-data directory, or an explicitly selected disposable test profile. A separate credential file is encrypted using Windows DPAPI. Protected OS storage is required for Marx-managed credentials.
+- DPAPI encryption/decryption runs in the Go host helper with bounded stdin/stdout pipes; credentials are never passed as command-line arguments. Plaintext fallback is disabled. Electron credential files are not migrated.
+- The interface runs in WebView2 without Node integration. CSP disables frames, objects, remote scripts, forms, and remote resources. The asset middleware denies frame requests and sets frame-ancestor and MIME protections. Native operations pass through the Go host and bounded sidecar protocol. Source access requires an authorized folder and matching project mapping, with containment and size checks.
 - Repository mappings store canonical folder paths, project IDs and names, and a SHA-256 configuration fingerprint. Configuration contents and credentials are not stored in the mapping file. CLI profile or environment changes invalidate the mapping; a project-ID lookup is checked before submission.
 - The workbench database stores normalized findings, source and configuration fingerprints, scan options, job logs, remediation notes and assistant handoffs. This evidence is not encrypted by Marx and can contain source fragments or sensitive project information. Database, WAL and SHM files request `0600` on POSIX; Windows relies on profile directory ACLs. No CLI configuration contents or credentials are intentionally added to the database.
 - Session evidence is pinned separately from refreshed results. Cleanup preserves evidence referenced by a session or unresolved job. Explicitly deleting a session removes its pinned copies; SQLite deletion is not guaranteed secure erasure. Protect device backups and exported bundles separately.
@@ -25,8 +25,12 @@ Never commit application-support data, environment secrets, signing keys or priv
 
 ## Distribution
 
-Local macOS builds are ad-hoc signed, not notarized. Approve only builds you trust through the macOS security controls. The current signing workflow does not use a Developer ID certificate or a private signing key in this repository.
+Windows x64 installers are unsigned and do not provide a verified publisher identity. This branch has not qualified macOS or Linux packaging.
 
-Windows installers are unsigned and do not provide a verified publisher identity. The macOS signing hook is skipped on Windows.
+## Wails framework limitation
 
-See [current limitations](docs/limitations.md) for integration and validation boundaries.
+Wails 3.0.0's release notes identify GHSA-2p5f-2gx8-mh8m as partly fixed. Embedded child frames can still access bound methods in some configurations, including the HTTP runtime endpoint. Marx does not embed external pages or frames and sends external links to the system browser. CSP and request middleware block frames; these are application mitigations, not a claim that the framework is fully patched. Do not add embedded content without reevaluating this boundary. Go vulnerability scans currently do not report this release-note limitation.
+
+Never publish local account paths, profile names, machine inventories, private findings, logs or credentials in verification records. Executables are built with Go path trimming and without VCS metadata. Audit generated assets and diffs before committing.
+
+See [current limitations](docs/limitations.md) and [Wails validation](docs/wails-migration.md).

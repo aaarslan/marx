@@ -1,4 +1,10 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import { Call, Events } from '@wailsio/runtime';
+const ipcRenderer = {
+  invoke: (channel: string, ...args: unknown[]) => Call.ByName('main.DesktopService.Invoke', channel, args),
+  on: (channel: string, fn: (...args: any[]) => void) => { subscriptions.set(fn, Events.On(channel, event => fn(null, event.data))); },
+  removeListener: (_channel: string, fn: (...args: any[]) => void) => { subscriptions.get(fn)?.(); subscriptions.delete(fn); }
+};
+const subscriptions = new Map<Function, () => void>();
 import { IPC, type MenuAction } from '@shared/ipc';
 import type { MarxApi, SourceSnippet } from '@shared/api-contract';
 import type { FindingQuery, FindingQueryPage, RemediationSession, ScanComparison, WorkbenchBootstrap, WorkspaceState } from '@shared/workbench';
@@ -26,7 +32,7 @@ async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: MarxApi = {
-  platform: process.platform,
+  platform: 'win32',
   settings: {
     get: () => call<Settings>(IPC.settingsGet),
     save: (s: Partial<Settings>) => call<Settings>(IPC.settingsSave, s),
@@ -38,10 +44,6 @@ const api: MarxApi = {
     selectCli: () => call<string | null>(IPC.selectCli)
   },
   fs: {
-    pathForFile: (file: File) => {
-      const path = webUtils.getPathForFile(file);
-      return path ? call<string>(IPC.authorizeFolder, path) : Promise.resolve('');
-    },
     readSourceFile: (folder: string, relPath: string, line?: number, projectId?: string) =>
       call<SourceSnippet>(IPC.readSourceFile, folder, relPath, line, projectId),
     openInEditor: (folder, relPath, line, projectId, editor) => call<void>(IPC.openInEditor, folder, relPath, line, projectId, editor),
@@ -105,6 +107,7 @@ const api: MarxApi = {
   shell: {
     openExternal: (url: string) => call<void>(IPC.openExternal, url)
   },
+  onFolderDrop: listener => Events.On('source:dropped', event => listener(event.data as string)),
   onScanEvent: (listener: (event: ScanEvent) => void) => {
     const wrapped = (_e: unknown, payload: ScanEvent) => listener(payload);
     ipcRenderer.on(IPC.scanEvent, wrapped as never);
@@ -119,4 +122,4 @@ const api: MarxApi = {
 
 export type { MarxApi };
 
-contextBridge.exposeInMainWorld('marx', api);
+window.marx = api;

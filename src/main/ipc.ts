@@ -1,4 +1,4 @@
-import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, Notification, app, clipboard, dialog, ipcMain, shell } from './desktop';
 import fs from 'node:fs';
 import path from 'node:path';
 import { IPC } from '@shared/ipc';
@@ -110,7 +110,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
       }
       if (job.finishedAt) { mappedJobs.delete(job.id); jobs.delete(job.id); }
       else if (!jobs.has(job.id)) jobs.set(job.id, job);
-      // macOS notification when a scan settles (completed / failed / canceled)
+      // Desktop notification when a scan settles (completed / failed / canceled)
       const prev = jobPhase.get(job.id);
       const phase = job.progress.phase;
       if (job.finishedAt) jobPhase.delete(job.id);
@@ -388,7 +388,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
     if (Buffer.byteLength(text, 'utf8') > MAX_PROMPT_EXPORT_BYTES) throw new Error('This prompt exceeds 8 MiB. Select fewer findings and try again.');
     return text;
   };
-  handle(IPC.remediationCopy, (text: string) => { clipboard.writeText(requirePrompt(text)); });
+  handle(IPC.remediationCopy, async (text: string) => { await clipboard.writeText(requirePrompt(text)); });
   let savingPrompt = false;
   handle(IPC.remediationSave, async (input: { text: string; suggestedName: string }): Promise<string | null> => {
     if (savingPrompt) throw new Error('A prompt save dialog is already open.');

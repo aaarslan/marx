@@ -1,4 +1,4 @@
-import { app, safeStorage } from 'electron';
+import { app, safeStorage } from './desktop';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';

@@ -1,3 +1,7 @@
+# Wails branch limitations
+
+This branch replaces Electron with Wails 3.0.0 on Windows x64 and a compiled Bun workflow sidecar. The earlier Electron platform validation below is historical. Current Wails coverage and remaining gaps are recorded in [the migration report](wails-migration.md). Other platforms, Electron data migration, and live tenant acceptance are not qualified. The known Wails frame limitation and application mitigations are described in [SECURITY.md](../SECURITY.md).
+
 # Current limitations and validation gaps
 
 Marx is a young client. Local unit tests, mock transports and sample-data UI checks cover application behavior, but they do not prove acceptance by every Checkmarx One tenant.

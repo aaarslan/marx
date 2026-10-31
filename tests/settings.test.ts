@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const state = vi.hoisted(() => ({ folder: '', encrypted: true, failEncryption: false, decryptCalls: 0 }));
-vi.mock('electron', () => ({
+vi.mock('../src/main/desktop', () => ({
   app: { getPath: () => state.folder },
   safeStorage: {
     isEncryptionAvailable: () => state.encrypted,

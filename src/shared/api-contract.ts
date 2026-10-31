@@ -1,5 +1,4 @@
-// Renderer-side API surface implemented by the preload bridge.
-// Kept electron-free so both node and web tsconfigs can consume it.
+// Renderer-side API surface implemented by the Wails desktop bridge.
 
 import type {
   Finding,
@@ -40,7 +39,6 @@ export interface MarxApi {
     selectCli(): Promise<string | null>;
   };
   fs: {
-    pathForFile(file: File): Promise<string>;
     readSourceFile(folder: string, relPath: string, line?: number, projectId?: string): Promise<SourceSnippet>;
     openInEditor(folder: string, relPath: string, line: number, projectId: string, editor: 'code' | 'cursor'): Promise<void>;
     sourceStatus(folder: string, scanId: string): Promise<{ matches: boolean | null; message: string }>;
@@ -81,7 +79,7 @@ export interface MarxApi {
     query(scanId: string, query: FindingQuery): Promise<FindingQueryPage>;
     sarif(scanId: string): Promise<string | null>;
     triage(req: TriageRequest): Promise<boolean>;
-    /** Write findings to ~/Downloads and reveal in Finder; returns the file path */
+    /** Write findings to Downloads and reveal in the system file manager; returns the file path */
     export(format: 'csv' | 'json', label: string, findings: Finding[]): Promise<string>;
   };
   remediation: {
@@ -107,6 +105,7 @@ export interface MarxApi {
   shell: {
     openExternal(url: string): Promise<void>;
   };
+  onFolderDrop(listener: (folder: string) => void): () => void;
   onScanEvent(listener: (event: ScanEvent) => void): () => void;
   onMenuAction(listener: (action: MenuAction) => void): () => void;
 }
