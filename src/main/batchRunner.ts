@@ -12,18 +12,29 @@ export class BatchRunner {
 
   constructor(
     private readonly scanRunner: ScanRunner,
-    private readonly onJobsUpdated: (jobs: ScanJobState[]) => void
+    private readonly onJobsUpdated: (jobs: ScanJobState[]) => void,
+    private readonly onPrepared: (jobs: ScanJobState[]) => void = () => undefined
   ) {}
 
   async runAll(inputs: RunJobInput[], concurrency: number): Promise<ScanJobState[]> {
+    return this.startAll(inputs, concurrency).completion;
+  }
+
+  startAll(inputs: RunJobInput[], concurrency: number): { jobs: ScanJobState[]; completion: Promise<ScanJobState[]> } {
     if (this.running) throw new Error('A batch is already running.');
     this.running = true;
     const batchId = randomUUID();
     this.jobs = inputs.map((i) => Object.assign(this.scanRunner.newJob(i), { batchId }));
-    this.onJobsUpdated([...this.jobs]);
+    try {
+      this.onPrepared([...this.jobs]);
+      this.onJobsUpdated([...this.jobs]);
+    } catch (error) { this.running = false; throw error; }
+    return { jobs: [...this.jobs], completion: this.execute(concurrency) };
+  }
 
+  private async execute(concurrency: number): Promise<ScanJobState[]> {
     let cursor = 0;
-    const workers = Array.from({ length: Math.max(1, Math.min(8, Number.isFinite(concurrency) ? Math.floor(concurrency) : 1, inputs.length)) }, async () => {
+    const workers = Array.from({ length: Math.max(1, Math.min(8, Number.isFinite(concurrency) ? Math.floor(concurrency) : 1, this.jobs.length)) }, async () => {
       for (;;) {
         const idx = cursor++;
         if (idx >= this.jobs.length) return;

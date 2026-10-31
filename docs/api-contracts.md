@@ -19,10 +19,11 @@ The checked baseline is official [CLI release 2.3.69](https://github.com/Checkma
 | Projects | `project list --format=json --filter=limit=100,offset=0,sort=name`, paged to 1,000 |
 | Submission | `scan create --file-source=<folder> --project-name=<name> --branch=<branch> --scan-types=sast,sca --async --scan-info-format=json --retry=0` |
 | Monitoring | `scan show --scan-id=<id> --format=json`, every five seconds |
-| History | `scan list --format=json --filter=limit=50,sort=-created_at` |
+| History | `scan list --format=json --filter=limit=50,offset=0,project-id=<id>,sort=-created_at`, with optional project scope and paging |
 | Cancellation | `scan cancel --scan-id=<id> --retry=0` |
 | Findings | `results show --scan-id=<id> --report-format=json --output-name=report --output-path=<private temporary directory>` |
 | Counts | The same report command with `--report-format=summaryJSON` |
+| SARIF export | The same report command with `--report-format=sarif`; original validated SARIF 2.1.0 bytes are exported |
 | Triage | `triage update` with project, scanner, state, comment and scanner-specific identity flags; `--retry=0` |
 
 Submission explicitly maps SAST preset, incremental/full mode, optional base branch, SCA Exploitable Path, and scan tags. Marx’s effective default and custom exclusions use `--skip-default-filter` plus CLI file filters. Basename patterns use `--file-filter`; path patterns use `--file-filter-ext`. `.git` is also covered by `--exclude-git-folder` when it is in the effective exclusion list. Commas and newlines in exclusion patterns are rejected because those CLI options use comma delimiters. Colons, commas and newlines inside tag names or values are rejected before submission because the CLI would otherwise truncate or split them.
@@ -33,12 +34,18 @@ The CLI selects projects by name. Before submission Marx runs a name-filtered lo
 
 Project and scan commands return views with fields such as `ID`, `Name`, `ProjectID`, `ProjectName`, `Status`, `Branch`, `CreatedAt` and `MainBranch`. The adapter accepts their lower-case API equivalents too. Metadata parsing tolerates diagnostic text surrounding a JSON document.
 
-The `json` findings report supplies `results`, `totalCount` and `scanID`. The CLI’s null result slice is accepted as empty only when the explicit total is zero. Reports without an explicit valid total or with a mismatched scan ID are rejected. Marx displays at most 5,000 findings and preserves truncation metadata. SCA report string identifiers and string locations are adapted to the existing findings model; exact name/version metadata comes from matching dependency-path entries. Missing metadata does not establish triage eligibility.
+The `json` findings report supplies `results`, `totalCount` and `scanID`. The CLI’s null result slice is accepted as empty only when the explicit total is zero. Reports without an explicit valid total or with a mismatched scan ID are rejected. Marx imports every returned record within the 64 MiB report bound, preserves reported/received/normalized/unsupported counts, and records incomplete imports explicitly. JSON parsing runs in a worker with a timeout and cancellation. Normalized findings are stored in indexed SQLite rows; the UI pages 100 rows at a time. The complete normalized scan still resides in renderer memory for filtering and grouping.
+
+SCA report string identifiers and string locations are adapted to the findings model; exact name/version metadata comes from matching dependency-path entries. Dependency paths and vendor redundancy hints are preserved. Duplicate vendor IDs receive deterministic local occurrence IDs while keeping the vendor ID; indistinguishable occurrences remain ambiguous for comparisons. Unknown severities stay Unknown rather than becoming Info. Missing metadata does not establish triage eligibility.
 
 The `summaryJSON` report supplies `CriticalIssues`, `HighIssues`, `MediumIssues`, `LowIssues` and `InfoIssues`. Every count must be a nonnegative integer; an unavailable or unrecognized report remains unavailable rather than displaying zero vulnerabilities.
 
 ## Cancellation and failure
 
 Commands have bounded timeouts, captured output and concurrency. Monitoring retries local capacity failures at most five times with exponential backoff and jitter (under one minute of backoff). An initial New status is treated as queued; three consecutive unknown statuses stop local monitoring without claiming a remote failure. Cancellation sends SIGTERM, followed by SIGKILL after three seconds if necessary. The runner remembers submitted scan identity and uses the CLI to request remote cancellation when known. An interrupted submission without an ID is reported as an unknown remote outcome. Scan creation and triage are never automatically retried by Marx; submission passes `--retry=0` to the CLI too.
+
+The central scheduler permits ten ordinary commands, reserves two slots for control work, and bounds its waiting queue at 128 commands. Cancel and monitoring work take precedence over report generation. Superseded result imports can be canceled; shared readers retain an import until its last reader releases it. A successful cancel command is followed by a status query before a scan is labeled Canceled.
+
+Jobs are recorded before submission. After restart, known IDs in the current connection are reconciled without resubmission; jobs without IDs remain Unknown for manual investigation. See [the workbench storage and verification contract](workbench.md).
 
 `tests/cliProcess.test.ts` exercises actual local child processes; `tests/cliClient.test.ts` checks commands and report handling with a mocked process transport. `bun run verify:cli` exercises the built Electron application with an isolated synthetic CLI, source folder and user-data profile. These checks make no live tenant calls and do not prove your organization’s upload permissions.

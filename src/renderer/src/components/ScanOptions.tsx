@@ -2,6 +2,7 @@ import { folderName } from '@shared/path';
 import React, { useEffect, useState } from 'react';
 import { FolderOpen, UploadCloud, Check, ArrowUpRight } from 'lucide-react';
 import type { ScanJobState, ScanOptions, ScannerType } from '@shared/types';
+import { SEVERITY_COLOR } from '@shared/severity';
 import { api, commandKey } from '../api';
 import { Toggle, formatCount } from './ui';
 
@@ -281,7 +282,7 @@ export function ProgressCard({
           </span>
         ))}
       </div>
-      {terminal && <div className="scan-outcome" role="status">{job.progress.phase === 'completed' ? (job.status === 'Partial' ? 'Scan finished with partial results' : 'Scan complete') : job.progress.phase === 'failed' ? 'Scan could not finish' : 'Scan canceled'}</div>}
+      {terminal && <div className="scan-outcome" role="status">{job.status === 'Unknown' ? 'Remote status is unknown · monitoring stopped' : job.progress.phase === 'completed' ? (job.status === 'Partial' ? 'Scan finished with partial results' : 'Scan complete') : job.progress.phase === 'failed' ? 'Scan could not finish' : 'Scan canceled'}</div>}
 
       {job.progress.detail && (
         <div className="dim" style={{ marginTop: 8, fontSize: 12 }}>
@@ -311,7 +312,8 @@ export function SeveritySummaryCounts({ summary }: { summary: ScanJobState['summ
     ['High', summary.HIGH, 'var(--high)'],
     ['Medium', summary.MEDIUM, 'var(--medium)'],
     ['Low', summary.LOW, 'var(--low)'],
-    ['Info', summary.INFO, 'var(--info)']
+    ['Info', summary.INFO, 'var(--info)'],
+    ['Unknown', summary.UNKNOWN, SEVERITY_COLOR.UNKNOWN]
   ];
   return (
     <>

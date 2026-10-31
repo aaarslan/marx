@@ -5,8 +5,9 @@ import type {
   ScanStatus
 } from '@shared/types';
 import type { CxCliClient } from './cxone/cli';
-import type { CxScan } from './cxone/client';
+import type { CxScan } from './cxone/types';
 import { CliBusyError } from './cliProcess';
+import type { ScanProvenance } from '@shared/workbench';
 
 export interface RunnerEvents {
   onJobUpdated: (job: ScanJobState) => void;
@@ -19,11 +20,11 @@ export interface RunJobInput {
   projectName: string;
   projectId?: string;
   options: ScanOptions;
+  provenance?: ScanProvenance;
 }
 
 export class ScanRunner {
   private clients = new Map<string, CxCliClient>();
-  private remoteCancelErrors = new Map<string, string>();
   private active = new Map<string, Promise<ScanJobState>>();
   private controllers = new Map<string, AbortController>();
   private canceled = new Set<string>();
@@ -37,6 +38,7 @@ export class ScanRunner {
     return {
       id: randomUUID(), folderPath: input.folderPath, projectName: input.projectName,
       connectionId: input.connectionId, projectId: input.projectId, branch: input.options.branch, options: input.options,
+      provenance: input.provenance, monitoringStatus: 'active',
       progress: { phase: 'idle' }, status: 'Unknown', startedAt: Date.now()
     };
   }
@@ -50,23 +52,35 @@ export class ScanRunner {
       job.progress = { phase: 'failed' };
       job.error = 'Eight scans are already active. Wait for a scan to finish before starting another.';
       job.finishedAt = Date.now();
+      job.monitoringStatus = 'stopped';
       this.events.onJobUpdated({ ...job });
       return Promise.resolve(job);
     }
+    return this.start(job, false);
+  }
+
+  reconcile(job: ScanJobState): Promise<ScanJobState> {
+    const existing = this.active.get(job.id);
+    if (existing) return existing;
+    if (!job.scanId) return Promise.reject(new Error('No remote scan ID is known. Reconcile the uncertain submission in Checkmarx One before creating another scan.'));
+    if (this.active.size >= 8) return Promise.reject(new Error('Eight scans are already being monitored. Wait for one to finish before reconciling another.'));
+    return this.start(job, true);
+  }
+
+  private start(job: ScanJobState, resume: boolean): Promise<ScanJobState> {
     const controller = new AbortController();
     this.controllers.set(job.id, controller);
-    const task = this.execute(job, controller.signal).finally(() => {
+    const task = this.execute(job, controller.signal, resume).finally(() => {
       this.active.delete(job.id);
       this.controllers.delete(job.id);
       this.clients.delete(job.id);
       this.canceled.delete(job.id);
-      this.remoteCancelErrors.delete(job.id);
     });
     this.active.set(job.id, task);
     return task;
   }
 
-  private async execute(job: ScanJobState, signal: AbortSignal): Promise<ScanJobState> {
+  private async execute(job: ScanJobState, signal: AbortSignal, resume: boolean): Promise<ScanJobState> {
     const emit = (patch: Partial<ScanJobState>) => {
       Object.assign(job, patch);
       this.events.onJobUpdated({ ...job });
@@ -81,22 +95,28 @@ export class ScanRunner {
       checkCanceled();
       const client = this.client();
       this.clients.set(job.id, client);
-      emit({ progress: { phase: 'submitting', detail: 'The official CLI is preparing and uploading source to Checkmarx One.' } });
-      log('Starting the official Checkmarx CLI.');
-      const scan = await client.createScan(job, signal, {
-        onLine: log,
-        onStarting: () => { submitting = true; },
-        onSubmitted: (submitted) => {
-          job.scanId = submitted.id;
-          job.projectId = submitted.projectId;
-          emit({});
-        }
-      });
-      submitting = false;
-      job.scanId = scan.id;
-      job.projectId = scan.projectId;
-      if (signal.aborted || this.canceled.has(job.id)) throw new CancellationError();
-      emit({ scanId: scan.id, status: normalizeStatus(scan.status), progress: { phase: 'queued' } });
+      if (resume) {
+        if (job.connectionId && job.connectionId !== await client.connectionId()) throw new Error('This scan belongs to a different CLI connection. Restore its connection before reconciling.');
+        emit({ finishedAt: undefined, error: undefined, monitoringStatus: 'reconciling', progress: { phase: 'running', detail: 'Checking the known remote scan. No new scan will be submitted.' } });
+        log(`Reconciling remote scan ${job.scanId}.`);
+      } else {
+        emit({ monitoringStatus: 'active', progress: { phase: 'submitting', detail: 'The official CLI is preparing and uploading source to Checkmarx One.' } });
+        log('Starting the official Checkmarx CLI.');
+        const scan = await client.createScan(job, signal, {
+          onLine: log,
+          onStarting: () => { submitting = true; },
+          onSubmitted: (submitted) => {
+            job.scanId = submitted.id;
+            job.projectId = submitted.projectId;
+            emit({});
+          }
+        });
+        submitting = false;
+        job.scanId = scan.id;
+        job.projectId = scan.projectId;
+        if (signal.aborted || this.canceled.has(job.id)) throw new CancellationError();
+        emit({ scanId: scan.id, status: normalizeStatus(scan.status), progress: { phase: 'queued' } });
+      }
       const finalScan = await this.poll(job, client, signal, emit, log);
       checkCanceled();
       remoteStatus = normalizeStatus(finalScan.status);
@@ -105,23 +125,35 @@ export class ScanRunner {
       emit({ status: normalizeStatus(finalScan.status), progress: { phase: 'fetching-results', detail: 'counting findings' } });
       let summary = null;
       let summaryError = false;
-      try { summary = await client.getScanSummary(scan.id, signal); } catch (error) {
+      try { summary = await client.getScanSummary(job.scanId!, signal); } catch (error) {
         checkCanceled();
         summaryError = true;
         log(`Summary unavailable: ${error instanceof Error ? error.message : String(error)}`);
       }
       checkCanceled();
       const counts = summaryToCounts(summary);
-      emit({ progress: { phase: 'completed', detail: remoteStatus === 'Partial' ? 'Partial scan: some engines did not finish.' : !counts ? 'Scan finished. Summary unavailable; open results to inspect findings.' : undefined }, status: normalizeStatus(finalScan.status), summary: counts ?? undefined, finishedAt: Date.now() });
+      emit({ monitoringStatus: 'stopped', progress: { phase: 'completed', detail: remoteStatus === 'Partial' ? 'Partial scan: some engines did not finish.' : !counts ? 'Scan finished. Summary unavailable; open results to inspect findings.' : undefined }, status: normalizeStatus(finalScan.status), summary: counts ?? undefined, finishedAt: Date.now() });
       if (!counts && !summaryError) log('Summary unavailable or unrecognized; open results to inspect findings.');
       log(`Done in ${fmtDuration(Date.now() - job.startedAt)}`);
     } catch (err) {
-      const canceled = signal.aborted || this.canceled.has(job.id) || err instanceof CancellationError;
-      if ((signal.aborted || this.canceled.has(job.id)) && job.scanId) await this.cancelRemote(job, this.clients.get(job.id)!);
-      let message = canceled ? (this.remoteCancelErrors.get(job.id) ?? 'Scan canceled') : err instanceof Error ? err.message : String(err);
+      const requestedCancel = signal.aborted || this.canceled.has(job.id);
+      const canceled = requestedCancel || err instanceof CancellationError;
+      let canceledStatus: ScanStatus = remoteStatus === 'Canceled' ? 'Canceled' : 'Unknown';
+      let message = err instanceof Error ? err.message : String(err);
+      if (requestedCancel && job.scanId) {
+        const outcome = await this.cancelRemote(job, this.clients.get(job.id)!);
+        canceledStatus = outcome.status;
+        message = outcome.message;
+      } else if (canceled) {
+        if (remoteStatus === 'Canceled') message = 'Remote scan cancellation confirmed.';
+        else if (!submitting && !job.scanId) { canceledStatus = 'Canceled'; message = 'Local job canceled before submission.'; }
+        else message = 'Local submission stopped. Remote cancellation is unconfirmed.';
+      }
       if (job.scanId && !canceled && remoteStatus !== 'Failed') message += ' Local monitoring stopped; check the scan in Checkmarx One for its remote status.';
       if (submitting && !job.scanId) message += ' No scan ID was received. Remote submission is unconfirmed; check Checkmarx One before retrying.';
-      emit({ progress: { phase: canceled ? 'canceled' : 'failed' }, status: canceled ? 'Canceled' : job.scanId && remoteStatus !== 'Failed' ? 'Unknown' : 'Failed', error: message, finishedAt: Date.now() });
+      const remoteUnconfirmed = (submitting && !job.scanId) || Boolean(job.scanId && remoteStatus !== 'Failed');
+      const status = canceled ? canceledStatus : remoteUnconfirmed ? 'Unknown' : 'Failed';
+      emit({ monitoringStatus: 'stopped', progress: { phase: status === 'Canceled' ? 'canceled' : status === 'Completed' || status === 'Partial' ? 'completed' : 'failed', detail: message }, status, error: message, finishedAt: Date.now() });
       log(message);
     }
     return job;
@@ -143,6 +175,7 @@ export class ScanRunner {
       let delay = 5000;
       try {
         const scan = await client.getScan(job.scanId!, signal);
+        if (job.projectId && scan.projectId && scan.projectId !== job.projectId) throw new Error('The remote scan belongs to a different project.');
         signal.throwIfAborted();
         const status = normalizeStatus(scan.status);
         if (['Completed', 'Partial', 'Failed', 'Canceled'].includes(status)) return scan;
@@ -171,12 +204,15 @@ export class ScanRunner {
     }
   }
 
-  private async cancelRemote(job: ScanJobState, client: CxCliClient): Promise<void> {
-    try { await client.cancelScan(job.scanId!); } catch (err) {
-      const message = `Local monitoring stopped; remote cancellation is unconfirmed: ${err instanceof Error ? err.message : String(err)}`;
-      this.remoteCancelErrors.set(job.id, message);
-      this.events.onLog(job.id, message);
-      if (job.finishedAt) { job.error = message; this.events.onJobUpdated({ ...job }); this.remoteCancelErrors.delete(job.id); }
+  private async cancelRemote(job: ScanJobState, client: CxCliClient): Promise<{ status: ScanStatus; message: string }> {
+    try {
+      await client.cancelScan(job.scanId!);
+      const status = normalizeStatus((await client.getScan(job.scanId!)).status);
+      if (status === 'Canceled') return { status, message: 'Remote scan cancellation confirmed.' };
+      if (status === 'Completed' || status === 'Partial' || status === 'Failed') return { status, message: `The remote scan is ${status.toLowerCase()}; it was not confirmed canceled.` };
+      return { status, message: 'Local monitoring stopped. Cancellation was requested but the remote scan has not confirmed cancellation. Reconcile this scan to check its status.' };
+    } catch (err) {
+      return { status: 'Unknown', message: `Local monitoring stopped; remote cancellation is unconfirmed: ${err instanceof Error ? err.message : String(err)}` };
     }
   }
 
@@ -188,6 +224,7 @@ export class ScanRunner {
       job.progress = { phase: 'canceled' };
       job.status = 'Canceled';
       job.finishedAt = Date.now();
+      job.monitoringStatus = 'stopped';
       this.canceled.delete(job.id);
       this.events.onJobUpdated({ ...job });
     }
@@ -209,7 +246,7 @@ function normalizeStatus(raw: unknown): ScanStatus {
 }
 
 export function summaryToCounts(summary: unknown): ScanJobState['summary'] | null {
-  const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0 };
+  const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, INFO: 0, UNKNOWN: 0 };
   const src = (summary ?? {}) as Record<string, unknown>;
   const scanObj = Array.isArray(src.scans) ? (src.scans[0] as Record<string, unknown> | undefined) : undefined;
   if (!['critical', 'high', 'medium', 'low', 'info'].every((key) => {

@@ -1,5 +1,6 @@
 import type { Finding, Severity } from './types';
 import { SEVERITIES, SEVERITY_LABEL, SEVERITY_ORDER } from './severity';
+import type { ScanProvenance } from './workbench';
 
 export const REMEDIATION_TARGETS = [
   { id: 'copilot', name: 'GitHub Copilot', instruction: 'Use this prompt in Copilot agent mode with the affected repository open. Inspect the repository and implement the fixes, rather than returning only suggestions.' },
@@ -9,6 +10,8 @@ export const REMEDIATION_TARGETS = [
 export type RemediationTarget = typeof REMEDIATION_TARGETS[number]['id'];
 
 export interface RemediationContext {
+  sessionId?: string;
+  sourceProvenance?: ScanProvenance;
   scanId?: string;
   projectName?: string;
   branch?: string;
@@ -62,6 +65,8 @@ export function createRemediationPrompts(input: RemediationInput): RemediationBa
     'Keep changes focused and preserve unrelated work. Reuse existing code and checks. Add focused regression coverage where useful and run relevant local tests, type checks and builds. Do not push, deploy, trigger CI, or start a cloud scan without authorization.',
     '',
     'Return a finding-by-finding account: finding ID, change and files, validation performed, and anything unresolved with its reason. This batch covers only the listed findings. After local checks, list what should be rescanned in Marx; do not claim Checkmarx findings are resolved until a fresh scan confirms it.',
+    '',
+    'Keep the remediation session ID with your completion notes. Report the commit or patch reference, changed files, checks actually executed, and unresolved finding IDs. A finding absent from a later scan is not verified remediation unless scan coverage and effective configuration are comparable. Unknown severity and scanner redundancy labels require review; never suppress a finding solely because it is labeled redundant.',
     ...(input.instructions?.trim() ? ['', '## Additional user instructions', '', input.instructions.trim()] : []),
     '',
     '## Scan context',
@@ -82,13 +87,14 @@ export function createRemediationPrompts(input: RemediationInput): RemediationBa
       '',
       '```json',
       JSON.stringify({
-        findingId: finding.id, scanId: finding.scanId, projectId: finding.projectId,
-        scanner: finding.type, severity: finding.severity, state: finding.state, status: finding.status,
+        findingId: finding.id, vendorId: finding.vendorId, identityAmbiguous: finding.identityAmbiguous, scanId: finding.scanId, projectId: finding.projectId,
+        scanner: finding.type, severity: finding.severity, rawSeverity: finding.rawSeverity, state: finding.state, status: finding.status,
         title: finding.title, location: finding.where, similarityId: finding.similarityId,
         cve: finding.cve, cwe: finding.cwe, cvssScore: finding.cvssScore,
-        package: finding.packageName ? { name: finding.packageName, version: finding.packageVersion, manager: finding.packageManager, directDependency: finding.isDirectDependency, recommendedVersion: finding.recommendedVersion, advisoryUrl: finding.fixLink } : undefined,
+        package: finding.packageName ? { name: finding.packageName, version: finding.packageVersion, manager: finding.packageManager, directDependency: finding.isDirectDependency, recommendedVersion: finding.recommendedVersion, advisoryUrl: finding.fixLink, dependencyPaths: finding.dependencyPaths } : undefined,
         language: finding.language, group: finding.group, description: finding.description,
-        flow: finding.flow
+        flow: finding.flow,
+        redundancy: finding.redundancy
       }, null, 2),
       '```'
     ].join('\n');

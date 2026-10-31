@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import type { ScanEvent, ScanJobState, Settings } from '@shared/types';
+import type { ScanEvent, ScanHistoryItem, ScanJobState, Settings } from '@shared/types';
+import type { RemediationSession, WorkspaceState } from '@shared/workbench';
 import type { MenuAction } from '@shared/ipc';
 import { api } from './api';
 
-export type View = 'scan' | 'batch' | 'results' | 'history' | 'settings';
+export type View = 'scan' | 'batch' | 'results' | 'history' | 'workbench' | 'settings';
 
 interface AppState {
   view: View;
@@ -11,19 +12,24 @@ interface AppState {
   jobs: ScanJobState[];
   batchId: string | null;
   logs: Record<string, string[]>;
-  /** scan to open in the Results view */
+  sessions: RemediationSession[];
+  cachedScans: ScanHistoryItem[];
+  connectionId: string | null;
+  initialized: boolean;
+  workbenchError: string | null;
+  workbenchTab: 'sessions' | 'activity';
+  selectedSessionId: string | null;
   selectedScanId: string | null;
-  /** local folder linked to the selected scan (for code snippets) */
   linkedFolder: string | null;
-  /** menu-driven actions (⌘R / ⌘O), consumed by the Scan view */
   menuAction: MenuAction | null;
   menuActionId: number;
-  /** bumped whenever a job settles, so history views can refetch */
   historyVersion: number;
   pendingAutoBaseline: boolean;
-
   setView: (v: View) => void;
   init: () => Promise<void>;
+  refreshWorkbench: () => Promise<void>;
+  setWorkbenchTab: (tab: 'sessions' | 'activity') => void;
+  openSession: (sessionId: string) => void;
   applyEvent: (e: ScanEvent) => void;
   setSelectedScan: (scanId: string | null, folder?: string | null, autoBaseline?: boolean) => void;
   clearAutoBaseline: () => void;
@@ -31,71 +37,121 @@ interface AppState {
 }
 
 let subscribed = false;
+const VIEWS: View[] = ['scan', 'batch', 'results', 'history', 'workbench', 'settings'];
 
-export const useApp = create<AppState>((set, get) => ({
-  view: 'scan',
-  settings: null,
-  jobs: [],
-  batchId: null,
-  logs: {},
-  selectedScanId: null,
-  linkedFolder: null,
-  menuAction: null,
-  menuActionId: 0,
-  historyVersion: 0,
-  pendingAutoBaseline: false,
+function navigation(state: AppState): WorkspaceState {
+  return {
+    view: state.view,
+    selectedScanId: state.selectedScanId,
+    linkedFolder: state.linkedFolder,
+    selectedSessionId: state.selectedSessionId ?? undefined,
+    workbenchTab: state.workbenchTab
+  };
+}
 
-  setView: (v) => set({ view: v }),
+export const useApp = create<AppState>((set, get) => {
+  const persist = () => {
+    if (!get().initialized) return;
+    void api.workbench.saveWorkspace('navigation', navigation(get())).catch((error) => {
+      set({ workbenchError: `Could not save workspace: ${error instanceof Error ? error.message : String(error)}` });
+    });
+  };
+  return {
+    view: 'scan',
+    settings: null,
+    jobs: [],
+    batchId: null,
+    logs: {},
+    sessions: [],
+    cachedScans: [],
+    connectionId: null,
+    initialized: false,
+    workbenchError: null,
+    workbenchTab: 'sessions',
+    selectedSessionId: null,
+    selectedScanId: null,
+    linkedFolder: null,
+    menuAction: null,
+    menuActionId: 0,
+    historyVersion: 0,
+    pendingAutoBaseline: false,
 
-  init: async () => {
-    if (!subscribed) {
-      subscribed = true;
-      api.onScanEvent((event) => get().applyEvent(event));
-    }
-    try {
-      const settings = await api.settings.get();
-      set({ settings });
-    } catch {
-      /* first run */
-    }
-  },
+    setView: (view) => { set({ view }); persist(); },
+    setWorkbenchTab: (workbenchTab) => { set({ workbenchTab }); persist(); },
+    openSession: (selectedSessionId) => { set({ selectedSessionId, workbenchTab: 'sessions', view: 'workbench' }); persist(); },
 
-  applyEvent: (e) => {
-    if (e.kind === 'job-updated') {
-      const jobs = [...get().jobs];
-      const idx = jobs.findIndex((j) => j.id === e.job.id);
-      if (idx >= 0) jobs[idx] = e.job;
-      else jobs.unshift(e.job);
-      const settled =
-        e.job.progress.phase === 'completed' ||
-        e.job.progress.phase === 'failed' ||
-        e.job.progress.phase === 'canceled';
-      set(settled ? { jobs, historyVersion: get().historyVersion + 1 } : { jobs });
-    } else if (e.kind === 'job-list') {
-      const incoming = new Map(e.jobs.map((j) => [j.id, j]));
-      set({ batchId: e.jobs[0]?.batchId ?? null, jobs: [...e.jobs, ...get().jobs.filter((j) => !incoming.has(j.id))] });
-    } else if (e.kind === 'log') {
-      const logs = { ...get().logs };
-      logs[e.jobId] = [...(logs[e.jobId] ?? []), e.line].slice(-200);
-      set({ logs });
-    } else if (e.kind === 'open-results') {
-      set((s) => ({
-        selectedScanId: e.scanId,
-        linkedFolder: e.folderPath ?? s.linkedFolder,
-        view: 'results'
+    init: async () => {
+      if (!subscribed) {
+        subscribed = true;
+        api.onScanEvent((event) => get().applyEvent(event));
+      }
+      try {
+        const settings = await api.settings.get();
+        set({ settings });
+        await get().refreshWorkbench();
+      } catch (error) {
+        set({ workbenchError: error instanceof Error ? error.message : String(error), initialized: true });
+      }
+    },
+
+    refreshWorkbench: async () => {
+      const data = await api.workbench.bootstrap();
+      const restore = !get().initialized || data.connectionId !== get().connectionId;
+      const saved = restore ? await api.workbench.workspace('navigation') : null;
+      const active = restore ? [] : get().jobs;
+      const jobs = new Map(data.jobs.map((job) => [job.id, job]));
+      for (const job of active) {
+        const stored = jobs.get(job.id);
+        if (!stored || (!job.finishedAt && stored.finishedAt === undefined)) jobs.set(job.id, job);
+      }
+      set({
+        jobs: [...jobs.values()].sort((a, b) => b.startedAt - a.startedAt),
+        logs: restore ? data.logs : { ...data.logs, ...get().logs },
+        sessions: data.sessions,
+        cachedScans: data.scans,
+        connectionId: data.connectionId,
+        initialized: true,
+        workbenchError: null,
+        ...(restore ? {
+          view: saved?.view && VIEWS.includes(saved.view as View) ? saved.view as View : saved?.selectedScanId ? 'results' as const : 'scan' as const,
+          selectedScanId: saved?.selectedScanId ?? null,
+          linkedFolder: saved?.linkedFolder ?? null,
+          selectedSessionId: saved?.selectedSessionId ?? null,
+          workbenchTab: saved?.workbenchTab === 'activity' ? 'activity' as const : 'sessions' as const,
+          batchId: data.jobs.find((job) => job.batchId)?.batchId ?? null
+        } : {})
+      });
+    },
+
+    applyEvent: (event) => {
+      if (event.kind === 'job-updated') {
+        const jobs = [...get().jobs];
+        const index = jobs.findIndex((job) => job.id === event.job.id);
+        if (index >= 0) jobs[index] = event.job;
+        else jobs.unshift(event.job);
+        const settled = Boolean(event.job.finishedAt) || ['completed', 'failed', 'canceled'].includes(event.job.progress.phase);
+        set(settled ? { jobs, historyVersion: get().historyVersion + 1 } : { jobs });
+        if (settled) void get().refreshWorkbench().catch((error) => set({ workbenchError: error instanceof Error ? error.message : String(error) }));
+      } else if (event.kind === 'job-list') {
+        const incoming = new Set(event.jobs.map((job) => job.id));
+        set({ batchId: event.jobs[0]?.batchId ?? null, jobs: [...event.jobs, ...get().jobs.filter((job) => !incoming.has(job.id))] });
+      } else if (event.kind === 'log') {
+        set((state) => ({ logs: { ...state.logs, [event.jobId]: [...(state.logs[event.jobId] ?? []), event.line].slice(-400) } }));
+      } else if (event.kind === 'open-results') {
+        set({ selectedScanId: event.scanId, linkedFolder: event.folderPath ?? null, view: 'results' });
+        persist();
+      }
+    },
+
+    setSelectedScan: (selectedScanId, folder, autoBaseline) => {
+      set((state) => ({
+        selectedScanId,
+        linkedFolder: folder === undefined ? selectedScanId === state.selectedScanId ? state.linkedFolder : null : folder,
+        pendingAutoBaseline: autoBaseline ?? false
       }));
-    }
-  },
-
-  setSelectedScan: (scanId, folder, autoBaseline) =>
-    set((s) => ({
-      selectedScanId: scanId,
-      linkedFolder: folder === undefined ? (scanId === s.selectedScanId ? s.linkedFolder : null) : folder,
-      pendingAutoBaseline: autoBaseline ?? false
-    })),
-
-  clearAutoBaseline: () => set({ pendingAutoBaseline: false }),
-
-  triggerMenuAction: (action) =>
-    set((s) => ({ menuAction: action, menuActionId: s.menuActionId + 1 }))
-}));
+      persist();
+    },
+    clearAutoBaseline: () => set({ pendingAutoBaseline: false }),
+    triggerMenuAction: (action) => set((state) => ({ menuAction: action, menuActionId: state.menuActionId + 1 }))
+  };
+});
