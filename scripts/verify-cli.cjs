@@ -164,7 +164,7 @@ app.whenReady().then(async () => {
     assert.ok(preview.includes('"severity": "HIGH"'));
     assert.ok(!preview.includes('"severity": "LOW"'));
     assert.equal(await contents.executeJavaScript('window.marx.remediation.copy("").then(() => false, error => error.message.includes("empty"))'), true);
-    assert.equal(await contents.executeJavaScript('window.marx.remediation.copy("â‚¬".repeat(2800000)).then(() => false, error => error.message.includes("8 MiB"))'), true);
+    assert.equal(await contents.executeJavaScript('window.marx.remediation.copy("€".repeat(2800000)).then(() => false, error => error.message.includes("8 MiB"))'), true);
     pendingSave = {};
     await contents.executeJavaScript('window.pendingPromptSave = window.marx.remediation.save({ text: "Canceled prompt", suggestedName: "canceled" }); void 0;');
     const saveDeadline = Date.now() + 3000;

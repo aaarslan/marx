@@ -40,7 +40,7 @@ In a local comparison with the same dependency lockfile, combined main JavaScrip
 - On a Windows host, install each relevant architecture and verify launch, native frame controls, folder picker and drop, `Ctrl+O`, `Ctrl+R`, persistence, DPAPI credential storage, notifications, exports and uninstall. Cross-building an installer alone does not prove those runtime behaviors.
 - Live Checkmarx checks require a real tenant and API key. Mock-service scan checks do not establish live API acceptance.
 
-Version 0.5.0 has been packaged as a macOS DMG/ZIP and Windows x64/ARM64 installers on Apple Silicon. macOS packaged runtime and a mock-service scan have local coverage. Windows native runtime validation remains pending.
+Version 0.5.0 has been packaged as a macOS DMG/ZIP and Windows x64/ARM64 installers on Apple Silicon. macOS packaged runtime and a mock-service scan have local coverage. Windows x64 native validation is recorded below; Windows ARM64 native runtime validation remains pending.
 
 ## Native Windows acceptance
 
