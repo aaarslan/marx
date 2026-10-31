@@ -6,6 +6,7 @@ Use Bun 1.4.4 with the committed lockfile. Electron includes its own runtime; en
 bun install --frozen-lockfile
 bun run typecheck
 bun run test
+bun run verify:packaging
 bun run build
 bun run audit
 ```
@@ -14,9 +15,9 @@ bun run audit
 
 | Command | Target | Output |
 | --- | --- | --- |
-| `bun run dist:mac` | macOS ARM64 | `Marx-0.5.0-arm64.dmg` and ZIP |
-| `bun run dist:win` | Windows x64 | `Marx-0.5.0-win-x64-setup.exe` |
-| `bun run dist:win:arm64` | Windows ARM64 | `Marx-0.5.0-win-arm64-setup.exe` |
+| `bun run dist:mac` | macOS ARM64 | `Marx-0.8.1-arm64.dmg` and ZIP |
+| `bun run dist:win` | Windows x64 | `Marx-0.8.1-win-x64-setup.exe` |
+| `bun run dist:win:arm64` | Windows ARM64 | `Marx-0.8.1-win-arm64-setup.exe` |
 | `bun run dist:win:dir` | Windows x64 | Unpacked app for inspection |
 | `bun run dist:dir` | Current host platform | Unpacked app |
 
@@ -28,14 +29,14 @@ Windows NSIS installers have been cross-built on macOS. Building and running the
 
 ## Build design
 
-Main and preload dependencies are bundled and minified. ZIP support lives in a bundled chunk loaded when a scan reaches archiving. Secondary renderer views load on demand; Scan remains mounted so navigating preserves its draft. Production sourcemaps and compiler caches are excluded from packages.
+Main and preload dependencies are bundled and minified, including the workspace glob matcher. The official Checkmarx CLI handles scan archives. Secondary renderer views load on demand; Scan remains mounted so navigating preserves its draft. Production sourcemaps and compiler caches are excluded from packages. Packaging uses [version-pinned Picomatch and fdir adaptations](dependencies.md), applied by Bun during installation.
 
 In a local comparison with the same dependency lockfile, combined main JavaScript fell from 578.83 KB to 260.24 KB, with the startup entry at 31.92 KB. The renderer entry fell from 287.68 KB to 250.68 KB. These are emitted uncompressed sizes, not startup-time or download guarantees. Electron itself dominates installer size.
 
 ## Validate packages
 
 - On macOS, mount the DMG, copy the app to a temporary directory, then launch that copy with a disposable `MARX_USER_DATA_DIR`. Verify all views, demo findings, shortcuts and single-instance behavior. Verify the bundle with `codesign --verify --deep --strict`.
-- Inspect `resources/app.asar` (Windows) or `Contents/Resources/app.asar` (macOS). It should contain bundled application chunks and no `node_modules` tree. Check that deferred ZIP and renderer view chunks are included.
+- Inspect `resources/app.asar` (Windows) or `Contents/Resources/app.asar` (macOS). It should contain bundled application chunks and no `node_modules` tree. Check that renderer view chunks and the report worker are included.
 - On a Windows host, install each relevant architecture and verify launch, native frame controls, folder picker and drop, `Ctrl+O`, `Ctrl+R`, persistence, DPAPI credential storage, notifications, exports and uninstall. Cross-building an installer alone does not prove those runtime behaviors.
 - Live Checkmarx checks require a real tenant and API key. Mock-service scan checks do not establish live API acceptance.
 

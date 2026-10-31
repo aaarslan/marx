@@ -22,6 +22,45 @@ beforeEach(() => {
 });
 
 describe('Checkmarx CLI adapter', () => {
+  it('imports complete reports beyond five thousand findings by default', async () => {
+    run.mockImplementation(async ({ args }) => {
+      const folder = args.find((arg) => arg.startsWith('--output-path='))!.slice('--output-path='.length);
+      await fs.writeFile(path.join(folder, 'report.json'), JSON.stringify({ scanID: 's1', totalCount: 6001, results: Array.from({ length: 6001 }, (_, index) => ({ id: String(index), type: 'sast' })) }));
+      return '';
+    });
+    const result = await client().getAllResults('s1');
+    expect(result.results).toHaveLength(6001);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('exports the official SARIF bytes and removes its private temporary report', async () => {
+    let folder = '';
+    const contents = '{\n"version":"2.1.0","runs":[]\n}\n';
+    run.mockImplementation(async ({ args }) => {
+      expect(args).toContain('--report-format=sarif');
+      folder = args.find((arg) => arg.startsWith('--output-path='))!.slice('--output-path='.length);
+      await fs.writeFile(path.join(folder, 'report.sarif'), contents);
+      return '';
+    });
+    expect(await client().reportSarif('s1')).toBe(contents);
+    await expect(fs.stat(folder)).rejects.toThrow();
+  });
+
+  it('blocks triage of unknown severity or an absent stable identity before any mutation', async () => {
+    const finding = normalizeFinding({ id: 'f1', type: 'sast', similarityId: 'stable', severity: 'UNKNOWN' }, 's1', 'p1');
+    await expect(client().triage({ finding, state: 'CONFIRMED', comment: 'reviewed' })).rejects.toThrow('severity is unknown');
+    await expect(client().triage({ finding: { ...finding, severity: 'HIGH', similarityId: '' }, state: 'CONFIRMED', comment: 'reviewed' })).rejects.toThrow('stable similarity identity');
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('paginates history with explicit project and branch scope', async () => {
+    run.mockResolvedValueOnce(JSON.stringify([scan]));
+    const result = await client().listScans({ limit: 1, offset: 50, projectId: 'p1', branch: 'story' });
+    expect(result.hasMore).toBe(true);
+    const args = run.mock.calls[0][0].args;
+    expect(args).toContain('--filter=limit=1,offset=50,sort=-created_at,project-id=p1,branch=story');
+  });
+
   it('uses CLI configuration without requiring or writing credentials', async () => {
     run.mockResolvedValueOnce('Authenticated').mockResolvedValueOnce(JSON.stringify([project]));
     expect(await client().testConnection()).toMatchObject({ ok: true, cliVersion: '2.3.69', cliPath: '/approved/cx' });

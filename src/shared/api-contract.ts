@@ -17,6 +17,7 @@ import type {
 } from './types';
 
 import type { MenuAction } from './ipc';
+import type { EvidenceBundle, FindingQuery, FindingQueryPage, RemediationSession, ScanComparison, WorkbenchBootstrap, WorkspaceState } from './workbench';
 
 export interface SourceSnippet {
   path: string;
@@ -41,10 +42,13 @@ export interface MarxApi {
   fs: {
     pathForFile(file: File): Promise<string>;
     readSourceFile(folder: string, relPath: string, line?: number, projectId?: string): Promise<SourceSnippet>;
+    openInEditor(folder: string, relPath: string, line: number, projectId: string, editor: 'code' | 'cursor'): Promise<void>;
+    sourceStatus(folder: string, scanId: string): Promise<{ matches: boolean | null; message: string }>;
   };
   git: {
     info(folder: string): Promise<GitInfo>;
     listSubProjects(parent: string): Promise<string[]>;
+    plan(parent: string): Promise<import('./workspace').WorkspacePlan>;
   };
   bindings: {
     get(folder: string): Promise<RepositoryBinding | null>;
@@ -61,17 +65,21 @@ export interface MarxApi {
       options: ScanOptions;
     }): Promise<ScanJobState>;
     runBatch(input: {
-      items: { folderPath: string; projectName: string; projectId?: string }[];
+      items: { folderPath: string; projectName: string; projectId?: string; options?: ScanOptions }[];
       options: ScanOptions;
       concurrency: number;
     }): Promise<ScanJobState[]>;
     cancelJob(job: ScanJobState): Promise<void>;
     jobs(): Promise<ScanJobState[]>;
-    history(): Promise<ScanHistoryItem[]>;
+    history(options?: { projectId?: string; offset?: number; limit?: number }): Promise<ScanHistoryItem[]>;
     summary(scanId: string): Promise<unknown>;
   };
   results: {
-    get(scanId: string): Promise<ResultsPage>;
+    get(scanId: string, options?: { refresh?: boolean; requestId?: string }): Promise<ResultsPage>;
+    cancel(requestId: string): Promise<void>;
+    compare(baselineId: string, currentId: string): Promise<ScanComparison>;
+    query(scanId: string, query: FindingQuery): Promise<FindingQueryPage>;
+    sarif(scanId: string): Promise<string | null>;
     triage(req: TriageRequest): Promise<boolean>;
     /** Write findings to ~/Downloads and reveal in Finder; returns the file path */
     export(format: 'csv' | 'json', label: string, findings: Finding[]): Promise<string>;
@@ -79,6 +87,22 @@ export interface MarxApi {
   remediation: {
     copy(text: string): Promise<void>;
     save(input: { text: string; suggestedName: string }): Promise<string | null>;
+  };
+  workbench: {
+    bootstrap(): Promise<WorkbenchBootstrap>;
+    evidence(id: string): Promise<EvidenceBundle>;
+    workspace(key: string): Promise<WorkspaceState | null>;
+    saveWorkspace(key: string, state: WorkspaceState): Promise<void>;
+    createSession(input: { title: string; scanId: string; findingIds: string[]; folderPath?: string; handoff?: string }): Promise<RemediationSession>;
+    updateSession(input: { id: string; title?: string; notes?: string; changeRef?: string; checks?: string; status?: 'open' | 'in_progress' | 'awaiting_verification'; handoff?: string }): Promise<RemediationSession>;
+    deleteSession(id: string): Promise<void>;
+    verifySession(input: { id: string; scanId: string }): Promise<RemediationSession>;
+    runVerification(id: string): Promise<ScanJobState>;
+    exportSession(id: string): Promise<string | null>;
+    reconcileJob(id: string): Promise<ScanJobState>;
+    logs(jobId: string): Promise<string[]>;
+    deleteSnapshot(scanId: string): Promise<void>;
+    prune(days: number): Promise<void>;
   };
   shell: {
     openExternal(url: string): Promise<void>;

@@ -3,10 +3,11 @@ import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import type { ScanJobState, Settings, TestConnectionResult, TriageRequest } from '@shared/types';
-import { DEFAULT_EXCLUDES } from '@shared/types';
-import type { CxProject, CxResult, CxScan, CxScanSummary } from './client';
+import { DEFAULT_EXCLUDES, RESULT_STATES } from '@shared/types';
+import type { CxProject, CxResult, CxScan, CxScanSummary } from './types';
 import { inspectCliCapabilities, requireScanCapabilities } from '../cliCapabilities';
 import { parseCliJson, resolveCli, runCliProcess } from '../cliProcess';
+import { readCliReport } from '../reportReader';
 
 export interface CliConfig {
   executable: string;
@@ -152,6 +153,10 @@ export class CxCliClient {
     return inspectCliCapabilities(await this.executable, this.env, runCliProcess, signal);
   }
 
+  async getVersion(signal?: AbortSignal): Promise<string> {
+    return (await this.command(['version'], { signal, timeoutMs: 10_000 })).trim().slice(0, 120) || 'unknown';
+  }
+
   async getProject(projectId: string, signal?: AbortSignal): Promise<CxProject> {
     const project = projectFromCli(await this.json(['project', 'show', `--project-id=${projectId}`, '--format=json'], signal));
     if (project.id !== projectId) throw new Error('The CLI returned a different project. Refresh the project list.');
@@ -224,11 +229,13 @@ export class CxCliClient {
     return scan;
   }
 
-  async listScans(params: { limit?: number; projectId?: string } = {}): Promise<{ scans: CxScan[]; totalCount: number }> {
-    const filter = [`limit=${params.limit ?? 50}`, 'sort=-created_at', ...(params.projectId ? [`project-id=${params.projectId}`] : [])];
-    const data = await this.json(['scan', 'list', '--format=json', `--filter=${filter.join(',')}`]);
+  async listScans(params: { limit?: number; offset?: number; projectId?: string; branch?: string } = {}, signal?: AbortSignal): Promise<{ scans: CxScan[]; totalCount: number; hasMore: boolean }> {
+    const limit = Math.max(1, Math.min(1000, Math.floor(Number.isFinite(params.limit) ? params.limit! : 50)));
+    const offset = Math.max(0, Math.floor(Number.isFinite(params.offset) ? params.offset! : 0));
+    const filter = [`limit=${limit}`, `offset=${offset}`, 'sort=-created_at', ...(params.projectId ? [csvValue(`project-id=${params.projectId}`)] : []), ...(params.branch ? [csvValue(`branch=${params.branch}`)] : [])];
+    const data = await this.json(['scan', 'list', '--format=json', `--filter=${filter.join(',')}`], signal);
     if (!Array.isArray(data)) throw new Error('The CLI returned an invalid scan list.');
-    return { scans: data.map(scanFromCli), totalCount: data.length };
+    return { scans: data.map(scanFromCli), totalCount: data.length, hasMore: data.length === limit };
   }
 
   async cancelScan(scanId: string): Promise<void> {
@@ -240,18 +247,27 @@ export class CxCliClient {
     try {
       await this.command(['results', 'show', `--scan-id=${scanId}`, `--report-format=${format}`, '--output-name=report', `--output-path=${folder}`], { signal, timeoutMs: 10 * 60_000 });
       const target = path.join(folder, 'report.json');
-      if ((await fs.stat(target)).size > 64 * 1024 * 1024) throw new Error('The CLI report exceeds the 64 MiB display limit. Open the scan in Checkmarx One.');
-      return JSON.parse(await fs.readFile(target, 'utf8'));
+      return await readCliReport(target, signal);
     } finally {
       await fs.rm(folder, { recursive: true, force: true });
     }
   }
 
-  async getAllResults(scanId: string, max = 5000): Promise<{ results: CxResult[]; totalCount: number; truncated: boolean }> {
-    const data = record(await this.report(scanId, 'json'));
+  async reportSarif(scanId: string, signal?: AbortSignal): Promise<string> {
+    const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'marx-cli-sarif-'));
+    try {
+      await this.command(['results', 'show', `--scan-id=${scanId}`, '--report-format=sarif', '--output-name=report', `--output-path=${folder}`], { signal, timeoutMs: 10 * 60_000 });
+      return await readCliReport(path.join(folder, 'report.sarif'), signal, 'sarif') as string;
+    } finally { await fs.rm(folder, { recursive: true, force: true }); }
+  }
+
+  async getAllResults(scanId: string, max = Number.POSITIVE_INFINITY, signal?: AbortSignal): Promise<{ results: CxResult[]; totalCount: number; truncated: boolean }> {
+    const data = record(await this.report(scanId, 'json', signal));
     const results = data.results === null && data.totalCount === 0 ? [] : data.results;
     if (!Array.isArray(results) || !Number.isSafeInteger(data.totalCount) || Number(data.totalCount) < results.length) throw new Error('The CLI returned an incomplete or unrecognized findings report.');
     if (data.scanID !== undefined && data.scanID !== scanId) throw new Error('The CLI report belongs to a different scan.');
+    if (max !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(max) || max < 0)) throw new Error('Choose a valid results import limit.');
+    signal?.throwIfAborted();
     return { results: results.slice(0, max).map(resultFromCli), totalCount: Number(data.totalCount), truncated: data.totalCount !== results.length || results.length > max };
   }
 
@@ -269,13 +285,17 @@ export class CxCliClient {
   async triage(req: TriageRequest): Promise<void> {
     const { finding, state, severity, comment } = req;
     if (!comment.trim()) throw new Error('A comment is required when changing a result state.');
+    if (!finding.projectId || !RESULT_STATES.some((item) => item.value === state)) throw new Error('A project and supported result state are required for triage.');
     const args = ['triage', 'update', `--project-id=${finding.projectId}`, `--state=${state}`, `--comment=${comment}`, '--retry=0'];
     if (finding.type === 'sca') {
       if (!finding.packageName || !finding.packageVersion || !finding.packageManager || !finding.cve) throw new Error('SCA CLI triage requires package name, version, package manager and vulnerability ID. Open this finding in Checkmarx One.');
       args.push('--scan-type=sca', `--vulnerability-identifiers=${[`packageName=${finding.packageName}`, `packageVersion=${finding.packageVersion}`, `packageManager=${finding.packageManager}`, `vulnerabilityId=${finding.cve}`].map(csvValue).join(',')}`);
     } else {
       if (!['sast', 'kics', 'iac-security'].includes(finding.type)) throw new Error('This finding type cannot be triaged through Marx’s CLI integration. Open it in Checkmarx One.');
-      args.push(`--scan-type=${finding.type === 'kics' ? 'iac-security' : finding.type}`, `--similarity-id=${finding.similarityId}`, `--severity=${severity ?? finding.severity}`);
+      if (!finding.similarityId) throw new Error('This finding has no stable similarity identity. Review it in Checkmarx One before triage.');
+      const selectedSeverity = severity ?? finding.severity;
+      if (!['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'].includes(selectedSeverity)) throw new Error('The original severity is unknown. Review it in Checkmarx One or choose a supported severity before triage.');
+      args.push(`--scan-type=${finding.type === 'kics' ? 'iac-security' : finding.type}`, `--similarity-id=${finding.similarityId}`, `--severity=${selectedSeverity}`);
     }
     await this.command(args);
   }

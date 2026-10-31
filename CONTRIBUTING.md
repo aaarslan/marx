@@ -24,7 +24,7 @@ bun run build
 bun run audit
 ```
 
-For UI changes, inspect the actual Electron app at its minimum 960×640 window size, with keyboard navigation and reduced motion. For packaging changes, follow [building and packaging](docs/building.md): verify the copied macOS app launches from the DMG, and validate Windows installer changes on Windows. No CI or GitHub Actions configuration is required or included.
+For UI changes, inspect the actual Electron app at its minimum 960×640 window size, with keyboard navigation and reduced motion. For dependency or packaging changes, run `bun run verify:packaging`, review [the dependency patches](docs/dependencies.md), and follow [building and packaging](docs/building.md): verify the copied macOS app launches from the DMG, and validate Windows installer changes on Windows. No CI or GitHub Actions configuration is required or included.
 
 Use a disposable directory through `MARX_USER_DATA_DIR` for runtime tests. Keep real credentials and existing app data out of fixtures.
 

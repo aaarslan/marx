@@ -8,9 +8,11 @@ The dialog captures a snapshot of the loaded scan and its metadata when opened. 
 
 The generated context includes the known scan, project, branch and source-folder name, plus the selected scope and loaded/total counts. Missing metadata is omitted. Partial scan data and synthetic demo evidence are identified explicitly. Findings outside the selected scope and severities are not included; findings marked Not Exploitable retain their state and the assistant is instructed to review their rationale rather than blindly change code.
 
+An explicit selected set or fix group can seed the dialog. **Track remediation** saves that exact selection and the reviewed handoff in a named Workbench session with pinned original evidence. Later notes, change references, checks and verification scans stay attached to that session. The [workbench guide](workbench.md) describes evidence retention and verification gates.
+
 ## Evidence and batching
 
-Each numbered finding includes its original normalized title and description, scanner/severity/state, identity, source location, CVE/CWE references, dependency metadata when present, and the complete available source flow. Scanner text is encoded as JSON and explicitly treated as untrusted evidence rather than instructions. Local source snippets are not automatically attached. The linked source-folder path is reduced to its basename; existing paths in scanner evidence are preserved.
+Each numbered finding includes its original normalized title and description, scanner/severity/state, local occurrence and vendor identities, source location, CVE/CWE references, dependency paths when present, vendor redundancy hints and the complete available source flow. Ambiguous duplicate identities are labeled. Scanner text is encoded as JSON and explicitly treated as untrusted evidence rather than instructions. Local source snippets are not automatically attached. The linked source-folder path is reduced to its basename; existing paths in scanner evidence are preserved.
 
 Prompts sort by severity and retain stable ordering within a severity. Batches contain at most the selected 10, 20 or 40 findings and target approximately 32,000 characters including instructions. Every batch is independently usable and includes its batch number and scope. If a single finding exceeds that target, its full evidence remains included and the dialog identifies the oversized batch. No finding or evidence field is silently truncated to meet a model limit.
 

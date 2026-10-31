@@ -22,6 +22,10 @@ export class RepositoryBindings {
     return this.read().find((row) => row.folderPath === folderPath && row.connectionId === connectionId) ?? null;
   }
 
+  folders(): string[] {
+    return [...new Set(this.read().map((row) => row.folderPath))];
+  }
+
   save(binding: RepositoryBinding): RepositoryBinding {
     const rows = this.read().filter((row) => row.folderPath !== binding.folderPath || row.connectionId !== binding.connectionId);
     if (rows.length >= 1000) throw new Error('Repository mapping limit reached.');
