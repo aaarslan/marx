@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -361,7 +362,21 @@ func (e *Engine) cancelRemote(c *CLI, id string) (string, string) {
 	return s, "Cancellation was requested; the remote scan is " + strings.ToLower(s) + ". Reconcile to check its outcome."
 }
 func (e *Engine) notify(job Object) {
-	_, _ = e.native("notification", Object{"id": str(job, "id"), "title": "Scan " + strings.ToLower(str(job, "status")), "body": str(job, "projectName") + ": open Marx to review its outcome."})
+	_, err := e.native("notification", Object{"id": str(job, "id"), "title": "Scan " + strings.ToLower(str(job, "status")), "body": str(job, "projectName") + ": open Marx to review its outcome."})
+	message := "Desktop notification submitted to Windows."
+	if err != nil {
+		message = "Desktop notification unavailable: " + err.Error()
+		if home, homeErr := os.UserHomeDir(); homeErr == nil {
+			message = strings.ReplaceAll(message, home, "%USERPROFILE%")
+			message = strings.ReplaceAll(message, strings.ReplaceAll(home, "\\", "/"), "%USERPROFILE%")
+		}
+		if len(message) > 2048 {
+			message = message[:2048]
+		}
+	}
+	id := str(job, "id")
+	_ = e.store.appendLog(id, message)
+	e.emit(Object{"kind": "log", "jobId": id, "line": message})
 }
 func (e *Engine) NotificationClick(id string) {
 	jobs, err := e.store.list("job", nil)

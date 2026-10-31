@@ -16,13 +16,18 @@ Go owns CLI discovery, capability checks, environment-based authentication, proj
 | Frozen installation | Passed; 96 resolved packages, no changes on the frozen installation |
 | TypeScript | Both compiler projects passed |
 | Frontend/shared regression suite | 41 tests passed across seven files |
-| Native Go regression suite | 30 top-level tests passed, including workflow subtests; executable CLI fixture, malformed/oversized reports, remote outcomes, shared imports/cancellation, capacity limits, source containment, nested workspaces, batch cancellation/options, evidence pinning, retention and database rejection |
+| Native Go regression suite | 34 top-level tests passed with the native race detector, including workflow subtests; executable CLI fixture, malformed/oversized reports, remote outcomes, shared imports/cancellation, capacity limits, source containment, nested workspaces, batch cancellation/options, evidence pinning, retention and database rejection |
 | Go vet | Passed for application, engine and resource tool |
 | Fresh dependency audits | Bun: zero findings across 95 checked packages; govulncheck source/resource-tool and production binary: no vulnerabilities found |
 | Dependency currency | No frontend updates from `bun outdated`; compiled Go modules checked for available updates; SQLite and libc updated to their latest resolved releases |
 | Packaging | Windows AMD64 PE32+; embedded lazy views; only one application executable in NSIS; no Bun sidecar, source or test fixture payload |
 | Native WebView acceptance | Passed all views, CLI capabilities/authentication, scan submission/monitoring/events, complete 5,051-finding import, 100-row GUI paging, sessions/notes, JSON export, inconclusive verification and uncertain cancellation |
 | Crash recovery | Known scan ID recovered to Completed without resubmission; uncertain submission stayed Unknown; CLI child did not survive host termination |
+| Additional failure coverage | Interrupted WAL snapshot with an incomplete tail recovered committed evidence and discarded uncommitted writes; actual SQLite FULL error rolled back notes/evidence atomically; disposable Windows read-deny ACL blocked source access |
+| Race-instrumented GUI | Native acceptance completed with Go's race detector and no reported race, including while a separate production profile was open |
+| Frame restrictions | Actual WebView rejected same-origin, remote and srcdoc frames and remote scripts through CSP; injected frame marker did not execute |
+| Source integrations | User-assisted physical Explorer folder drop passed; loopback SMB/UNC source read and scan passed; actual installed VS Code opened the synthetic Unicode source at line 1 |
+| Notifications | Native API submission passed and synthetic notifications reached Windows history; Windows silenced notifications during the manual check, so visible banner/click interaction is not claimed |
 | Production executable GUI | Launched outside repository working directory; restored results and finding details; folder picker through Ctrl+O; synthetic scan through Ctrl+R and button; native evidence bundle saved and read back |
 | Window/layout controls | Single-instance activation, maximize, restore, minimize and shutdown passed; actual window resized to the configured 960×640 minimum; results remained accessible |
 | Native credentials/clipboard | Actual DPAPI encryption and decryption through a disposable CLI credential; plaintext absent from credential blob; generated remediation prompt copied and read back |
@@ -34,8 +39,8 @@ The earlier 161 TypeScript tests included the removed backend. They are not repo
 
 ## Tested artifacts
 
-- Unpacked executable: `dist/Marx.exe` — 16,094,720 bytes.
-- Installer: `dist/Marx-0.9.0-win-x64-setup.exe` — 5,287,039 bytes.
+- Unpacked executable: `dist/Marx.exe` — 16,095,232 bytes.
+- Installer: `dist/Marx-0.9.0-win-x64-setup.exe` — 5,289,030 bytes.
 - Installed executable: `%LOCALAPPDATA%/Programs/MarxWails/Marx.exe`.
 - Disposable profile: `%TEMP%/marx-wails-test-<generated>/profile`.
 - Native evidence exports stayed inside the disposable fixture; no raw exported evidence is published.
@@ -44,9 +49,9 @@ SHA-256:
 
 ```text
 Marx.exe
-2D480E81B8993EE45EBF4F76729D90A8C5439A95909877060AD1BFBA30D1B82B
+5D751BFFEDC7835324F120B13B030C24712B09C331D1E751DBE7945A28E3BF88
 Marx-0.9.0-win-x64-setup.exe
-E48F0AF73374DA8BBFBEF3E0566D3579742211B377FD4B2530218CE7BB2A69F4
+0A8FAB37CB5FBB5233732091DFAE5CBC1613FD75CE4EEB6958B8B956C66F34B8
 ```
 
 The installer is approximately 5.3 MB, versus approximately 45.6 MB for the earlier Wails/Bun prototype. WebView2's shared installed runtime and the separately supplied Checkmarx CLI are excluded from these sizes.
@@ -57,8 +62,10 @@ The selected project identity now survives streamed CLI responses; a returned sc
 
 A release-GUI check exposed inconsistent Ctrl+R handling with focus in the branch input. Shortcuts now route through a capture-phase renderer handler with duplicate native bindings removed and repeat suppression. Actual keyboard typing followed by Ctrl+R created and completed one new scan in the final installed app. Ctrl+O also opened the native folder picker.
 
+The branch hint now sits below its input so project and branch controls align in both existing/new project modes; both were inspected in the actual release GUI. Native notification submission failures now appear in the scan log without changing the remote outcome. A simultaneous production/acceptance run initially timed out with Wails' shared default WebView directory; WebView data now lives inside each selected profile. The race-instrumented acceptance run then passed while a production profile was open.
+
 ## Remaining boundaries
 
 Wails 3.0.0 still discloses a partly fixed child-frame/native-bridge vulnerability; Marx's frame/remote-resource restrictions mitigate the application's exposure but are not an upstream patch. No framework-wide vulnerability-free claim is made. See [SECURITY.md](../SECURITY.md).
 
-Live tenant integration, physical UNC shares, manual Explorer drop gestures, installed editor-link launches, OS toast delivery/click interaction, full accessibility certification and damaged-database recovery remain unqualified. Corrupt/newer databases were tested for safe rejection; committed/WAL persistence and restart were tested. Go's race detector could not run because CGO is disabled and no C compiler is configured; functional concurrency tests passed. No other operating system or architecture was built or qualified. The installer remains unsigned. See [limitations](limitations.md).
+Live tenant integration, remote NAS authentication/network failure behavior, Cursor, visible OS toast/click interaction, full accessibility certification and arbitrary damaged-page repair remain unqualified. SQLite FULL was induced with a page limit rather than exhausting a physical disk. Corrupt/newer databases were tested for safe rejection; committed/WAL persistence, interrupted-tail recovery and restart were tested. No other operating system or architecture was built or qualified. The installer remains unsigned. See [limitations](limitations.md).

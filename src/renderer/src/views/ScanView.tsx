@@ -268,8 +268,9 @@ export function ScanView() {
                   <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="my-service" />
                 </label>
               )}
-              <label className="field">Branch {git && !git.hasGit && <span className="faint">No Git branch detected</span>}
+              <label className="field">Branch
                 <input type="text" value={options.branch} onChange={(e) => setOptions((o) => ({ ...o, branch: e.target.value }))} />
+                {git && !git.hasGit && <span className="faint">No Git branch detected</span>}
               </label>
             </div>
           </div>

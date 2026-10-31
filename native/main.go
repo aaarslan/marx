@@ -177,8 +177,10 @@ func main() {
 		os.Exit(1)
 	}
 	identity := sha256.Sum256([]byte(strings.ToLower(profile)))
+	windowsOptions := browserOptions()
+	windowsOptions.WebviewUserDataPath = filepath.Join(profile, "webview2")
 	s := &DesktopService{ready: make(chan struct{}), notifier: notifications.New()}
-	s.app = application.New(application.Options{Name: "Marx", Windows: browserOptions(), Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s), application.NewService(s.notifier)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s), application.NewService(s.notifier)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 		if s.win != nil {
 			s.win.Show()
 			s.win.Focus()

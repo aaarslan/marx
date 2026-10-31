@@ -565,3 +565,33 @@ func TestCLIProgressStreamsWithoutContaminatingJSON(t *testing.T) {
 		t.Fatal("Stderr progress was not delivered")
 	}
 }
+
+func TestNotificationFailureDoesNotChangeScanOutcome(t *testing.T) {
+	f := fixture(t)
+	original := f.e.host.Native
+	f.e.host.Native = func(name string, p Object) (any, error) {
+		if name == "notification" {
+			return nil, errors.New("Synthetic notification refusal")
+		}
+		return original(name, p)
+	}
+	job := object(invoke(t, f.e, "scan:run", f.input()))
+	saved := settled(t, f, str(job, "id"))
+	if str(saved, "status") != "Completed" {
+		t.Fatal("Notification failure changed the remote scan outcome")
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		logs, err := f.e.store.logs(str(job, "id"))
+		if err != nil {
+			t.Fatal("Notification failure log could not be read")
+		}
+		for _, line := range logs {
+			if strings.Contains(line, "Desktop notification unavailable: Synthetic notification refusal") {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("Notification failure was silently discarded")
+}
