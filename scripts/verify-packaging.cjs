@@ -182,7 +182,7 @@ async function verifyAsar() {
     ['assets/literal[1].txt', Buffer.from('literal brackets')],
     ['assets/empty.bin', Buffer.alloc(0)],
     ['assets/nested/binary.dat', Buffer.from([0, 1, 2, 127, 128, 255])],
-    ['assets/space Ã¼.txt', Buffer.from('unicode filename')],
+    ['assets/space ü.txt', Buffer.from('unicode filename')],
     ['native/addon.node', Buffer.from([4, 3, 2, 1])],
     ['external/nested/data.txt', Buffer.from('unpacked directory')],
     ['drop.skip', Buffer.from('ignored fixture')],
