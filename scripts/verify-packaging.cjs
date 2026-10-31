@@ -8,6 +8,7 @@ const vm = require('node:vm');
 const { spawn } = require('node:child_process');
 const { createRequire } = require('node:module');
 
+const nativeArchivePath = value => value.split('/').join(path.sep);
 const project = path.resolve(__dirname, '..');
 const projectRequire = createRequire(path.join(project, 'package.json'));
 const PATCH_VERSIONS = {
@@ -181,7 +182,7 @@ async function verifyAsar() {
     ['assets/literal[1].txt', Buffer.from('literal brackets')],
     ['assets/empty.bin', Buffer.alloc(0)],
     ['assets/nested/binary.dat', Buffer.from([0, 1, 2, 127, 128, 255])],
-    ['assets/space ü.txt', Buffer.from('unicode filename')],
+    ['assets/space Ã¼.txt', Buffer.from('unicode filename')],
     ['native/addon.node', Buffer.from([4, 3, 2, 1])],
     ['external/nested/data.txt', Buffer.from('unpacked directory')],
     ['drop.skip', Buffer.from('ignored fixture')],
@@ -215,18 +216,18 @@ async function verifyAsar() {
     const entries = archiveEntries(asar, archive);
     for (const [relative, data] of files) {
       assert.ok(entries.includes(relative), `Missing ASAR file ${relative}`);
-      assert.deepEqual(asar.extractFile(archive, relative), data, `Changed bytes in ${relative}`);
+      assert.deepEqual(asar.extractFile(archive, nativeArchivePath(relative)), data, `Changed bytes in ${relative}`);
     }
-    for (const directory of ['empty', 'assets/empty', '.config']) assert.ok('files' in asar.statFile(archive, directory));
-    if (process.platform !== 'win32') assert.equal(asar.statFile(archive, 'bin/run.sh').executable, true);
+    for (const directory of ['empty', 'assets/empty', '.config']) assert.ok('files' in asar.statFile(archive, nativeArchivePath(directory)));
+    if (process.platform !== 'win32') assert.equal(asar.statFile(archive, nativeArchivePath('bin/run.sh')).executable, true);
     if (links) {
-      assert.equal(asar.statFile(archive, 'file-link', false).link, 'main.js');
-      assert.equal(asar.statFile(archive, 'dir-link', false).link, 'assets');
-      assert.equal(asar.statFile(archive, 'absolute-file-link', false).link, 'main.js');
-      assert.equal(asar.statFile(archive, 'absolute-dir-link', false).link, 'assets');
-      assert.equal(asar.statFile(archive, 'dot-name-link', false).link, '..name');
-      assert.deepEqual(asar.extractFile(archive, 'file-link'), files.get('main.js'));
-      assert.deepEqual(asar.extractFile(archive, 'absolute-file-link'), files.get('main.js'));
+      assert.equal(asar.statFile(archive, nativeArchivePath('file-link'), false).link, 'main.js');
+      assert.equal(asar.statFile(archive, nativeArchivePath('dir-link'), false).link, 'assets');
+      assert.equal(asar.statFile(archive, nativeArchivePath('absolute-file-link'), false).link, 'main.js');
+      assert.equal(asar.statFile(archive, nativeArchivePath('absolute-dir-link'), false).link, 'assets');
+      assert.equal(asar.statFile(archive, nativeArchivePath('dot-name-link'), false).link, '..name');
+      assert.deepEqual(asar.extractFile(archive, nativeArchivePath('file-link')), files.get('main.js'));
+      assert.deepEqual(asar.extractFile(archive, nativeArchivePath('absolute-file-link')), files.get('main.js'));
       assert.ok(!entries.some(entry => entry.startsWith('dir-link/') || entry.startsWith('absolute-dir-link/')), 'Crawling must not duplicate descendants through a directory symlink.');
     }
     const extracted = path.join(temporary, 'extracted');
@@ -240,11 +241,11 @@ async function verifyAsar() {
     }
     const unpacked = path.join(temporary, 'unpacked.asar');
     await asar.createPackageWithOptions(source, unpacked, { unpack: '*.node', unpackDir: 'external' });
-    assert.equal(asar.statFile(unpacked, 'native/addon.node').unpacked, true);
-    assert.equal(asar.statFile(unpacked, 'external/nested/data.txt').unpacked, true);
-    assert.notEqual(asar.statFile(unpacked, 'main.js').unpacked, true);
+    assert.equal(asar.statFile(unpacked, nativeArchivePath('native/addon.node')).unpacked, true);
+    assert.equal(asar.statFile(unpacked, nativeArchivePath('external/nested/data.txt')).unpacked, true);
+    assert.notEqual(asar.statFile(unpacked, nativeArchivePath('main.js')).unpacked, true);
     assert.deepEqual(fs.readFileSync(path.join(`${unpacked}.unpacked`, 'native', 'addon.node')), files.get('native/addon.node'));
-    assert.deepEqual(asar.extractFile(unpacked, 'external/nested/data.txt'), files.get('external/nested/data.txt'));
+    assert.deepEqual(asar.extractFile(unpacked, nativeArchivePath('external/nested/data.txt')), files.get('external/nested/data.txt'));
     const filtered = path.join(temporary, 'filtered.asar');
     await asar.createPackageWithOptions(source, filtered, { dot: false, globOptions: { ignore: '**/*.skip' } });
     const filteredEntries = archiveEntries(asar, filtered);
@@ -258,10 +259,10 @@ async function verifyAsar() {
     ];
     if (links) streams.push({ path: 'file-link', type: 'link', stat: fs.lstatSync(path.join(source, 'file-link')), unpacked: false, symlink: 'main.js' });
     await asar.createPackageFromStreams(streamArchive, streams);
-    assert.deepEqual(asar.extractFile(streamArchive, '.hidden'), files.get('.hidden'));
-    assert.deepEqual(asar.extractFile(streamArchive, 'native/addon.node'), files.get('native/addon.node'));
-    assert.ok('files' in asar.statFile(streamArchive, 'empty'));
-    if (links) assert.deepEqual(asar.extractFile(streamArchive, 'file-link'), files.get('main.js'));
+    assert.deepEqual(asar.extractFile(streamArchive, nativeArchivePath('.hidden')), files.get('.hidden'));
+    assert.deepEqual(asar.extractFile(streamArchive, nativeArchivePath('native/addon.node')), files.get('native/addon.node'));
+    assert.ok('files' in asar.statFile(streamArchive, nativeArchivePath('empty')));
+    if (links) assert.deepEqual(asar.extractFile(streamArchive, nativeArchivePath('file-link')), files.get('main.js'));
     if (links) {
       fs.writeFileSync(path.join(temporary, 'outside.txt'), 'must not enter the archive');
       fs.symlinkSync('../outside.txt', path.join(source, 'escape'), 'file');
@@ -286,24 +287,24 @@ async function verifyAsar() {
 
 function inspectArchive(archive) {
   const asar = projectRequire('@electron/asar');
-  const manifest = JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
+  const manifest = JSON.parse(asar.extractFile(archive, nativeArchivePath('package.json')).toString('utf8'));
   assert.equal(manifest.name, 'marx');
   assert.equal(manifest.main, './out/main/index.js');
   const entries = archiveEntries(asar, archive);
   for (const required of ['package.json', 'out/main/index.js', 'out/preload/index.js', 'out/renderer/index.html']) assert.ok(entries.includes(required), `Packaged app is missing ${required}.`);
   assert.ok(!entries.some(entry => /(?:^|\/)(?:src|tests|docs|node_modules)(?:\/|$)|\.(?:map|tsbuildinfo)$/.test(entry)), 'Sources, tests, documentation, development modules, or maps leaked into app.asar.');
   const inventory = entries.map(entry => {
-    const stat = asar.statFile(archive, entry, false);
+    const stat = asar.statFile(archive, nativeArchivePath(entry), false);
     if ('files' in stat) return { path: entry, type: 'directory' };
     if ('link' in stat) return { path: entry, type: 'link', target: stat.link };
-    const data = asar.extractFile(archive, entry);
+    const data = asar.extractFile(archive, nativeArchivePath(entry));
     const local = path.join(project, entry);
     if (entry.startsWith('out/')) assert.deepEqual(data, fs.readFileSync(local), `Packaged bytes differ from the current build: ${entry}`);
     return { path: entry, type: 'file', bytes: data.length, sha256: crypto.createHash('sha256').update(data).digest('hex'), unpacked: Boolean(stat.unpacked) };
   });
   const built = fs.readdirSync(path.join(project, 'out'), { recursive: true, withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.relative(project, path.join(entry.parentPath, entry.name)).replaceAll('\\', '/')).filter(entry => !/\.(?:map|tsbuildinfo)$/.test(entry));
   for (const entry of built) assert.ok(entries.includes(entry), `A compiled asset was omitted: ${entry}`);
-  return { archive, manifest, inventory };
+  return { archive: path.relative(project, archive).split(path.sep).join('/'), manifest, inventory };
 }
 
 function run(executable, args, options = {}) {
@@ -385,7 +386,7 @@ async function verifyPackage(options) {
   assert.equal(fs.readFileSync(path.join(unpacked, 'version'), 'utf8').trim(), expectedElectron);
   const archive = inspectArchive(path.join(unpacked, 'resources', 'app.asar'));
   fs.writeFileSync(path.join(directory, 'inventory.json'), JSON.stringify(archive, null, 2));
-  const result = { directory, electronVersion: expectedElectron, archive: archive.archive, inventory: path.join(directory, 'inventory.json') };
+  const result = { directory, electronVersion: expectedElectron, archive: path.join(unpacked, 'resources', 'app.asar'), inventory: path.join(directory, 'inventory.json') };
   if (options.launch) result.launch = await launchPackagedApp(path.join(unpacked, 'marx'), directory);
   if (options.acceptance) {
     const harness = path.join(directory, 'acceptance', 'scripts', 'verify-cli.cjs');
@@ -393,7 +394,7 @@ async function verifyPackage(options) {
     fs.mkdirSync(path.join(directory, 'acceptance', 'docs'));
     fs.copyFileSync(path.join(project, 'scripts', 'verify-cli.cjs'), harness);
     const command = displayCommand(electron, [...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), harness]);
-    const env = { ...process.env, MARX_ACCEPTANCE_BUNDLE: archive.archive };
+    const env = { ...process.env, MARX_ACCEPTANCE_BUNDLE: path.join(unpacked, 'resources', 'app.asar') };
     delete env.ELECTRON_RUN_AS_NODE;
     await run(command.executable, command.args, { env });
     result.acceptance = 'passed against packaged app.asar';

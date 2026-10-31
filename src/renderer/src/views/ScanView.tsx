@@ -233,7 +233,7 @@ export function ScanView() {
 
       {!folder && (
         <div className="workflow-guide" aria-label="How scanning works">
-          <div><span className="guide-icon"><FolderOpen size={17} /></span><strong>Choose source</strong><p>A service, app, or repository on your Mac.</p></div>
+          <div><span className="guide-icon"><FolderOpen size={17} /></span><strong>Choose source</strong><p>A service, app, or repository on your computer.</p></div>
           <div><span className="guide-icon"><Settings2 size={17} /></span><strong>Configure the scan</strong><p>Pick a project, branch, and scan engines.</p></div>
           <div><span className="guide-icon"><ShieldCheck size={17} /></span><strong>Review and resolve</strong><p>Explore findings or compare with a baseline.</p></div>
         </div>

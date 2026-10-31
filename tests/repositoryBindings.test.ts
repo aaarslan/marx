@@ -23,7 +23,7 @@ describe('explicit repository mappings', () => {
     expect(reloaded.get('/second/ui', 'tenant-a')?.projectId).toBe('p2');
     expect(reloaded.get('/first/ui', 'tenant-b')).toBeNull();
     expect(reloaded.get('/unmapped/ui', 'tenant-a')).toBeNull();
-    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    if (process.platform !== 'win32') expect(fs.statSync(file).mode & 0o777).toBe(0o600);
   });
 
   it('replaces only the selected folder mapping within its connection', () => {
