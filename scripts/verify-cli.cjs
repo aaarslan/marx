@@ -4,11 +4,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-if (process.platform === 'win32') throw new Error('This synthetic CLI executable harness currently requires macOS or Linux.');
 const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'marx-cli-acceptance-'));
 const profile = path.join(folder, 'profile');
 const source = path.join(folder, 'source with spaces');
-const executable = path.join(folder, 'cx');
+const executable = path.join(folder, process.platform === 'win32' ? 'cx.exe' : 'cx');
 const receipt = path.join(folder, 'calls.jsonl');
 const obsolete = path.join(folder, 'obsolete');
 const holdSubmission = path.join(folder, 'hold-submission');
@@ -30,8 +29,9 @@ fs.writeFileSync(path.join(workspaceWeb, 'package.json'), JSON.stringify({ name:
 fs.writeFileSync(path.join(workspaceCore, 'package.json'), JSON.stringify({ name: 'synthetic-core' }));
 fs.writeFileSync(path.join(workspaceWeb, 'index.js'), 'const web = true;');
 fs.writeFileSync(path.join(workspaceCore, 'index.js'), 'const core = true;');
-const node = require('node:child_process').execFileSync('which', ['node'], { encoding: 'utf8' }).trim();
-fs.writeFileSync(executable, `#!${node}
+const node = process.platform === 'win32' ? '' : require('node:child_process').execFileSync('which', ['node'], { encoding: 'utf8' }).trim();
+const mockScript = process.platform === 'win32' ? path.join(folder, 'cx.js') : executable;
+fs.writeFileSync(mockScript, `${process.platform === 'win32' ? '' : '#!' + node}
 const fs = require('node:fs');
 const path = require('node:path');
 const args = process.argv.slice(2);
@@ -72,11 +72,12 @@ else if (args[0] === 'results') {
   const report = value('report-format') === 'summaryJSON'
     ? { CriticalIssues: 0, HighIssues: count, MediumIssues: 0, LowIssues: 0, InfoIssues: 0 }
     : { scanID: value('scan-id'), totalCount: count, results: Array.from({ length: count }, (_, index) => ({ id: 'finding-' + (index + 1), similarityId: 'stable-' + (index + 1), type: 'sast', severity: 'HIGH', state: 'TO_VERIFY', status: 'NEW', data: { queryName: index ? 'Synthetic injection ' + (index + 1) : 'Synthetic injection', nodes: [{ fileName: 'index.js', line: 1 }] } })) };
-  fs.writeFileSync(path.join(value('output-path'), 'report.json'), JSON.stringify(report));
+  fs.writeFileSync(path.join(value('output-path'), value('report-format') === 'sarif' ? 'report.sarif' : 'report.json'), JSON.stringify(value('report-format') === 'sarif' ? { version: '2.1.0', runs: [{ tool: { driver: { name: 'Synthetic CLI' } }, results: [] }] } : report));
   console.log('Report created');
 }
 else process.exit(3);
 `, { mode: 0o700 });
+if (process.platform === 'win32') require('node:child_process').execFileSync('bun', ['build', mockScript, '--compile', '--outfile', executable], { stdio: 'pipe', env: { ...process.env, ELECTRON_RUN_AS_NODE: '' } });
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ cliPath: executable, cliConfigPath: config, cliAuthMode: 'cli', recentFolders: [fs.realpathSync(source)] }));
 let copiedPrompt = '';
 const promptFile = path.join(folder, 'remediation.md');
@@ -346,7 +347,7 @@ app.whenReady().then(async () => {
     fs.writeFileSync(path.join(folder, 'results-960x640.png'), (await contents.capturePage()).toPNG());
     win.setSize(1440, 1000);
     await contents.executeJavaScript('document.querySelector("main").scrollTop = 0; new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-    fs.writeFileSync(path.join(__dirname, '../docs/workbench-results.png'), (await contents.capturePage()).toPNG());
+    fs.writeFileSync(path.join(folder, 'workbench-results.png'), (await contents.capturePage()).toPNG());
     await clickText(contents, 'All findings');
     await clickText(contents, 'Clear filters');
     await clickText(contents, 'Group by fix');
@@ -389,7 +390,7 @@ app.whenReady().then(async () => {
     assert.ok(verifiedSession.verification.comparison.reasons.some(reason => reason.includes('Effective server configuration')));
     win.setSize(1440, 1420);
     await contents.executeJavaScript('document.querySelector("main").scrollTop = 0; new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
-    fs.writeFileSync(path.join(__dirname, '../docs/workbench-session.png'), (await contents.capturePage()).toPNG());
+    fs.writeFileSync(path.join(folder, 'workbench-session.png'), (await contents.capturePage()).toPNG());
     await clickText(contents, 'Export evidence bundle');
     await waitFor(contents, 'document.body.textContent.includes("Evidence exported")');
     const exportedEvidence = JSON.parse(fs.readFileSync(promptFile, 'utf8'));
@@ -558,7 +559,7 @@ app.whenReady().then(async () => {
     await setControl(contents, 'Search findings', 'Synthetic injection 505');
     await waitFor(contents, 'document.querySelectorAll(".remediation-group").length === 3');
     assert.equal(await contents.executeJavaScript('Array.from(document.querySelectorAll("button")).find(button => button.textContent.trim() === "Previous groups").disabled'), true);
-    console.log(JSON.stringify({ result: 'passed', evidence: folder, checks: ['opaque native window and application background without full-window blur', 'native CLI configuration without Marx API key', 'CLI capability preflight and obsolete CLI blocked before authentication/upload', 'explicit project mapping, configuration invalidation, protected source access and reload restoration', 'explicit baseline, branch opt-in and reset', 'CLI connection test', 'settings at 1280 and 960 pixels', 'demo remains available with CLI authentication', 'remediation severity selection, preview, copy and Markdown save', 'dropdown inset and remediation dialog at desktop and narrow widths', 'Escape and focus return', 'multi-batch navigation, copy and complete Markdown export', 'filtered and individual finding scope, generic assistant', 'empty/oversized copy rejection, canceled and duplicate saves', 'GUI folder selection and scan button', 'sustained CLI output without application-shell rerenders, focus loss or scroll jumps', 'bounded scrolling log, live timer and navigation during scanning', 'subprocess scan and progress', 'summary and findings rendered', 'single initial submission', 'CLI failure and uncertain-outcome message', 'persistent filters, selected finding and resize keyboard controls', '960 by 640 layouts and reduced motion', 'fix grouping rationale', 'tracked remediation creation, notes and renderer reload restoration', 'pinned baseline survives a refreshed snapshot', 'source drift detected', 'explicit verification scan and inconclusive coverage', 'complete evidence export', 'durable activity, diagnostics and saved evidence', 'nested workspace discovery through the GUI, exact project mappings and custom per-project scanners', 'review before two explicit batch submissions, common batch identity and durable options after reload', '5051 complete findings with 100-row and 100-group DOM bounds, filter and page-three selection restored after reload'] }, null, 2));
+    console.log(JSON.stringify({ result: 'passed', evidence: '%TEMP%/marx-cli-acceptance-<generated>', checks: ['opaque native window and application background without full-window blur', 'native CLI configuration without Marx API key', 'CLI capability preflight and obsolete CLI blocked before authentication/upload', 'explicit project mapping, configuration invalidation, protected source access and reload restoration', 'explicit baseline, branch opt-in and reset', 'CLI connection test', 'settings at 1280 and 960 pixels', 'demo remains available with CLI authentication', 'remediation severity selection, preview, copy and Markdown save', 'dropdown inset and remediation dialog at desktop and narrow widths', 'Escape and focus return', 'multi-batch navigation, copy and complete Markdown export', 'filtered and individual finding scope, generic assistant', 'empty/oversized copy rejection, canceled and duplicate saves', 'GUI folder selection and scan button', 'sustained CLI output without application-shell rerenders, focus loss or scroll jumps', 'bounded scrolling log, live timer and navigation during scanning', 'subprocess scan and progress', 'summary and findings rendered', 'single initial submission', 'CLI failure and uncertain-outcome message', 'persistent filters, selected finding and resize keyboard controls', '960 by 640 layouts and reduced motion', 'fix grouping rationale', 'tracked remediation creation, notes and renderer reload restoration', 'pinned baseline survives a refreshed snapshot', 'source drift detected', 'explicit verification scan and inconclusive coverage', 'complete evidence export', 'durable activity, diagnostics and saved evidence', 'nested workspace discovery through the GUI, exact project mappings and custom per-project scanners', 'review before two explicit batch submissions, common batch identity and durable options after reload', '5051 complete findings with 100-row and 100-group DOM bounds, filter and page-three selection restored after reload'] }, null, 2));
   } catch (error) {
     console.error(error);
     try { console.error(await contents.executeJavaScript('JSON.stringify(window.scanRenderCounts)')); console.error((await contents.executeJavaScript('document.body.innerText')).slice(-6000)); } catch {}

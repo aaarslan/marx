@@ -35,7 +35,7 @@ Treat these as unverified integration paths, not as passed checks.
 
 ## Platform and accessibility
 
-- Packaged targets are macOS ARM64 and Windows x64/ARM64. Both Windows installers have been cross-built on macOS; installation, launch, notifications and credential storage still require validation on a Windows host. Intel macOS and Linux are not supported release targets.
+- Packaged targets are macOS ARM64 and Windows x64/ARM64. Windows x64 has native installation, executable launch, DPAPI credential round-trip, SQLite persistence and uninstall coverage on Windows 11 Pro x64 (October 31, 2026). Windows ARM64 remains unverified natively. See [the Windows evidence record](native-windows-verification.md) for coverage boundaries; native notification delivery/click behavior remains unverified. Intel macOS and Linux are not supported release targets.
 - Workbench changes have local Electron runtime coverage with synthetic data on Linux/Xvfb, including the actual SQLite module and report worker. This does not substitute for native macOS/Windows installation, credential and signing tests.
 - macOS builds are ad-hoc signed and not notarized. First launch may require explicit macOS approval. Windows installers are unsigned.
 - Fresh-copy startup has shown a delay between page load and the first rendered window. Repeated launches were faster in local checks; a consistently sub-second first launch is not established.

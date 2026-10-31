@@ -1,0 +1,293 @@
+{
+  "result": "passed",
+  "dependencies": {
+    "patchedVersions": {
+      "@electron/asar": "3.4.1",
+      "@electron/universal": "2.0.3",
+      "app-builder-lib": "26.18.0",
+      "dir-compare": "4.2.0"
+    },
+    "resolved": [
+      {
+        "consumer": "@electron/asar",
+        "slot": "picomatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "@electron/asar",
+        "slot": "minimatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "@electron/asar",
+        "slot": "fdir",
+        "name": "fdir",
+        "version": "6.5.0"
+      },
+      {
+        "consumer": "@electron/asar",
+        "slot": "glob",
+        "name": "fdir",
+        "version": "6.5.0"
+      },
+      {
+        "consumer": "@electron/universal",
+        "slot": "picomatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "@electron/universal",
+        "slot": "minimatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "app-builder-lib",
+        "slot": "picomatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "app-builder-lib",
+        "slot": "minimatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "dir-compare",
+        "slot": "picomatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      },
+      {
+        "consumer": "dir-compare",
+        "slot": "minimatch",
+        "name": "picomatch",
+        "version": "4.0.7"
+      }
+    ],
+    "installedPackages": 325
+  },
+  "filters": {
+    "pathImplementations": [
+      {
+        "platform": "linux",
+        "root": "/tmp/project with spaces",
+        "assertions": 37
+      },
+      {
+        "platform": "darwin",
+        "root": "/Users/test/Project With Spaces",
+        "assertions": 37
+      },
+      {
+        "platform": "win32",
+        "root": "C:\\work space\\marx",
+        "assertions": 37
+      },
+      {
+        "platform": "win32",
+        "root": "\\\\server\\share\\marx",
+        "assertions": 37
+      }
+    ],
+    "nativePlatform": "win32",
+    "assertions": 148
+  },
+  "asar": {
+    "files": 12,
+    "entries": 26,
+    "archives": [
+      "default",
+      "unpacked",
+      "filtered",
+      "streams"
+    ],
+    "symlinks": true,
+    "windowsLinkAssertions": 5,
+    "skipped": []
+  },
+  "archive": {
+    "archive": "dist/win-unpacked/resources/app.asar",
+    "manifest": {
+      "name": "marx",
+      "productName": "Marx",
+      "version": "0.8.1",
+      "description": "A desktop client for Checkmarx One SAST and SCA scans",
+      "main": "./out/main/index.js",
+      "author": "Marx contributors",
+      "license": "MIT",
+      "dependencies": {},
+      "overrides": {
+        "@electron/asar>glob": "npm:fdir@6.5.0",
+        "@electron/asar>minimatch": "npm:picomatch@4.0.7",
+        "@electron/universal>minimatch": "npm:picomatch@4.0.7",
+        "app-builder-lib>ejs": "5.0.2",
+        "app-builder-lib>minimatch": "npm:picomatch@4.0.7",
+        "dir-compare>minimatch": "npm:picomatch@4.0.7"
+      },
+      "packageExtensions": {
+        "@electron/asar@3.4.1": {
+          "dependencies": {
+            "fdir": "6.5.0",
+            "picomatch": "4.0.7"
+          }
+        },
+        "@electron/universal@2.0.3": {
+          "dependencies": {
+            "picomatch": "4.0.7"
+          }
+        },
+        "app-builder-lib@26.18.0": {
+          "dependencies": {
+            "picomatch": "4.0.7"
+          },
+          "peerDependenciesMeta": {
+            "electron-builder-squirrel-windows": {
+              "optional": true
+            }
+          }
+        },
+        "dir-compare@4.2.0": {
+          "dependencies": {
+            "picomatch": "4.0.7"
+          }
+        }
+      },
+      "packageManager": "bun@1.4.4",
+      "engines": {
+        "bun": ">=1.4.4"
+      },
+      "private": true,
+      "patchedDependencies": {
+        "app-builder-lib@26.18.0": "patches/app-builder-lib@26.18.0.patch",
+        "@electron/asar@3.4.1": "patches/@electron%2Fasar@3.4.1.patch",
+        "@electron/universal@2.0.3": "patches/@electron%2Funiversal@2.0.3.patch",
+        "dir-compare@4.2.0": "patches/dir-compare@4.2.0.patch"
+      }
+    },
+    "inventory": [
+      {
+        "path": "out",
+        "type": "directory"
+      },
+      {
+        "path": "out/main",
+        "type": "directory"
+      },
+      {
+        "path": "out/main/index.js",
+        "type": "file",
+        "bytes": 118755,
+        "sha256": "e9f0baa44a21ff47e3a4e8814f59eeaecda65b753adf8c3f82e21e35762f58f4",
+        "unpacked": false
+      },
+      {
+        "path": "out/preload",
+        "type": "directory"
+      },
+      {
+        "path": "out/preload/index.js",
+        "type": "file",
+        "bytes": 3764,
+        "sha256": "6ace5555b28e3ab4b6c73db5e4ba29cdc7b48e4465c530a1773ff3886f1756f1",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer",
+        "type": "directory"
+      },
+      {
+        "path": "out/renderer/assets",
+        "type": "directory"
+      },
+      {
+        "path": "out/renderer/assets/BatchView-C_zf9Vdh.js",
+        "type": "file",
+        "bytes": 10817,
+        "sha256": "a66c6eed1affc4ce1dea8266c3bcd0375639ef74a8dcf6a04dc314cfad1de9d4",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/HistoryView-cVwZ_bl6.js",
+        "type": "file",
+        "bytes": 6327,
+        "sha256": "14d4b85591cff2645d073e2306cc3325959bee568f13aa3da3f0d4f4068d4d31",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/RemediationDialog-cn6HvBB6.js",
+        "type": "file",
+        "bytes": 13667,
+        "sha256": "7d343ee6756dd993418b10d7d6da14225316cdf1d7bbf6801360712c4fbbf09e",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/ResultsView-Dem-sNI1.js",
+        "type": "file",
+        "bytes": 37665,
+        "sha256": "da80b740fa59de9dd2a478a67470b69ea2583acd3e2417ead8d603e0902d249c",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/SettingsView-CTmUxwYD.js",
+        "type": "file",
+        "bytes": 9392,
+        "sha256": "e0125734ffe73593cb4a09a51043d6c2279a5ebc38fadf250eab5e465ac4e440",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/WorkbenchView-DRtyiaJv.js",
+        "type": "file",
+        "bytes": 26752,
+        "sha256": "c8c11f07dc51c12bb81191f852043aed51d4c5619967231991923297bd5c58bb",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/external-link-SOEUm8Mp.js",
+        "type": "file",
+        "bytes": 280,
+        "sha256": "cbddeb2aa5ac53b25ec8cf3089e3068c8645e8d4483b0b8e97bd33a998d65dd9",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/index-BIRXxIbE.css",
+        "type": "file",
+        "bytes": 32573,
+        "sha256": "3146e5922ea1b31cb5e1711739e65e4a8500635b97e463e7e097c65d6f1e8795",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/index-X_enzpWd.js",
+        "type": "file",
+        "bytes": 255345,
+        "sha256": "ab28f4fda6c403c1cefa7a033d81fda6c2c855f51b99d13578ef392fd8358f40",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/assets/search-DXDXTnSc.js",
+        "type": "file",
+        "bytes": 496,
+        "sha256": "8cee1107e2bd349401b300862b36735321249724bb6afbde29b94c279eb3bca9",
+        "unpacked": false
+      },
+      {
+        "path": "out/renderer/index.html",
+        "type": "file",
+        "bytes": 652,
+        "sha256": "ce97a735a8118527931c0a833cf1cd2fa0bea025ab24c81f623fdbdafca675fe",
+        "unpacked": false
+      },
+      {
+        "path": "package.json",
+        "type": "file",
+        "bytes": 1552,
+        "sha256": "517b21fbd76fdfde23a89ba2e4ea17d79b338f4768801b1d5fe385a9f901bf77",
+        "unpacked": false
+      }
+    ]
+  }
+}

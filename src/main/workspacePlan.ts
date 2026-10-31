@@ -172,10 +172,14 @@ export async function planWorkspace(root: string): Promise<WorkspacePlan> {
   const plan = discoverWorkspace(root);
   try {
     const options = { cwd: plan.rootPath, timeout: 5000, maxBuffer: 8 * 1024 * 1024, encoding: 'utf8' as const };
-    const results = await Promise.all([
+    const settled = await Promise.allSettled([
       exec('git', ['-c', 'core.fsmonitor=false', 'diff', '--no-renames', '--name-only', '--relative', '-z', 'HEAD', '--', '.'], options),
       exec('git', ['-c', 'core.fsmonitor=false', 'ls-files', '--others', '--exclude-standard', '-z', '--', '.'], options)
     ]);
+    const results = settled.map(result => {
+      if (result.status === 'rejected') throw result.reason;
+      return result.value;
+    });
     plan.changedFiles = [...new Set(results.flatMap((result) => result.stdout.split('\0').filter(Boolean)))];
     plan.impactAvailable = true;
   } catch {
