@@ -6,6 +6,21 @@ import os from 'node:os';
 import { StringDecoder } from 'node:string_decoder';
 
 const activeProcesses = new Set<() => void>();
+type CliPriority = 'control' | 'monitor' | 'normal' | 'report';
+type QueuedProcess = { priority: number; start: () => void; cancel: () => void };
+const queue: QueuedProcess[] = [];
+let running = 0;
+let stopping = false;
+
+function drainQueue(): void {
+  if (stopping) return;
+  queue.sort((a, b) => a.priority - b.priority);
+  while (running < 12 && queue.length) {
+    const index = queue.findIndex((item) => item.priority === 0 || running < 10);
+    if (index < 0) return;
+    queue.splice(index, 1)[0].start();
+  }
+}
 
 export class CliBusyError extends Error {
   constructor() {
@@ -15,7 +30,10 @@ export class CliBusyError extends Error {
 }
 
 export function stopCliProcesses(): void {
+  stopping = true;
+  for (const request of [...queue]) request.cancel();
   for (const stop of activeProcesses) stop();
+  stopping = false;
 }
 
 export interface CliProcessOptions {
@@ -27,6 +45,8 @@ export interface CliProcessOptions {
   timeoutMs?: number;
   maxOutputBytes?: number;
   onLine?: (line: string) => void;
+  priority?: CliPriority;
+  queueTimeoutMs?: number;
 }
 
 export async function resolveCli(configured = '', env = process.env): Promise<string> {
@@ -60,6 +80,46 @@ export function redactCliOutput(text: string, env: NodeJS.ProcessEnv): string {
 }
 
 export function runCliProcess(options: CliProcessOptions): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (options.signal?.aborted) { reject(options.signal.reason ?? new Error('CLI canceled')); return; }
+    if (queue.length >= 128) { reject(new CliBusyError()); return; }
+    const operation = options.args.slice(0, 2).join(' ');
+    const priority = options.priority ?? (operation === 'scan cancel' ? 'control' : operation === 'scan show' ? 'monitor' : operation === 'results show' ? 'report' : 'normal');
+    const rank = { control: 0, monitor: 1, normal: 2, report: 3 }[priority];
+    let timer: ReturnType<typeof setTimeout>;
+    const cleanup = () => { clearTimeout(timer); options.signal?.removeEventListener('abort', request.cancel); };
+    const request: QueuedProcess = {
+      priority: rank,
+      start: () => {
+        cleanup();
+        running++;
+        executeCliProcess(options).then(resolve, reject).finally(() => { running--; drainQueue(); });
+      },
+      cancel: () => {
+        const index = queue.indexOf(request);
+        if (index < 0) return;
+        queue.splice(index, 1);
+        cleanup();
+        reject(new Error('CLI canceled before starting.'));
+        drainQueue();
+      }
+    };
+    timer = setTimeout(() => {
+      const index = queue.indexOf(request);
+      if (index < 0) return;
+      queue.splice(index, 1);
+      cleanup();
+      reject(new CliBusyError());
+      drainQueue();
+    }, options.queueTimeoutMs ?? 120_000);
+    options.signal?.addEventListener('abort', request.cancel, { once: true });
+    queue.push(request);
+    if (options.signal?.aborted) request.cancel();
+    else drainQueue();
+  });
+}
+
+function executeCliProcess(options: CliProcessOptions): Promise<string> {
   const env = options.env ?? process.env;
   return new Promise((resolve, reject) => {
     if (options.signal?.aborted) { reject(options.signal.reason ?? new Error('CLI canceled')); return; }

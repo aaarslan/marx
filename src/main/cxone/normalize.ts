@@ -1,4 +1,5 @@
-import type { CxResult } from './client';
+import type { CxResult } from './types';
+import { createHash } from 'node:crypto';
 import type { Finding, Severity } from '@shared/types';
 import { normalizeSeverity } from '@shared/severity';
 
@@ -63,12 +64,14 @@ export function normalizeFinding(raw: CxResult, scanId: string, projectId: strin
 
   return {
     id: String(raw.id),
+    vendorId: String(raw.id),
     scanId,
     projectId,
     type,
     label: raw.label ?? type,
     similarityId: String(raw.similarityId ?? ''),
     severity,
+    rawSeverity: raw.severity == null ? undefined : String(raw.severity),
     state: normalizeState(raw.state),
     status: normalizeStatus(raw.status),
     created: raw.created,
@@ -87,9 +90,52 @@ export function normalizeFinding(raw: CxResult, scanId: string, projectId: strin
     packageManager: data.packageIdentifier?.packageManager,
     recommendedVersion: data.recommendedVersion,
     isDirectDependency: data.scaPackageData?.isDirectDependency,
+    dependencyPaths: normalizeDependencyPaths(data.scaPackageData?.dependencyPaths),
+    redundancy: data.redundancy === 'fix' || data.redundancy === 'redundant' ? data.redundancy : undefined,
     fixLink: data.scaPackageData?.fixLink,
     comments: raw.comments
   };
+}
+
+export function normalizeFindings(raw: CxResult[], scanId: string, projectId: string): Finding[] {
+  const findings = raw.map((item) => normalizeFinding(item, scanId, projectId));
+  const idCounts = new Map<string, number>();
+  for (const finding of findings) idCounts.set(finding.id, (idCounts.get(finding.id) ?? 0) + 1);
+  const evidenceKey = (finding: Finding) => JSON.stringify([
+    finding.scanId, finding.projectId, finding.type, finding.vendorId, finding.similarityId,
+    finding.cve, finding.packageManager, finding.packageName, finding.packageVersion, finding.flow
+  ]);
+  const evidenceCounts = new Map<string, number>();
+  for (const finding of findings) {
+    if (idCounts.get(finding.id)! < 2) continue;
+    const key = evidenceKey(finding);
+    evidenceCounts.set(key, (evidenceCounts.get(key) ?? 0) + 1);
+  }
+  const used = new Set(findings.map((finding) => finding.id));
+  const ordinals = new Map<string, number>();
+  return findings.map((finding) => {
+    if (idCounts.get(finding.id)! < 2) return finding;
+    const evidence = evidenceKey(finding);
+    const stem = `occurrence:${createHash('sha256').update(evidence).digest('hex')}`;
+    let ordinal = ordinals.get(stem) ?? 0;
+    let key = stem;
+    while (used.has(key)) key = `${stem}:${++ordinal}`;
+    ordinals.set(stem, ordinal);
+    used.add(key);
+    return { ...finding, id: key, identityAmbiguous: evidenceCounts.get(evidence)! > 1 || undefined };
+  });
+}
+
+function normalizeDependencyPaths(raw: unknown): Finding['dependencyPaths'] {
+  if (!Array.isArray(raw)) return undefined;
+  const paths = raw.filter(Array.isArray).map((path) => path.filter((node) => node && typeof node === 'object').map((node: Record<string, unknown>) => ({
+    id: typeof node.id === 'string' ? node.id : undefined,
+    name: typeof node.name === 'string' ? node.name : undefined,
+    version: typeof node.version === 'string' ? node.version : undefined,
+    packageManager: typeof node.packageManager === 'string' ? node.packageManager : undefined,
+    locations: Array.isArray(node.locations) ? node.locations.filter((location) => location && typeof location === 'object' && typeof location.path === 'string').map((location) => ({ path: location.path as string, line: typeof location.line === 'number' ? location.line : undefined })) : undefined
+  }))).filter((path) => path.length > 0);
+  return paths.length ? paths : undefined;
 }
 
 function stripLeadingSlash(p: string): string {

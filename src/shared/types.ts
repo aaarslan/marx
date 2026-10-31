@@ -1,4 +1,4 @@
-// Shared domain types used by main process, preload bridge, and renderer.
+import type { ScanProvenance } from './workbench';
 
 export type ScannerType = 'sast' | 'sca';
 
@@ -12,7 +12,7 @@ export const SCAN_STATUSES = [
 ] as const;
 export type ScanStatus = (typeof SCAN_STATUSES)[number] | 'Unknown';
 
-export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
+export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | 'UNKNOWN';
 
 export type ResultState =
   | 'TO_VERIFY'
@@ -95,6 +95,7 @@ export interface SeverityCounts {
   MEDIUM: number;
   LOW: number;
   INFO: number;
+  UNKNOWN: number;
 }
 
 export const emptySeverityCounts = (): SeverityCounts => ({
@@ -102,11 +103,14 @@ export const emptySeverityCounts = (): SeverityCounts => ({
   HIGH: 0,
   MEDIUM: 0,
   LOW: 0,
-  INFO: 0
+  INFO: 0,
+  UNKNOWN: 0
 });
 
 export interface ScanJobState {
   connectionId?: string;
+  provenance?: ScanProvenance;
+  monitoringStatus?: 'active' | 'stopped' | 'reconciling';
   batchId?: string;
   /** local job id */
   id: string;
@@ -143,6 +147,8 @@ export interface ProjectInfo {
 
 export interface ScanHistoryItem {
   id: string;
+  connectionId?: string;
+  provenance?: ScanProvenance;
   projectId: string;
   projectName: string;
   branch: string;
@@ -164,15 +170,27 @@ export interface FlowNode {
   typeName?: string;
 }
 
+export interface DependencyPathNode {
+  id?: string;
+  name?: string;
+  version?: string;
+  packageManager?: string;
+  locations?: { path: string; line?: number }[];
+}
+
 /** Normalized finding shown in the results table. */
 export interface Finding {
   id: string;
+  vendorId?: string;
+  identityAmbiguous?: boolean;
+  connectionId?: string;
   scanId: string;
   projectId: string;
   type: ScannerType | 'kics' | 'secrets' | string;
   label: string;
   similarityId: string;
   severity: Severity;
+  rawSeverity?: string;
   state: ResultState;
   status: ResultStatus;
   created?: string;
@@ -195,6 +213,8 @@ export interface Finding {
   packageManager?: string;
   recommendedVersion?: string;
   isDirectDependency?: boolean;
+  dependencyPaths?: DependencyPathNode[][];
+  redundancy?: 'fix' | 'redundant';
   fixLink?: string;
   /** severity count bucket derived values */
   comments?: unknown;
@@ -202,9 +222,21 @@ export interface Finding {
 
 export interface ResultsPage {
   scan?: ScanHistoryItem;
+  provenance?: ScanProvenance;
+  connectionId?: string;
+  importedAt?: number;
+  cached?: boolean;
+  counts?: ResultsCounts;
   truncated?: boolean;
   findings: Finding[];
   totalCount: number;
+}
+
+export interface ResultsCounts {
+  reported: number;
+  received: number;
+  normalized: number;
+  unsupported: number;
 }
 
 export interface TriageRequest {

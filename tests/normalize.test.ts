@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeFinding, normalizeState, normalizeStatus } from '../src/main/cxone/normalize';
-import type { CxResult } from '../src/main/cxone/client';
+import { normalizeFinding, normalizeFindings, normalizeState, normalizeStatus } from '../src/main/cxone/normalize';
+import type { CxResult } from '../src/main/cxone/types';
 
 describe('normalizeFinding', () => {
   it('maps a SAST result with a flow', () => {
@@ -82,9 +82,23 @@ describe('normalizeFinding', () => {
 
   it('is defensive with missing data', () => {
     const f = normalizeFinding({ id: '9', type: 'sast', severity: 'weird' }, 's', 'p');
-    expect(f.severity).toBe('INFO');
+    expect(f.severity).toBe('UNKNOWN');
+    expect(f.rawSeverity).toBe('weird');
     expect(f.title).toBe('SAST finding');
     expect(f.flow).toEqual([]);
+  });
+
+  it('preserves explicit informational severity, redundancy and dependency paths', () => {
+    const raw: CxResult = { id: 'r', type: 'sca', severity: 'Information', data: {
+      redundancy: 'redundant',
+      scaPackageData: { dependencyPaths: [[{ name: 'parent', version: '2.0.0' }, { name: 'child', version: '1.0.0' }]] }
+    } };
+    const result = normalizeFinding(raw, 's', 'p');
+    expect(result.severity).toBe('INFO');
+    expect(result.rawSeverity).toBe('Information');
+    expect(result.redundancy).toBe('redundant');
+    expect(result.dependencyPaths?.[0].map((node) => node.name)).toEqual(['parent', 'child']);
+    expect(normalizeFinding({ id: 'r', type: 'sast' }, 's', 'p').severity).toBe('UNKNOWN');
   });
 
   it('normalizes states and statuses', () => {
@@ -94,5 +108,26 @@ describe('normalizeFinding', () => {
     expect(normalizeState(undefined)).toBe('TO_VERIFY');
     expect(normalizeStatus('RECURRENT')).toBe('RECURRENT');
     expect(normalizeStatus('junk')).toBe('NEW');
+  });
+
+  it('retains duplicate CVE records across packages as distinct local selections', () => {
+    const results: CxResult[] = ['one', 'two'].map((name) => ({
+      id: 'CVE-2026-1234', type: 'sca', severity: 'HIGH', vulnerabilityDetails: { cveName: 'CVE-2026-1234' },
+      data: { packageIdentifier: { name, version: '1.0.0', packageManager: 'npm' } }
+    }));
+    const findings = normalizeFindings(results, 'scan', 'project');
+    expect(new Set(findings.map((finding) => finding.id)).size).toBe(2);
+    expect(findings.map((finding) => finding.vendorId)).toEqual(['CVE-2026-1234', 'CVE-2026-1234']);
+    expect(findings.every((finding) => !finding.identityAmbiguous)).toBe(true);
+    expect(normalizeFindings([...results].reverse(), 'scan', 'project').map((finding) => finding.id)).toEqual([...findings].reverse().map((finding) => finding.id));
+  });
+
+  it('preserves exact duplicate vendor records without inventing cross-scan occurrence identity', () => {
+    const raw: CxResult = { id: 'same', type: 'sast', similarityId: 'family', severity: 'HIGH', data: { queryName: 'Query' } };
+    const findings = normalizeFindings([raw, raw], 'scan', 'project');
+    expect(findings).toHaveLength(2);
+    expect(new Set(findings.map((finding) => finding.id)).size).toBe(2);
+    expect(findings.every((finding) => finding.vendorId === 'same' && finding.identityAmbiguous)).toBe(true);
+    expect(normalizeFinding(raw, 'scan', 'project').id).toBe('same');
   });
 });

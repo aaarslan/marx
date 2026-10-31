@@ -1,7 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
 import React, { lazy, Suspense, useEffect } from 'react';
-import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
+import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon, ShieldCheck, Wrench } from 'lucide-react';
 import { useApp, type View } from './store';
 import { api, isMac } from './api';
 import { ScanView } from './views/ScanView';
@@ -10,11 +10,13 @@ const BatchView = lazy(() => import('./views/BatchView').then((m) => ({ default:
 const ResultsView = lazy(() => import('./views/ResultsView').then((m) => ({ default: m.ResultsView })));
 const HistoryView = lazy(() => import('./views/HistoryView').then((m) => ({ default: m.HistoryView })));
 const SettingsView = lazy(() => import('./views/SettingsView').then((m) => ({ default: m.SettingsView })));
+const WorkbenchView = lazy(() => import('./views/WorkbenchView').then((m) => ({ default: m.WorkbenchView })));
 
 const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
   { id: 'scan', label: 'Scan', icon: <ScanSearch size={16} /> },
   { id: 'batch', label: 'Batch Scan', icon: <Layers size={16} /> },
   { id: 'results', label: 'Results', icon: <ListChecks size={16} /> },
+  { id: 'workbench', label: 'Workbench', icon: <Wrench size={16} /> },
   { id: 'history', label: 'History', icon: <FolderSearch size={16} /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon size={16} /> }
 ];
@@ -81,6 +83,7 @@ export function App() {
           {view === 'batch' && <BatchView />}
           {view === 'results' && <ResultsView />}
           {view === 'history' && <HistoryView />}
+          {view === 'workbench' && <WorkbenchView />}
           {view === 'settings' && <SettingsView />}
           </Suspense>
           </div>

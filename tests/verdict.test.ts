@@ -33,4 +33,19 @@ describe('computeVerdict (story-check gate)', () => {
     expect(v.pass).toBe(false);
     expect(v.totalNew).toBe(6);
   });
+
+  it('counts informational findings rather than reporting no new findings', () => {
+    const verdict = computeVerdict({ newBySeverity: { INFO: 2 } });
+    expect(verdict.pass).toBe(true);
+    expect(verdict.totalNew).toBe(2);
+    expect(verdict.newInfo).toBe(2);
+    expect(verdict.headline).toContain('2 lower-severity');
+  });
+
+  it('does not pass an unknown severity as informational', () => {
+    const verdict = computeVerdict({ newBySeverity: { UNKNOWN: 1, INFO: 1 } });
+    expect(verdict.pass).toBe(false);
+    expect(verdict.totalNew).toBe(2);
+    expect(verdict.headline).toContain('unknown severity');
+  });
 });
