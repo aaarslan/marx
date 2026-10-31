@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
-import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { GitInfo } from '@shared/types';
+import { discoverWorkspace } from './workspacePlan';
 
 const exec = promisify(execFile);
 
@@ -21,46 +21,9 @@ export async function getGitInfo(folder: string): Promise<GitInfo> {
   }
 }
 
-const PROJECT_MARKERS = [
-  'package.json',
-  'pom.xml',
-  'build.gradle',
-  'build.gradle.kts',
-  'settings.gradle',
-  'go.mod',
-  'Cargo.toml',
-  'requirements.txt',
-  'pyproject.toml',
-  'Gemfile',
-  'composer.json',
-  '*.csproj',
-  'pubspec.yaml',
-  'Makefile',
-  '.git'
-];
-
-function looksLikeProject(dir: string): boolean {
-  try {
-    const entries = fs.readdirSync(dir);
-    return entries.some((e) =>
-      PROJECT_MARKERS.some((m) =>
-        m.startsWith('*') ? e.endsWith(m.slice(1)) : e === m
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-/** Immediate subfolders of `parent` that look like code projects. */
 export function listSubProjects(parent: string): string[] {
   try {
-    return fs
-      .readdirSync(parent, { withFileTypes: true })
-      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
-      .map((d) => path.join(parent, d.name))
-      .filter(looksLikeProject)
-      .sort();
+    return discoverWorkspace(parent).projects.map((item) => item.folderPath);
   } catch {
     return [];
   }

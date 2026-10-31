@@ -19,7 +19,7 @@ export interface RemediationSelection {
   context: Omit<RemediationContext, 'scope'>;
 }
 
-export function RemediationDialog({ selection, onClose }: { selection: RemediationSelection; onClose: () => void }) {
+export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'Track remediation' }: { selection: RemediationSelection; onClose: () => void; onTrack?: (input: { findingIds: string[]; handoff: string }) => Promise<void>; trackLabel?: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [scopeId, setScopeId] = useState(selection.initialScope);
   const [severities, setSeverities] = useState<Severity[]>(selection.initialSeverities);
@@ -28,7 +28,7 @@ export function RemediationDialog({ selection, onClose }: { selection: Remediati
   const [instructions, setInstructions] = useState('');
   const [index, setIndex] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState<'copy' | 'save' | null>(null);
+  const [busy, setBusy] = useState<'copy' | 'save' | 'track' | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const actionLock = useRef(false);
@@ -53,7 +53,7 @@ export function RemediationDialog({ selection, onClose }: { selection: Remediati
     return () => clearTimeout(timer);
   }, [copied]);
 
-  const run = async (action: 'copy' | 'save') => {
+  const run = async (action: 'copy' | 'save' | 'track') => {
     if (!batch || actionLock.current) return;
     actionLock.current = true;
     setBusy(action);
@@ -64,9 +64,12 @@ export function RemediationDialog({ selection, onClose }: { selection: Remediati
         await api.remediation.copy(batch.text);
         setCopied(true);
         setFeedback(`Batch ${batchIndex + 1} copied. Paste it into your coding assistant with the repository open.`);
-      } else {
+      } else if (action === 'save') {
         const saved = await api.remediation.save({ text: batches.map((item) => item.text).join('\n\n---\n\n'), suggestedName: `${selection.context.projectName ?? 'scan'}-remediation` });
         if (saved) setFeedback(`Saved ${batches.length} ${batches.length === 1 ? 'batch' : 'batches'} to ${saved}`);
+      } else if (onTrack) {
+        await onTrack({ findingIds: batches.flatMap((item) => item.findingIds), handoff: batches.map((item) => item.text).join('\n\n---\n\n') });
+        setFeedback('Saved the findings and handoff in Workbench.');
       }
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { actionLock.current = false; setBusy(null); }
@@ -104,6 +107,7 @@ export function RemediationDialog({ selection, onClose }: { selection: Remediati
       {batch && batch.text.length > PROMPT_CHARACTER_TARGET && <Banner kind="warn">One finding has unusually large evidence. Its full content is preserved; check your assistant’s input limit before pasting.</Banner>}
       {error && <Banner kind="error">{error}</Banner>}
       {feedback && <div className="remediation-feedback" role="status">{feedback}</div>}
+      {onTrack && !selection.context.demo && <div className="remediation-track"><span className="field-help">Keep this evidence and handoff together, then verify the change with a fresh scan.</span><button className="btn" disabled={!batch || Boolean(busy)} onClick={() => void run('track')}>{busy === 'track' ? <Spinner size={13} /> : <Check size={14} />}{trackLabel}</button></div>}
       <div className="remediation-footer">
         <div className="row"><button className="btn ghost small" aria-label="Previous prompt batch" disabled={!batch || batchIndex === 0 || Boolean(busy)} onClick={() => setIndex(batchIndex - 1)}><ChevronLeft size={15} /></button><span aria-live="polite">Batch {batches.length ? batchIndex + 1 : 0} of {batches.length}</span><button className="btn ghost small" aria-label="Next prompt batch" disabled={!batch || batchIndex >= batches.length - 1 || Boolean(busy)} onClick={() => setIndex(batchIndex + 1)}><ChevronRight size={15} /></button></div>
         <div className="row"><button className="btn" disabled={!batch || Boolean(busy)} onClick={() => void run('save')}>{busy === 'save' ? <Spinner size={13} /> : <Download size={14} />}Save {batches.length > 1 ? 'all batches' : 'prompt'}</button><button className="btn primary" disabled={!batch || Boolean(busy)} onClick={() => void run('copy')}>{busy === 'copy' ? <Spinner size={13} /> : copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : batches.length > 1 ? 'Copy this batch' : 'Copy prompt'}</button></div>
