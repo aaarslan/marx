@@ -25,7 +25,7 @@ Artifacts are written to the ignored `dist/` directory. Publishing is disabled i
 
 Build macOS packages on a Mac. The existing macOS hook ad-hoc signs and verifies the app without a certificate. These builds are not notarized.
 
-Windows NSIS installers have been cross-built on macOS. Building and running them on Windows still requires a Windows-host validation pass. The supported NSIS toolset is pinned to `1.2.1`, which provides a native Apple Silicon compiler; the legacy default toolset requires an Intel Mac runtime. Windows executables retain their icon and version resources, but Authenticode signing is disabled because no certificate is configured. Installers allow a per-user installation and a custom destination. Signing a release for public distribution requires a separate certificate workflow.
+Windows x64 NSIS installation, packaged launch, synthetic workflows, persistence and uninstallation were verified natively on Windows 11 Pro x64 on October 31, 2026. See [native Windows evidence](native-windows-verification.md) for exact coverage and remaining gaps. Windows ARM64 runtime validation remains pending. The supported NSIS toolset is pinned to `1.2.1`, which provides a native Apple Silicon compiler; the legacy default toolset requires an Intel Mac runtime. Windows executables retain their icon and version resources, but Authenticode signing is disabled because no certificate is configured. Installers allow a per-user installation and a custom destination. Signing a release for public distribution requires a separate certificate workflow.
 
 ## Build design
 
@@ -41,3 +41,11 @@ In a local comparison with the same dependency lockfile, combined main JavaScrip
 - Live Checkmarx checks require a real tenant and API key. Mock-service scan checks do not establish live API acceptance.
 
 Version 0.5.0 has been packaged as a macOS DMG/ZIP and Windows x64/ARM64 installers on Apple Silicon. macOS packaged runtime and a mock-service scan have local coverage. Windows native runtime validation remains pending.
+
+## Native Windows acceptance
+
+Use PowerShell and Bun 1.4.4. Run `bun run test --pool=threads --maxWorkers=2`; Windows runs 176 tests and intentionally skips ten macOS universal-package cases. `bun run verify:cli` now builds a disposable native mock CLI with Bun; it exercises synthetic data, not a live tenant. The harness clears Electron's inherited `ELECTRON_RUN_AS_NODE` during compilation and saves screenshots in its temporary evidence directory.
+
+After `bun run dist:win`, inspect with `bun run verify:packaging --archive dist/win-unpacked/resources/app.asar`. To run synthetic acceptance against that archive, set `$env:MARX_ACCEPTANCE_BUNDLE = Join-Path $PWD 'dist/win-unpacked/resources/app.asar'` before `bun --bun electron scripts/verify-cli.cjs`. This uses Electron with the packaged application code; separately launch `dist/win-unpacked/Marx.exe` and the installed executable to verify executable startup.
+
+Close Marx before rebuilding: Windows locks running executable files. `dist:win:dir` calls the clean build and removes the previous installer from `dist`; preserve desired artifacts outside that directory before invoking another clean build. Never run the Linux `--package --launch --acceptance` extension on Windows. Use a unique disposable `MARX_USER_DATA_DIR` for executable tests, including installer-launched apps. Uncheck Run Marx in the wizard and launch explicitly with that environment variable to avoid touching the ordinary profile.

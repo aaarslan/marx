@@ -25,8 +25,8 @@ describe('credential and settings persistence', () => {
     const settings = await import('../src/main/settings');
     settings.setApiKey('synthetic-key');
     expect(settings.getApiKey()).toBe('synthetic-key');
-    expect(fs.statSync(keyFile()).mode & 0o777).toBe(0o600);
-    expect(fs.statSync(path.join(state.folder, 'settings.json')).mode & 0o777).toBe(0o600);
+    if (process.platform !== 'win32') expect(fs.statSync(keyFile()).mode & 0o777).toBe(0o600);
+    if (process.platform !== 'win32') expect(fs.statSync(path.join(state.folder, 'settings.json')).mode & 0o777).toBe(0o600);
     expect(fs.readFileSync(keyFile(), 'utf8')).toBe('encrypted:synthetic-key');
     settings.saveSettings({ recentFolders: ['/tmp/fixture'] });
     vi.resetModules();
