@@ -6,7 +6,7 @@ A desktop remediation workbench for Checkmarx One.
 ![Windows x64](https://img.shields.io/badge/Windows-x64-17181c)
 [![License: MIT](https://img.shields.io/badge/license-MIT-ff864d)](LICENSE)
 
-This branch uses Wails 3.0.0 with the installed WebView2 runtime, Go for native desktop integration, and a compiled Bun sidecar for the existing scan/workbench engine and SQLite. Electron is not shipped. Windows 11 x64 is the verified target.
+This branch uses Wails 3.0.0 with the installed WebView2 runtime and Go for the complete scan/workbench engine, SQLite, credentials and native desktop integration. One application executable is shipped. Bun is a frontend build/test tool only. Windows 11 x64 is the verified target.
 
 <img src="docs/workbench-results.png" width="960" alt="Marx findings and remediation workbench" />
 
@@ -53,7 +53,7 @@ govulncheck ./native ./tools/resources
 bun run dist:win
 ```
 
-Output: `dist/Marx.exe`, `dist/marx-core.exe`, and `dist/Marx-0.9.0-win-x64-setup.exe`. Keep both executables together. The per-user installer uses a separate `MarxWails` destination and retains data on uninstall. Electron credentials and settings are not imported.
+Output: `dist/Marx.exe` and `dist/Marx-0.9.0-win-x64-setup.exe`. No workflow sidecar or Bun runtime is shipped. The per-user installer uses a separate `MarxWails` destination and retains data on uninstall. Electron credentials and settings are not imported.
 
 ## Security and validation
 

@@ -3,17 +3,17 @@ package main
 import (
 	"errors"
 	"io"
-	"os"
 	"os/exec"
-	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
-func hideProcess(cmd *exec.Cmd) { cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} }
-
 type processJob windows.Handle
+
+func windowsDownloadsDirectory() (string, error) {
+	return windows.KnownFolderPath(windows.FOLDERID_Downloads, 0)
+}
 
 func (j processJob) Close() error { return windows.CloseHandle(windows.Handle(j)) }
 func containProcess(cmd *exec.Cmd) (io.Closer, error) {
@@ -60,16 +60,4 @@ func protectCredential(mode string, value []byte) ([]byte, error) {
 	}
 	defer windows.LocalFree(windows.Handle(uintptr(unsafe.Pointer(out.Data))))
 	return append([]byte(nil), unsafe.Slice(out.Data, int(out.Size))...), nil
-}
-func credentialCommand(mode string) error {
-	value, err := io.ReadAll(io.LimitReader(os.Stdin, 1024*1024+1))
-	if err != nil {
-		return err
-	}
-	result, err := protectCredential(mode, value)
-	if err != nil {
-		return err
-	}
-	_, err = os.Stdout.Write(result)
-	return err
 }

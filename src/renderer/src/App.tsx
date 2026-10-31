@@ -5,6 +5,7 @@ import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon,
 import { useApp, type View } from './store';
 import { api, isMac } from './api';
 import { ScanView } from './views/ScanView';
+import { desktopShortcut } from '@shared/desktopShortcuts';
 
 const BatchView = lazy(() => import('./views/BatchView').then((m) => ({ default: m.BatchView })));
 const ResultsView = lazy(() => import('./views/ResultsView').then((m) => ({ default: m.ResultsView })));
@@ -35,12 +36,20 @@ export function App() {
   }, [init]);
 
   useEffect(() => {
-    // ⌘R / ⌘O always land on the Scan view
-    const off = api.onMenuAction((action) => {
+    const dispatch = (action: import('@shared/ipc').MenuAction) => {
       triggerMenuAction(action);
       setView('scan');
-    });
-    return off;
+    };
+    const off = api.onMenuAction(dispatch);
+    const onKey = (event: KeyboardEvent) => {
+      const action = desktopShortcut(event);
+      if (!action) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch(action);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => { off(); window.removeEventListener('keydown', onKey, true); };
   }, [setView, triggerMenuAction]);
 
   return (

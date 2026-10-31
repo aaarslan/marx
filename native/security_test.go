@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -42,24 +41,11 @@ func TestProtectedCredentialRoundTrip(t *testing.T) {
 	}
 }
 
-type testWriter struct{ bytes.Buffer }
-
-func (*testWriter) Close() error { return nil }
 func TestConcurrentNativeDialogIsRejected(t *testing.T) {
-	output := &testWriter{}
-	s := &DesktopService{input: output}
+	s := &DesktopService{}
 	s.dialogMu.Lock()
 	defer s.dialogMu.Unlock()
-	s.native(wireMessage{ID: 7, Native: "open"})
-	var response wireMessage
-	if json.Unmarshal(output.Bytes(), &response) != nil || !response.Reply || response.ID != 7 || response.Error == "" {
+	if _, err := s.native("open", nil); err == nil {
 		t.Fatal("Repeated native dialog was not rejected")
 	}
-}
-func TestMissingEngineFailsAndShutsDown(t *testing.T) {
-	s := &DesktopService{ready: make(chan struct{}), done: make(chan struct{})}
-	if s.start(t.TempDir()) == nil {
-		t.Fatal("Expected missing scan engine to fail")
-	}
-	s.stop()
 }

@@ -25,10 +25,9 @@
     "tsBuildInfoFile": "./node_modules/.cache/tsconfig.main.tsbuildinfo"
   },
   "include": [
-    "src/main/**/*.ts",
     "src/shared/**/*.ts",
     "tests/**/*.ts",
     "vite.config.ts",
-    "scripts/build-wails.ts"
+    "scripts/**/*.ts"
   ]
 }

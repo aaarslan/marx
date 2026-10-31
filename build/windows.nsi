@@ -37,7 +37,6 @@ FunctionEnd
 Section "Marx"
  SetOutPath "$INSTDIR"
  File "..\dist\Marx.exe"
- File "..\dist\marx-core.exe"
  WriteUninstaller "$INSTDIR\Uninstall Marx.exe"
  CreateShortcut "$SMPROGRAMS\Marx.lnk" "$INSTDIR\Marx.exe"
  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MarxWails" "DisplayName" "Marx"
@@ -56,7 +55,6 @@ Function un.onInit
 FunctionEnd
 Section "Uninstall"
  Delete "$INSTDIR\Marx.exe"
- Delete "$INSTDIR\marx-core.exe"
  Delete "$INSTDIR\Uninstall Marx.exe"
  Delete "$SMPROGRAMS\Marx.lnk"
  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MarxWails"

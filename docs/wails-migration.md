@@ -1,46 +1,64 @@
-# Wails migration verification
+# Wails and Go engine verification
 
-Verified on native Windows 11 x64 on October 31, 2026. This branch starts from main after PR #3. No Electron data compatibility is attempted. All workflow verification used disposable profiles and synthetic CLI responses, not a live tenant.
+Verified natively on Windows 11 x64 on October 31, 2026, on `feature/wails-desktop` for PR #4. All workflow data and credentials were disposable and synthetic. No live Checkmarx tenant scan is claimed.
 
-## Implementation
+## Shipped architecture
 
-- Wails 3.0.0 with Go 1.27.3 provides the desktop host and Microsoft WebView2 interface.
-- The existing TypeScript workflow engine is compiled with Bun 1.4.4 into `marx-core.exe`. SQLite, report parsing workers, CLI process management, evidence pinning, and remediation logic remain in this engine.
-- Host/engine communication uses inherited pipes, with bounded requests and messages. There is no application network listener. A Windows job object removes the engine and its descendants when the host closes.
-- Go provides dialogs, clipboard, external links, notifications and click routing, single-instance focus, folder-drop delivery and DPAPI. Frame embedding and remote resources are disabled. The accepted upstream Wails child-frame limitation remains documented in SECURITY.md.
-- Electron packages, ASAR adaptations and packaging patches are removed. A minimal Go resource generator replaces the Wails CLI in the build to avoid unrelated CLI dependencies.
+`Marx.exe` contains the Wails 3.0.0 desktop host, complete Go 1.27.3 scan/workbench engine, modernc.org/sqlite 1.61.1 and embedded React assets. Bun is used only to build/test the frontend. The Bun workflow executable, pipe protocol, credential helper, JavaScript report worker, Electron/ASAR dependencies and workspace Picomatch dependency are removed. The synthetic CLI fixture is Go and is never packaged.
+
+Go owns CLI discovery, capability checks, environment-based authentication, project validation, scan arguments, submission/monitoring/cancellation, bounded report imports, normalization, provenance, workspace planning, batch settings, SQLite persistence, pinned remediation evidence, comparison, notes, handoffs, verification and exports. Windows DPAPI runs directly in process. CLI descendants are contained in Windows job objects. Production builds expose no acceptance debug port.
 
 ## Executed checks
 
-| Validation | Result |
+| Validation | Result and evidence |
 | --- | --- |
-| Frozen Bun installation | Pass, lockfile unchanged |
-| Latest frontend versions | `bun outdated` reports no newer versions |
-| Latest modules compiled into app/resource tool | No available updates reported for their resolved module paths |
-| TypeScript | Pass for backend and renderer projects |
-| Workflow tests | 161 passed across 25 files; four obsolete Electron-specific test files removed |
-| Go tests | Four native tests passed: frame boundary, DPAPI, duplicate-dialog guard, missing-engine shutdown |
-| Go vet | Pass |
-| JavaScript audit | Zero advisories across 96 checked packages |
-| Go source/resource-tool and compiled application scans | No findings from govulncheck; the Wails release-note limitation is separately disclosed |
-| Wails synthetic acceptance | Pass: all views, CLI capabilities and connection, submission/monitoring/events, worker import of all 5,051 findings, bounded GUI paging, notes, pinned session evidence, inconclusive verification, uncertain cancellation and restart recovery |
-| Native credentials and clipboard | DPAPI encrypt/decrypt round-trip; plaintext absent from saved blob; real clipboard IPC/readback |
-| Native dialogs | Folder picker selected a disposable source with spaces, Unicode, parentheses and brackets; prompt-save dialog wrote the expected synthetic text |
-| Windows resources | Executable product name Marx and version 0.9.0 verified |
-| NSIS installation and installed launch | Exit 0; installed executable launched with a working directory outside the source checkout and restored 5,051 findings from a disposable profile |
-| Clean shutdown and uninstall | Final uninstall exit 0; both installed executables removed, no Marx/engine processes left, disposable SQLite profile retained |
-| Privacy | Home-directory paths absent from executable bytes; public records omit account paths, host inventory and temporary profile identifiers |
+| Native Windows x64 | All application builds, commands and GUI checks ran natively in PowerShell/Windows executables |
+| Frozen installation | Passed; 96 resolved packages, no changes on the frozen installation |
+| TypeScript | Both compiler projects passed |
+| Frontend/shared regression suite | 41 tests passed across seven files |
+| Native Go regression suite | 30 top-level tests passed, including workflow subtests; executable CLI fixture, malformed/oversized reports, remote outcomes, shared imports/cancellation, capacity limits, source containment, nested workspaces, batch cancellation/options, evidence pinning, retention and database rejection |
+| Go vet | Passed for application, engine and resource tool |
+| Fresh dependency audits | Bun: zero findings across 95 checked packages; govulncheck source/resource-tool and production binary: no vulnerabilities found |
+| Dependency currency | No frontend updates from `bun outdated`; compiled Go modules checked for available updates; SQLite and libc updated to their latest resolved releases |
+| Packaging | Windows AMD64 PE32+; embedded lazy views; only one application executable in NSIS; no Bun sidecar, source or test fixture payload |
+| Native WebView acceptance | Passed all views, CLI capabilities/authentication, scan submission/monitoring/events, complete 5,051-finding import, 100-row GUI paging, sessions/notes, JSON export, inconclusive verification and uncertain cancellation |
+| Crash recovery | Known scan ID recovered to Completed without resubmission; uncertain submission stayed Unknown; CLI child did not survive host termination |
+| Production executable GUI | Launched outside repository working directory; restored results and finding details; folder picker through Ctrl+O; synthetic scan through Ctrl+R and button; native evidence bundle saved and read back |
+| Window/layout controls | Single-instance activation, maximize, restore, minimize and shutdown passed; actual window resized to the configured 960×640 minimum; results remained accessible |
+| Native credentials/clipboard | Actual DPAPI encryption and decryption through a disposable CLI credential; plaintext absent from credential blob; generated remediation prompt copied and read back |
+| Installed application | NSIS exit 0; installed file matched release build; launched from a temporary working directory; filtered to finding 5,051; generated/copied a prompt; scanned successfully; saved notes survived restart and reinstall |
+| Uninstallation | Exit 0; application/uninstaller and uninstall registration removed; zero Marx processes remained; disposable database retained as intended |
+| Privacy | Public record uses portable paths only; profiles, detailed logs, screenshots and hardware inventory are not committed; staged files and release binaries checked for local home paths |
 
-## Size
+The earlier 161 TypeScript tests included the removed backend. They are not reported as current Go coverage; native Go tests replace those consumers, while frontend/shared tests remain. The original Electron packaging contracts are obsolete because ASAR and its patched consumers are no longer shipped.
 
-The Wails installer is approximately 45.6 MB, compared with the locally built Electron 0.8.1 installer at approximately 121.3 MB: about 62% smaller. The Go executable is approximately 11.5 MB and the compiled Bun sidecar approximately 115.4 MB before installer compression. These are measured artifacts, not guarantees for future builds. This architecture still ships a JavaScript runtime in the sidecar; WebView2's shared system runtime is not included in these application sizes.
+## Tested artifacts
 
-## Fixes found during migration
+- Unpacked executable: `dist/Marx.exe` — 16,094,720 bytes.
+- Installer: `dist/Marx-0.9.0-win-x64-setup.exe` — 5,287,039 bytes.
+- Installed executable: `%LOCALAPPDATA%/Programs/MarxWails/Marx.exe`.
+- Disposable profile: `%TEMP%/marx-wails-test-<generated>/profile`.
+- Native evidence exports stayed inside the disposable fixture; no raw exported evidence is published.
 
-JSON transport represents omitted array entries as null. The bridge now restores omitted optional arguments before invoking workflow handlers; otherwise result loading failed. Native clipboard operations are awaited. The drop handler unwraps the workflow result before emitting a folder path. Notifications retain identifiers for native click routing. Duplicate native dialogs are rejected. Missing-engine startup closes its channels safely and displays a native error. Installer/uninstaller guards require the running app to close before replacing/removing its files. Windows resources include both fixed and string version values.
+SHA-256:
 
-## Boundaries
+```text
+Marx.exe
+2D480E81B8993EE45EBF4F76729D90A8C5439A95909877060AD1BFBA30D1B82B
+Marx-0.9.0-win-x64-setup.exe
+E48F0AF73374DA8BBFBEF3E0566D3579742211B377FD4B2530218CE7BB2A69F4
+```
 
-The framework is not asserted vulnerability-free. Release 3.0.0 still documents a partly fixed iframe/native-bridge issue; Marx's no-frame policy is an application mitigation. No live Checkmarx tenant, other OS/architecture, physical UNC share, native notification-click interaction, manual OS folder-drop gesture, or disk-corruption recovery was qualified in this pass. Runtime tests cover synthetic behavior and do not replace those integration checks. The installer is unsigned and requires the installed WebView2 runtime. Do not expose acceptance debugging builds or use real credentials in test profiles.
+The installer is approximately 5.3 MB, versus approximately 45.6 MB for the earlier Wails/Bun prototype. WebView2's shared installed runtime and the separately supplied Checkmarx CLI are excluded from these sizes.
 
-The earlier Electron verification documents are historical. No machine-specific screenshots, detailed runtime logs, user profiles or findings were added to this branch.
+## Defects fixed during this port
+
+The selected project identity now survives streamed CLI responses; a returned scan in another project requests cancellation rather than overwriting the selection and passing validation. A report missing its results field is rejected even if it claims zero findings; an explicit null slice is accepted only with an explicit zero total. Shared import cancellation does not strand an immediate retry on an aborted task. CLI stderr progress is streamed while structured stdout stays parseable. Queued batch cancellation prevents upload, and per-package options remain distinct. Shutdown waits for admitted operations before closing SQLite. Source reads use rooted filesystem access. Downloads resolves through the Windows known-folder API.
+
+A release-GUI check exposed inconsistent Ctrl+R handling with focus in the branch input. Shortcuts now route through a capture-phase renderer handler with duplicate native bindings removed and repeat suppression. Actual keyboard typing followed by Ctrl+R created and completed one new scan in the final installed app. Ctrl+O also opened the native folder picker.
+
+## Remaining boundaries
+
+Wails 3.0.0 still discloses a partly fixed child-frame/native-bridge vulnerability; Marx's frame/remote-resource restrictions mitigate the application's exposure but are not an upstream patch. No framework-wide vulnerability-free claim is made. See [SECURITY.md](../SECURITY.md).
+
+Live tenant integration, physical UNC shares, manual Explorer drop gestures, installed editor-link launches, OS toast delivery/click interaction, full accessibility certification and damaged-database recovery remain unqualified. Corrupt/newer databases were tested for safe rejection; committed/WAL persistence and restart were tested. Go's race detector could not run because CGO is disabled and no C compiler is configured; functional concurrency tests passed. No other operating system or architecture was built or qualified. The installer remains unsigned. See [limitations](limitations.md).

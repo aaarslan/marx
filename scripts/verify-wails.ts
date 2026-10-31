@@ -11,13 +11,14 @@ let proc: ReturnType<typeof spawn>|undefined;
 let socket:WebSocket|undefined;
 async function run(args:string[]){const p=Bun.spawn(args,{stdout:'pipe',stderr:'pipe'});if(await p.exited)throw new Error('Verification build failed.');}
 try {
- await run(['bun','build','scripts/fixtures/synthetic-cli.cjs','--compile','--outfile',cli]);
+ const go=process.env.GO_EXECUTABLE||Bun.which('go')||path.join(process.env.LOCALAPPDATA!,'MarxBuildTools/go/bin/go.exe');
+ await run([go,'build','-trimpath','-buildvcs=false','-o',cli,'./scripts/fixtures/cli']);
  fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify({cliPath:cli,cliAuthMode:'cli',recentFolders:[source]}));
  const executable=process.env.MARX_TEST_EXECUTABLE;
  if(!executable)throw new Error('Set MARX_TEST_EXECUTABLE to an acceptance-tagged Wails build.');
  proc=spawn(executable,[],{cwd:os.tmpdir(),stdio:'ignore',env:{...process.env,MARX_USER_DATA_DIR:profile,MARX_FIXTURE_ROOT:root,MARX_ACCEPTANCE_PORT:'19332'}});
  const deadline=Date.now()+30000;let target:any;
- while(Date.now()<deadline&&!target){try{target=(await(await fetch('http://127.0.0.1:19332/json')).json()).find((t:any)=>t.type==='page')}catch{}if(!target)await Bun.sleep(100);}
+ while(Date.now()<deadline&&!target){try{target=(await(await fetch('http://127.0.0.1:19332/json')).json() as any[]).find((t:any)=>t.type==='page')}catch{}if(!target)await Bun.sleep(100);}
  assert.ok(target,'Wails WebView did not start');socket=new WebSocket(target.webSocketDebuggerUrl);
  await new Promise<void>((resolve,reject)=>{socket!.onopen=()=>resolve();socket!.onerror=()=>reject(new Error('WebView connection failed'))});
  let sequence=0;const pending=new Map<number,(r:any)=>void>();
@@ -28,8 +29,14 @@ try {
  await wait('!!window.marx');assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
  for(const name of ['Scan','Results','Batch Scan','Workbench','Settings']){await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()===${JSON.stringify(name)}).click()`);await Bun.sleep(100);assert.ok(await evaluate('!!document.querySelector("main")?.textContent.trim()'))}
  const settings=await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");assert.equal(settings.hasStoredApiKey,true);assert.ok(!fs.readFileSync(path.join(profile,'settings.key')).includes(Buffer.from('disposable-wails-test')));
+ fs.writeFileSync(path.join(root,'expectedKey'),'disposable-wails-test');
+ await evaluate("window.marx.settings.save({cliAuthMode:'marx'})");assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
+ await evaluate("window.marx.settings.save({cliAuthMode:'cli'})");fs.rmSync(path.join(root,'expectedKey'));
  await evaluate('window.marx.workbench.saveWorkspace("native-test",{search:"persisted"})');assert.equal((await evaluate('window.marx.workbench.workspace("native-test")')).search,'persisted');
  await evaluate('window.marx.remediation.copy("Synthetic Wails clipboard")');
+ fs.writeFileSync(path.join(root,'missingResults'),'synthetic');
+ assert.equal(await evaluate("window.marx.results.get('malformed-zero').then(()=>false,()=>true)"),true,'Missing results must not be imported as a clean scan');
+ fs.rmSync(path.join(root,'missingResults'));
  const large=await evaluate('window.marx.results.get("large-paging")');assert.equal(large.findings.length,5051);
  await evaluate('window.marx.onScanEvent(e=>{(window.testEvents??=[]).push(e)})');
  const binding=await evaluate(`window.marx.bindings.save(${JSON.stringify(source)},'p1')`);assert.equal(binding.projectId,'p1');
@@ -39,29 +46,37 @@ try {
  const session=await evaluate(`window.marx.workbench.createSession({title:'Synthetic Wails remediation',scanId:'s1',findingIds:['finding-1']})`);
  assert.ok(session.id);await evaluate(`window.marx.workbench.updateSession({id:${JSON.stringify(session.id)},notes:'Synthetic notes'})`);
  assert.equal((await evaluate('window.marx.workbench.bootstrap()')).sessions[0].notes,'Synthetic notes');
- const exported=await evaluate(`window.marx.results.export('json','synthetic-wails',${JSON.stringify(large.findings.slice(0,2))})`);assert.equal(JSON.parse(fs.readFileSync(exported,'utf8')).findings?.length??JSON.parse(fs.readFileSync(exported,'utf8')).length,2);
+ const exported=await evaluate(`window.marx.results.export('json','synthetic-wails',${JSON.stringify(large.findings.slice(0,2))})`);assert.equal(JSON.parse(fs.readFileSync(exported,'utf8')).findings.length,2);fs.rmSync(exported);
 
  const verify = await evaluate(`window.marx.workbench.verifySession({id:${JSON.stringify(session.id)},scanId:'s2'})`);
  assert.equal(verify.verification.comparison.verdict,'inconclusive');
+ fs.rmSync(path.join(root,'submissionStarted'),{force:true});
  fs.writeFileSync(path.join(root,'holdSubmission'),'hold');
- const held=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);await Bun.sleep(500);
+ const held=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);const submissionDeadline=Date.now()+15000;while(!fs.existsSync(path.join(root,'submissionStarted'))&&Date.now()<submissionDeadline)await Bun.sleep(50);assert.ok(fs.existsSync(path.join(root,'submissionStarted')));
  await evaluate(`window.marx.scan.cancelJob(${JSON.stringify(held)})`);
  await wait(`window.marx.scan.jobs().then(jobs=>jobs.some(j=>j.id===${JSON.stringify(held.id)}&&j.status==='Unknown'))`);
  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Results').click()`);
  await wait(`!!document.querySelector('[aria-label="Scan"] option[value="large-paging"]')`);
  await evaluate(`(()=>{const e=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'large-paging');e.dispatchEvent(new Event('change',{bubbles:true}))})()`);
  await wait(`document.querySelectorAll('.finding-link').length===100`);
- const encrypted=fs.readFileSync(path.join(profile,'settings.key'));
- const decrypted=Bun.spawn([executable,'--credential','unprotect'],{stdin:encrypted,stdout:'pipe',stderr:'pipe'});
- assert.equal(await new Response(decrypted.stdout).text(),'disposable-wails-test');assert.equal(await decrypted.exited,0);
+ fs.rmSync(path.join(root,'holdSubmission'));fs.writeFileSync(path.join(root,'running'),'running');
+ const recovering=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);
+ await wait(`window.marx.scan.jobs().then(jobs=>jobs.some(j=>j.id===${JSON.stringify(recovering.id)}&&j.scanId&&j.status==='Running'))`);
+ fs.rmSync(path.join(root,'submissionStarted'),{force:true});fs.writeFileSync(path.join(root,'holdSubmission'),'hold');
+ const uncertain=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);
+ const crashDeadline=Date.now()+15000;while(!fs.existsSync(path.join(root,'submissionStarted'))&&Date.now()<crashDeadline)await Bun.sleep(50);assert.ok(fs.existsSync(path.join(root,'submissionStarted')));
+ const childPID=Number(fs.readFileSync(path.join(root,'submissionPID'),'utf8'));const submissions=fs.readFileSync(path.join(root,'counter'),'utf8');
  socket.close();proc.kill();await new Promise<void>(resolve=>proc!.once('exit',()=>resolve()));await Bun.sleep(1000);
+ let orphan=false;try{process.kill(childPID,0);orphan=true}catch{}assert.equal(orphan,false,'CLI process survived the host crash');fs.rmSync(path.join(root,'running'));fs.rmSync(path.join(root,'holdSubmission'));
  proc=spawn(executable,[],{cwd:os.tmpdir(),stdio:'ignore',env:{...process.env,MARX_USER_DATA_DIR:profile,MARX_FIXTURE_ROOT:root,MARX_ACCEPTANCE_PORT:'19332'}});
  let restarted:any;const end=Date.now()+30000;
- while(Date.now()<end&&!restarted){try{restarted=(await(await fetch('http://127.0.0.1:19332/json')).json()).find((t:any)=>t.type==='page')}catch{}if(!restarted)await Bun.sleep(100);}
+ while(Date.now()<end&&!restarted){try{restarted=(await(await fetch('http://127.0.0.1:19332/json')).json() as any[]).find((t:any)=>t.type==='page')}catch{}if(!restarted)await Bun.sleep(100);}
  assert.ok(restarted);socket=new WebSocket(restarted.webSocketDebuggerUrl);await new Promise<void>(resolve=>socket!.onopen=()=>resolve());socket.onmessage=onMessage;
  await wait('!!window.marx');assert.equal((await evaluate('window.marx.workbench.workspace("native-test")')).search,'persisted');
  assert.equal((await evaluate('window.marx.workbench.bootstrap()')).sessions[0].notes,'Synthetic notes');
  assert.ok((await evaluate('window.marx.scan.jobs()')).some((j:any)=>j.status==='Unknown'));
- console.log(JSON.stringify({result:'passed',checks:['Wails WebView2 startup','all views','native CLI bridge','Windows DPAPI encryption','SQLite persistence','real clipboard IPC','5051 findings and report worker','scan submission, monitoring and native event delivery','remediation notes','JSON export','DPAPI decryption','inconclusive verification','uncertain cancellation','100-row GUI paging','restart recovery'],evidence:'%TEMP%/marx-wails-test-<generated>'},null,2));
+ await wait(`window.marx.scan.jobs().then(jobs=>jobs.some(j=>j.id===${JSON.stringify(recovering.id)}&&j.status==='Completed'))`);
+ assert.ok((await evaluate('window.marx.scan.jobs()')).some((j:any)=>j.id===uncertain.id&&j.status==='Unknown'&&!j.scanId));assert.equal(fs.readFileSync(path.join(root,'counter'),'utf8'),submissions);
+ console.log(JSON.stringify({result:'passed',checks:['Wails WebView2 startup','all views','native CLI bridge','Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','known-ID restart recovery without resubmission','CLI child cleanup after host crash'],evidence:'%TEMP%/marx-wails-test-<generated>'},null,2));
  await command('Browser.close').catch(()=>{});
-} catch(error) {console.error('Wails acceptance failed:',String(error).replaceAll(root,'<fixture>'));process.exitCode=1;} finally {socket?.close();if(proc&&!proc.killed)proc.kill();}
+} catch(error) {console.error('Wails acceptance failed:',String(error).replaceAll(root,'<fixture>').replaceAll(os.homedir(),'%USERPROFILE%').replaceAll(os.homedir().replaceAll('\\','/'),'%USERPROFILE%'));process.exitCode=1;} finally {socket?.close();if(proc&&!proc.killed)proc.kill();}

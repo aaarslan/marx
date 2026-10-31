@@ -1,24 +1,21 @@
 package main
 
 import (
-	"bufio"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/aaarslan/marx/native/engine"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
@@ -27,180 +24,56 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-type wireMessage struct {
-	ID      uint64          `json:"id"`
-	Channel string          `json:"channel,omitempty"`
-	Args    json.RawMessage `json:"args,omitempty"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Data    json.RawMessage `json:"data,omitempty"`
-	Error   string          `json:"error,omitempty"`
-	Native  string          `json:"native,omitempty"`
-	Event   string          `json:"event,omitempty"`
-	Ready   bool            `json:"ready,omitempty"`
-	Reply   bool            `json:"reply,omitempty"`
-}
-
 type DesktopService struct {
 	dialogMu sync.Mutex
 	app      *application.App
 	win      *application.WebviewWindow
 	notifier *notifications.NotificationService
-	cmd      *exec.Cmd
-	input    io.WriteCloser
-	writeMu  sync.Mutex
-	mu       sync.Mutex
-	pending  map[uint64]chan wireMessage
-	sequence atomic.Uint64
+	engine   *engine.Engine
 	ready    chan struct{}
-	done     chan struct{}
+	startErr error
 	stopOnce sync.Once
-	job      io.Closer
 }
 
+func jsonValue(value any) []byte { b, _ := json.Marshal(value); return b }
 func (s *DesktopService) start(profile string) error {
-	executable, err := os.Executable()
-	if err != nil {
-		return err
+	s.engine, s.startErr = engine.Open(profile, engine.Host{Native: s.native, Emit: func(event engine.Object) { s.app.Event.Emit("scan:event", event) }, Protect: protectCredential, Guard: containProcess, Downloads: downloadsDirectory()})
+	close(s.ready)
+	if s.startErr == nil {
+		s.engine.Recover()
 	}
-	core := filepath.Join(filepath.Dir(executable), "marx-core.exe")
-	s.cmd = exec.Command(core)
-	s.cmd.Env = append(os.Environ(), "MARX_USER_DATA_DIR="+profile, "MARX_HOST_EXECUTABLE="+executable, "MARX_DOWNLOADS_DIR="+downloadsDirectory())
-	hideProcess(s.cmd)
-	s.input, err = s.cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
-	output, err := s.cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	s.cmd.Stderr = io.Discard
-	if err = s.cmd.Start(); err != nil {
-		close(s.done)
-		return errors.New("The scan engine could not start. Reinstall Marx.")
-	}
-	s.job, err = containProcess(s.cmd)
-	if err != nil {
-		s.cmd.Process.Kill()
-		s.cmd.Wait()
-		close(s.done)
-		return errors.New("The scan engine could not be isolated.")
-	}
-	go func() {
-		scanner := bufio.NewScanner(output)
-		scanner.Buffer(make([]byte, 65536), 96*1024*1024)
-		for scanner.Scan() {
-			var m wireMessage
-			if json.Unmarshal(scanner.Bytes(), &m) != nil {
-				break
-			}
-			if m.Ready {
-				select {
-				case <-s.ready:
-				default:
-					close(s.ready)
-				}
-				continue
-			}
-			if m.Event != "" {
-				var data any
-				json.Unmarshal(m.Data, &data)
-				s.app.Event.Emit(m.Event, data)
-				continue
-			}
-			if m.Native != "" {
-				go s.native(m)
-				continue
-			}
-			s.mu.Lock()
-			c := s.pending[m.ID]
-			delete(s.pending, m.ID)
-			s.mu.Unlock()
-			if c != nil {
-				c <- m
-			}
-		}
-		s.cmd.Wait()
-		close(s.done)
-	}()
-	select {
-	case <-s.ready:
-		return nil
-	case <-s.done:
-		return errors.New("The scan engine stopped during startup.")
-	case <-time.After(20 * time.Second):
-		s.stop()
-		return errors.New("The scan engine did not become ready.")
-	}
+	return s.startErr
 }
-func (s *DesktopService) write(m wireMessage) error {
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	return json.NewEncoder(s.input).Encode(m)
-}
-
 func (s *DesktopService) Invoke(channel string, args []json.RawMessage) (json.RawMessage, error) {
-	if strings.HasPrefix(channel, "$") {
-		return nil, errors.New("Reserved operation.")
-	}
 	select {
 	case <-s.ready:
-	case <-s.done:
-		return nil, errors.New("The scan engine is unavailable. Restart Marx.")
 	case <-time.After(20 * time.Second):
-		return nil, errors.New("The scan engine is starting.")
+		return nil, errors.New("The scan engine is starting")
 	}
-	id := s.sequence.Add(1)
-	c := make(chan wireMessage, 1)
-	s.mu.Lock()
-	if len(s.pending) >= 256 {
-		s.mu.Unlock()
-		return nil, errors.New("Too many pending operations.")
+	if s.startErr != nil {
+		return nil, errors.New("The workbench could not be opened")
 	}
-	s.pending[id] = c
-	s.mu.Unlock()
-	defer func() { s.mu.Lock(); delete(s.pending, id); s.mu.Unlock() }()
-	payload, _ := json.Marshal(args)
-	if err := s.write(wireMessage{ID: id, Channel: channel, Args: payload}); err != nil {
-		return nil, errors.New("The scan engine is unavailable.")
+	value, err := s.engine.Invoke(channel, args)
+	if err != nil {
+		return jsonValue(map[string]any{"ok": false, "error": err.Error()}), nil
 	}
-	select {
-	case m := <-c:
-		if m.Error != "" {
-			return nil, errors.New(m.Error)
-		}
-		if len(m.Result) == 0 {
-			return json.RawMessage("null"), nil
-		}
-		return m.Result, nil
-	case <-s.done:
-		return nil, errors.New("The scan engine stopped. Restart Marx.")
-	case <-time.After(31 * time.Minute):
-		return nil, errors.New("The desktop operation timed out.")
-	}
+	return jsonValue(map[string]any{"ok": true, "data": value}), nil
 }
 func (s *DesktopService) stop() {
 	s.stopOnce.Do(func() {
-		if s.input == nil {
-			return
-		}
-		s.write(wireMessage{Channel: "$shutdown"})
-		s.input.Close()
 		select {
-		case <-s.done:
-		case <-time.After(5 * time.Second):
-			s.cmd.Process.Kill()
-		}
-		if s.job != nil {
-			s.job.Close()
+		case <-s.ready:
+			if s.engine != nil {
+				s.engine.Close()
+			}
+		case <-time.After(20 * time.Second):
 		}
 	})
 }
-func (s *DesktopService) native(m wireMessage) {
-	if m.Native == "open" || m.Native == "save" {
+func (s *DesktopService) native(name string, values engine.Object) (any, error) {
+	if name == "open" || name == "save" {
 		if !s.dialogMu.TryLock() {
-			s.write(wireMessage{ID: m.ID, Reply: true, Error: "A native dialog is already open."})
-			return
+			return nil, errors.New("A native dialog is already open.")
 		}
 		defer s.dialogMu.Unlock()
 	}
@@ -215,10 +88,11 @@ func (s *DesktopService) native(m wireMessage) {
 		DefaultPath string   `json:"defaultPath"`
 		Properties  []string `json:"properties"`
 	}
-	json.Unmarshal(m.Args, &p)
+	data := jsonValue(values)
+	json.Unmarshal(data, &p)
 	var value any
 	var err error
-	switch m.Native {
+	switch name {
 	case "clipboard":
 		if !s.app.Clipboard.SetText(p.Text) {
 			err = errors.New("The clipboard could not be written.")
@@ -261,14 +135,12 @@ func (s *DesktopService) native(m wireMessage) {
 	default:
 		err = errors.New("Unknown native operation.")
 	}
-	data, _ := json.Marshal(value)
-	reply := wireMessage{ID: m.ID, Reply: true, Data: data}
-	if err != nil {
-		reply.Error = "The native desktop operation could not be completed."
-	}
-	s.write(reply)
+	return value, err
 }
 func downloadsDirectory() string {
+	if directory, err := windowsDownloadsDirectory(); err == nil {
+		return directory
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Downloads")
 }
@@ -285,12 +157,6 @@ func secureAssets(next http.Handler) http.Handler {
 	})
 }
 func main() {
-	if len(os.Args) == 3 && os.Args[1] == "--credential" {
-		if credentialCommand(os.Args[2]) != nil {
-			os.Exit(1)
-		}
-		return
-	}
 	profile := os.Getenv("MARX_USER_DATA_DIR")
 	if profile == "" {
 		base, err := os.UserConfigDir()
@@ -302,8 +168,16 @@ func main() {
 	if err := os.MkdirAll(profile, 0700); err != nil {
 		os.Exit(1)
 	}
-	identity := sha256.Sum256([]byte(profile))
-	s := &DesktopService{pending: make(map[uint64]chan wireMessage), ready: make(chan struct{}), done: make(chan struct{}), notifier: notifications.New()}
+	canonical, err := filepath.EvalSymlinks(profile)
+	if err != nil {
+		os.Exit(1)
+	}
+	profile, err = filepath.Abs(canonical)
+	if err != nil {
+		os.Exit(1)
+	}
+	identity := sha256.Sum256([]byte(strings.ToLower(profile)))
+	s := &DesktopService{ready: make(chan struct{}), notifier: notifications.New()}
 	s.app = application.New(application.Options{Name: "Marx", Windows: browserOptions(), Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s), application.NewService(s.notifier)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 		if s.win != nil {
 			s.win.Show()
@@ -312,11 +186,16 @@ func main() {
 	}}})
 	s.notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
 		if result.Error == nil {
-			payload, _ := json.Marshal([]string{result.Response.ID})
-			s.write(wireMessage{Channel: "$notification-click", Args: payload})
+			select {
+			case <-s.ready:
+				if s.engine != nil {
+					s.engine.NotificationClick(result.Response.ID)
+				}
+			default:
+			}
 		}
 	})
-	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true, KeyBindings: map[string]func(application.Window){"Ctrl+O": func(application.Window) { s.app.Event.Emit("menu:action", "open-folder") }, "Ctrl+R": func(application.Window) { s.app.Event.Emit("menu:action", "run-scan") }}})
+	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true})
 	s.win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()
 		if len(files) == 1 {
