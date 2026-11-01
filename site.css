@@ -142,7 +142,7 @@ video:focus-visible,
   display: grid;
   grid-template-columns: 1.55fr 1fr;
   gap: 50px;
-  align-items: end;
+  align-items: center;
   margin-top: 21px;
 }
 h1,
@@ -1041,3 +1041,5 @@ pre code {
     object-fit: contain;
   }
 }
+
+.hero-aside .preview-note { font-size: 11px; line-height: 1.6; margin: 14px 0 0; color: var(--muted); }
