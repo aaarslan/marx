@@ -65,12 +65,6 @@ try {
  const input={folderPath:source,projectName:'synthetic-fixture',projectId:'p1',options:{scanners:['sast'],branch:'main',sastPreset:'',sastIncremental:false,scaExploitablePath:false,excludes:[],tags:{}}};
  const job=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);
  await wait(`window.testEvents?.some(e=>e.kind==='job-updated'&&e.job.id===${JSON.stringify(job.id)}&&e.job.status==='Completed')`);
- await wait(`window.marx.workbench.logs(${JSON.stringify(job.id)}).then(lines=>lines.some(line=>line.startsWith('Desktop notification ')))`);
- if(process.env.MARX_VERIFY_NOTIFICATIONS==='1'){
-  const lines:string[]=await evaluate(`window.marx.workbench.logs(${JSON.stringify(job.id)})`);
-  const failure=lines.find(line=>line.startsWith('Desktop notification unavailable:'));
-  assert.equal(failure,undefined,failure||'Notification submission failed');
- }
  const session=await evaluate(`window.marx.workbench.createSession({title:'Synthetic Wails remediation',scanId:'s1',findingIds:['finding-1']})`);
  assert.ok(session.id);await evaluate(`window.marx.workbench.updateSession({id:${JSON.stringify(session.id)},notes:'Synthetic notes'})`);
  assert.equal((await evaluate('window.marx.workbench.bootstrap()')).sessions[0].notes,'Synthetic notes');

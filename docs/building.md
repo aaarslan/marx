@@ -47,7 +47,7 @@ bun run verify:runtime
 
 The harness compiles a synthetic Go CLI and creates a private temporary profile. Only acceptance-tagged builds enable the local WebView debugging port; never distribute them. The production executable must also be launched and interacted with, installed through NSIS, reopened with its disposable profile, and uninstalled. Build logs do not establish GUI acceptance.
 
-Optional harness checks use `MARX_VERIFY_UNC=1` for the existing loopback administrative SMB share, `MARX_VERIFY_EDITOR=code` to request an installed VS Code protocol launch, and `MARX_VERIFY_NOTIFICATIONS=1` to require successful native notification submission. These do not configure shares or Windows notification preferences. The editor window and visible toast/click behavior require separate observation.
+Optional harness checks use `MARX_VERIFY_UNC=1` for the existing loopback administrative SMB share and `MARX_VERIFY_EDITOR=code` to request an installed VS Code protocol launch. These do not configure shares. The editor window requires separate observation. Desktop notifications are not included; scan status, diagnostics and result navigation stay inside the application.
 
 For native race-detector checks, configure a Windows x64 MinGW-compatible C compiler in the current PowerShell session. The verification used the official portable LLVM-MinGW UCRT release `20261020`, without installing it globally or shipping it:
 

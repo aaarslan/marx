@@ -137,9 +137,6 @@ export const useApp = create<AppState>((set, get) => {
         set({ batchId: event.jobs[0]?.batchId ?? null, jobs: [...event.jobs, ...get().jobs.filter((job) => !incoming.has(job.id))] });
       } else if (event.kind === 'log') {
         set((state) => ({ logs: { ...state.logs, [event.jobId]: [...(state.logs[event.jobId] ?? []), event.line].slice(-400) } }));
-      } else if (event.kind === 'open-results') {
-        set({ selectedScanId: event.scanId, linkedFolder: event.folderPath ?? null, view: 'results' });
-        persist();
       }
     },
 

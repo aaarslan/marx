@@ -4,6 +4,8 @@ Wails 3.0.0 and Go 1.27.3 provide the desktop and workflow engine. The SQLite dr
 
 Electron, electron-builder, ASAR, their packaging patches, Picomatch/fdir adapters and the Bun workflow sidecar have been removed with their consumers. Workspace matching is bounded Go code. Former TypeScript backend tests have been replaced by native Go tests against an executable Go CLI fixture; frontend/shared TypeScript tests remain.
 
+Desktop notification support and its go-toast dependency were removed. The application does not register a toast service or send desktop notifications; scan status and result navigation remain in the application.
+
 Use `bun outdated` and `go list -deps` with `go list -m -u` to review modules actually compiled into the application and resource tool. Upstream Wails' graph also names unused tooling and other platforms. Upgrading the entire graph indiscriminately can introduce incompatible task aliases or APIs; inspect the compiled dependency set.
 
 Run `bun audit`, `govulncheck ./native/... ./tools/resources`, and `govulncheck -mode=binary dist/Marx.exe`. These returned no findings during this verification. Advisory databases are snapshots, not proof that dependencies have no defects. Wails 3.0.0's release notes still disclose a partly fixed child-frame/native-bridge issue that the Go scanner does not report. Marx blocks frames and remote resources as documented in [SECURITY.md](../SECURITY.md); this is an application mitigation, not an upstream fix.

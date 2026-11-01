@@ -4,7 +4,7 @@ The current target is native Windows 11 x64 using Wails 3.0.0, Go 1.27.3 and Web
 
 ## Integration boundaries
 
-All scan acceptance used a synthetic Go CLI and disposable data. No live Checkmarx tenant, real source upload, organization proxy/certificate setup, live triage or server-side notification outcome is claimed. Use the organization's approved CLI; capability help checks cannot prove tenant compatibility. Native notification submission succeeded and synthetic entries reached Windows notification history. Windows notifications were silenced during the manual check, so banner appearance and clicking a toast remain unqualified. Submission errors are surfaced in the scan log without changing the remote scan outcome.
+All scan acceptance used a synthetic Go CLI and disposable data. No live Checkmarx tenant, real source upload, organization proxy/certificate setup or live triage is claimed. Use the organization's approved CLI; capability help checks cannot prove tenant compatibility. Desktop notifications were removed at the user's request after visible delivery could not be established. Scan completion, diagnostics and result navigation remain available in the application. No notification delivery or click-through success is claimed.
 
 A user-assisted physical Explorer folder drop and an installed VS Code link launch were verified with disposable source. Cursor and full screen-reader behavior remain unqualified. Local paths with spaces, Unicode, parentheses, brackets and mixed separators have coverage. A real loopback SMB/UNC source read and scan passed; remote NAS authentication, network failures and latency remain outside that check.
 

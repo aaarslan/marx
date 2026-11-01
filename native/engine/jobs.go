@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 )
@@ -270,7 +269,6 @@ func (e *Engine) executeJob(ctx context.Context, a *activeJob, resume bool) {
 			}
 			update(patch)
 			log("Scan monitoring completed.")
-			e.notify(job)
 			return
 		}
 	}
@@ -313,7 +311,6 @@ func (e *Engine) executeJob(ctx context.Context, a *activeJob, resume bool) {
 		}
 		update(Object{"status": s, "finishedAt": now(), "monitoringStatus": "stopped", "error": message, "progress": Object{"phase": phase, "detail": message}})
 		log(message)
-		e.notify(job)
 	}
 }
 func (e *Engine) validateRemoteProject(ctx context.Context, c *CLI, job Object) error {
@@ -360,36 +357,6 @@ func (e *Engine) cancelRemote(c *CLI, id string) (string, string) {
 		return s, "Remote scan cancellation confirmed."
 	}
 	return s, "Cancellation was requested; the remote scan is " + strings.ToLower(s) + ". Reconcile to check its outcome."
-}
-func (e *Engine) notify(job Object) {
-	_, err := e.native("notification", Object{"id": str(job, "id"), "title": "Scan " + strings.ToLower(str(job, "status")), "body": str(job, "projectName") + ": open Marx to review its outcome."})
-	message := "Desktop notification submitted to Windows."
-	if err != nil {
-		message = "Desktop notification unavailable: " + err.Error()
-		if home, homeErr := os.UserHomeDir(); homeErr == nil {
-			message = strings.ReplaceAll(message, home, "%USERPROFILE%")
-			message = strings.ReplaceAll(message, strings.ReplaceAll(home, "\\", "/"), "%USERPROFILE%")
-		}
-		if len(message) > 2048 {
-			message = message[:2048]
-		}
-	}
-	id := str(job, "id")
-	_ = e.store.appendLog(id, message)
-	e.emit(Object{"kind": "log", "jobId": id, "line": message})
-}
-func (e *Engine) NotificationClick(id string) {
-	jobs, err := e.store.list("job", nil)
-	if err != nil {
-		return
-	}
-	for _, job := range jobs {
-		if str(job, "id") == id && str(job, "scanId") != "" {
-			e.emit(Object{"kind": "open-results", "scanId": job["scanId"], "folderPath": job["folderPath"]})
-			break
-		}
-	}
-	_, _ = e.native("show", Object{})
 }
 func (e *Engine) summary(ctx context.Context, c *CLI, id string) (Object, error) {
 	data, err := c.report(ctx, id, "summaryJSON")

@@ -18,7 +18,6 @@ import (
 	"github.com/aaarslan/marx/native/engine"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
-	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
 //go:embed all:frontend/dist
@@ -28,7 +27,6 @@ type DesktopService struct {
 	dialogMu sync.Mutex
 	app      *application.App
 	win      *application.WebviewWindow
-	notifier *notifications.NotificationService
 	engine   *engine.Engine
 	ready    chan struct{}
 	startErr error
@@ -79,12 +77,10 @@ func (s *DesktopService) native(name string, values engine.Object) (any, error) 
 	}
 
 	var p struct {
-		ID          string   `json:"id"`
 		Text        string   `json:"text"`
 		URL         string   `json:"url"`
 		File        string   `json:"file"`
 		Title       string   `json:"title"`
-		Body        string   `json:"body"`
 		DefaultPath string   `json:"defaultPath"`
 		Properties  []string `json:"properties"`
 	}
@@ -97,9 +93,6 @@ func (s *DesktopService) native(name string, values engine.Object) (any, error) 
 		if !s.app.Clipboard.SetText(p.Text) {
 			err = errors.New("The clipboard could not be written.")
 		}
-	case "show":
-		s.win.Show()
-		s.win.Focus()
 	case "external":
 		var u *url.URL
 		u, err = url.Parse(p.URL)
@@ -130,8 +123,6 @@ func (s *DesktopService) native(name string, values engine.Object) (any, error) 
 		var selected string
 		selected, err = s.app.Dialog.SaveFile().SetDirectory(filepath.Dir(p.DefaultPath)).SetFilename(filepath.Base(p.DefaultPath)).AttachToWindow(s.win).PromptForSingleSelection()
 		value = map[string]any{"canceled": selected == "", "filePath": selected}
-	case "notification":
-		err = s.notifier.SendNotification(notifications.NotificationOptions{ID: p.ID, Title: p.Title, Body: p.Body})
 	default:
 		err = errors.New("Unknown native operation.")
 	}
@@ -179,24 +170,13 @@ func main() {
 	identity := sha256.Sum256([]byte(strings.ToLower(profile)))
 	windowsOptions := browserOptions()
 	windowsOptions.WebviewUserDataPath = filepath.Join(profile, "webview2")
-	s := &DesktopService{ready: make(chan struct{}), notifier: notifications.New()}
-	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s), application.NewService(s.notifier)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+	s := &DesktopService{ready: make(chan struct{})}
+	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 		if s.win != nil {
 			s.win.Show()
 			s.win.Focus()
 		}
 	}}})
-	s.notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
-		if result.Error == nil {
-			select {
-			case <-s.ready:
-				if s.engine != nil {
-					s.engine.NotificationClick(result.Response.ID)
-				}
-			default:
-			}
-		}
-	})
 	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true})
 	s.win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()

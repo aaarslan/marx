@@ -22,4 +22,5 @@ const go=process.env.GO_EXECUTABLE||Bun.which('go')||join(process.env.LOCALAPPDA
 const metadata=execFileSync(go,['version','-m','dist/Marx.exe'],{encoding:'utf8'});
 assert.match(metadata,/GOARCH=amd64/);assert.match(metadata,/modernc.org\/sqlite\s+v1\.61\.1/);
 assert.match(metadata,/-trimpath=true/);
+assert.doesNotMatch(metadata,/git\.sr\.ht\/\~jackmordaunt\/go-toast/,'Desktop toast support was linked into the application');
 console.log('Windows x64 PE, Go SQLite engine, embedded lazy views, single-executable installer payload, and absence of Bun sidecar verified.');

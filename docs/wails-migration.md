@@ -16,7 +16,7 @@ Go owns CLI discovery, capability checks, environment-based authentication, proj
 | Frozen installation | Passed; 96 resolved packages, no changes on the frozen installation |
 | TypeScript | Both compiler projects passed |
 | Frontend/shared regression suite | 41 tests passed across seven files |
-| Native Go regression suite | 34 top-level tests passed with the native race detector, including workflow subtests; executable CLI fixture, malformed/oversized reports, remote outcomes, shared imports/cancellation, capacity limits, source containment, nested workspaces, batch cancellation/options, evidence pinning, retention and database rejection |
+| Native Go regression suite | 33 top-level tests passed with the native race detector, including workflow subtests; executable CLI fixture, malformed/oversized reports, remote outcomes, shared imports/cancellation, capacity limits, source containment, nested workspaces, batch cancellation/options, evidence pinning, retention and database rejection |
 | Go vet | Passed for application, engine and resource tool |
 | Fresh dependency audits | Bun: zero findings across 95 checked packages; govulncheck source/resource-tool and production binary: no vulnerabilities found |
 | Dependency currency | No frontend updates from `bun outdated`; compiled Go modules checked for available updates; SQLite and libc updated to their latest resolved releases |
@@ -27,7 +27,7 @@ Go owns CLI discovery, capability checks, environment-based authentication, proj
 | Race-instrumented GUI | Native acceptance completed with Go's race detector and no reported race, including while a separate production profile was open |
 | Frame restrictions | Actual WebView rejected same-origin, remote and srcdoc frames and remote scripts through CSP; injected frame marker did not execute |
 | Source integrations | User-assisted physical Explorer folder drop passed; loopback SMB/UNC source read and scan passed; actual installed VS Code opened the synthetic Unicode source at line 1 |
-| Notifications | Native API submission passed and synthetic notifications reached Windows history; Windows silenced notifications during the manual check, so visible banner/click interaction is not claimed |
+| Desktop notifications | Removed at the user's request after visible delivery could not be established; the service, activation route and go-toast dependency are absent; in-app status and result navigation remain |
 | Production executable GUI | Launched outside repository working directory; restored results and finding details; folder picker through Ctrl+O; synthetic scan through Ctrl+R and button; native evidence bundle saved and read back |
 | Window/layout controls | Single-instance activation, maximize, restore, minimize and shutdown passed; actual window resized to the configured 960×640 minimum; results remained accessible |
 | Native credentials/clipboard | Actual DPAPI encryption and decryption through a disposable CLI credential; plaintext absent from credential blob; generated remediation prompt copied and read back |
@@ -39,8 +39,8 @@ The earlier 161 TypeScript tests included the removed backend. They are not repo
 
 ## Tested artifacts
 
-- Unpacked executable: `dist/Marx.exe` — 16,095,232 bytes.
-- Installer: `dist/Marx-0.9.0-win-x64-setup.exe` — 5,289,030 bytes.
+- Unpacked executable: `dist/Marx.exe` — 15,497,728 bytes.
+- Installer: `dist/Marx-0.9.0-win-x64-setup.exe` — 5,110,466 bytes.
 - Installed executable: `%LOCALAPPDATA%/Programs/MarxWails/Marx.exe`.
 - Disposable profile: `%TEMP%/marx-wails-test-<generated>/profile`.
 - Native evidence exports stayed inside the disposable fixture; no raw exported evidence is published.
@@ -49,12 +49,14 @@ SHA-256:
 
 ```text
 Marx.exe
-5D751BFFEDC7835324F120B13B030C24712B09C331D1E751DBE7945A28E3BF88
+569A4C9476C83F7D471FABB76FB1C9542C1D1624D948E1E29F2B267E150B7152
 Marx-0.9.0-win-x64-setup.exe
-0A8FAB37CB5FBB5233732091DFAE5CBC1613FD75CE4EEB6958B8B956C66F34B8
+F9F2721098CB307C3E82487AF5900A1757AD0AE5BD20B270F44A2C82BA56FCED
 ```
 
-The installer is approximately 5.3 MB, versus approximately 45.6 MB for the earlier Wails/Bun prototype. WebView2's shared installed runtime and the separately supplied Checkmarx CLI are excluded from these sizes.
+The installer is approximately 5.1 MB, versus approximately 45.6 MB for the earlier Wails/Bun prototype. WebView2's shared installed runtime and the separately supplied Checkmarx CLI are excluded from these sizes.
+
+The production GUI and install/reinstall/uninstall scenarios above were completed before desktop notifications were removed. These final artifacts were rebuilt after removal and passed native acceptance, regression, packaging and audit checks. The installer scenarios were not repeated after that removal.
 
 ## Defects fixed during this port
 
@@ -62,10 +64,12 @@ The selected project identity now survives streamed CLI responses; a returned sc
 
 A release-GUI check exposed inconsistent Ctrl+R handling with focus in the branch input. Shortcuts now route through a capture-phase renderer handler with duplicate native bindings removed and repeat suppression. Actual keyboard typing followed by Ctrl+R created and completed one new scan in the final installed app. Ctrl+O also opened the native folder picker.
 
-The branch hint now sits below its input so project and branch controls align in both existing/new project modes; both were inspected in the actual release GUI. Native notification submission failures now appear in the scan log without changing the remote outcome. A simultaneous production/acceptance run initially timed out with Wails' shared default WebView directory; WebView data now lives inside each selected profile. The race-instrumented acceptance run then passed while a production profile was open.
+The branch hint now sits below its input so project and branch controls align in both existing/new project modes; both were inspected in the actual release GUI. A simultaneous production/acceptance run initially timed out with Wails' shared default WebView directory; WebView data now lives inside each selected profile. The race-instrumented acceptance run then passed while a production profile was open.
+
+Desktop notifications were subsequently removed at the user's request. Native submission and Windows history did not establish visible delivery, and clicking a notification never passed verification. The service, send calls, activation event/renderer route and go-toast dependency are removed. Scan progress, saved diagnostics and explicit result navigation remain in the application. The notification-only regression test was removed, leaving 33 native tests.
 
 ## Remaining boundaries
 
 Wails 3.0.0 still discloses a partly fixed child-frame/native-bridge vulnerability; Marx's frame/remote-resource restrictions mitigate the application's exposure but are not an upstream patch. No framework-wide vulnerability-free claim is made. See [SECURITY.md](../SECURITY.md).
 
-Live tenant integration, remote NAS authentication/network failure behavior, Cursor, visible OS toast/click interaction, full accessibility certification and arbitrary damaged-page repair remain unqualified. SQLite FULL was induced with a page limit rather than exhausting a physical disk. Corrupt/newer databases were tested for safe rejection; committed/WAL persistence, interrupted-tail recovery and restart were tested. No other operating system or architecture was built or qualified. The installer remains unsigned. See [limitations](limitations.md).
+Live tenant integration, remote NAS authentication/network failure behavior, Cursor, full accessibility certification and arbitrary damaged-page repair remain unqualified. SQLite FULL was induced with a page limit rather than exhausting a physical disk. Corrupt/newer databases were tested for safe rejection; committed/WAL persistence, interrupted-tail recovery and restart were tested. Desktop notifications are outside the product's scope. No other operating system or architecture was built or qualified. The installer remains unsigned. See [limitations](limitations.md).
