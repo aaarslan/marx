@@ -24,6 +24,8 @@ export function ScanView() {
   const [folder, setFolder] = useState<string | null>(null);
   const [git, setGit] = useState<GitInfo | null>(null);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const folderSelected = folder !== null;
   const [projectMode, setProjectMode] = useState<'existing' | 'new'>('existing');
   const [projectId, setProjectId] = useState<string>('');
   const [boundProjectId, setBoundProjectId] = useState('');
@@ -64,18 +66,25 @@ export function ScanView() {
   }, [defaults]);
 
   useEffect(() => {
-    if (hasScanCredentials(settings)) {
+    let current = true;
+    if (folderSelected && hasScanCredentials(settings)) {
+      setProjectsLoading(true);
       api.projects
         .list()
         .then((ps) => {
+          if (!current) return;
           setProjects(ps);
           if (ps.length === 0) {
             setProjectMode('new');
           }
         })
-        .catch((error) => { setProjects([]); setError(error instanceof Error ? error.message : String(error)); });
+        .catch((error) => { if (current) { setProjects([]); setError(error instanceof Error ? error.message : String(error)); } })
+        .finally(() => { if (current) setProjectsLoading(false); });
+    } else {
+      setProjectsLoading(false);
     }
-  }, [settings?.cliAuthMode, settings?.hasApiKey, settings?.cliPath, settings?.cliConfigPath]);
+    return () => { current = false; };
+  }, [folderSelected, settings?.cliAuthMode, settings?.hasApiKey, settings?.cliPath, settings?.cliConfigPath]);
 
   const folderRequest = useRef(0);
   const pickFolder = async (path: string) => {
@@ -108,7 +117,7 @@ export function ScanView() {
     Boolean(folder) &&
     options.scanners.length > 0 &&
     (projectMode === 'new' ? projectName.trim().length > 0 : Boolean(projectId)) &&
-    Boolean(hasScanCredentials(settings));
+    Boolean(hasScanCredentials(settings)) && !projectsLoading;
 
   const running =
     currentJob != null &&
@@ -210,9 +219,17 @@ export function ScanView() {
         </Banner>
       )}
 
+      {!folder && settings && !settings.cliPath && !settings.recentFolders.length && (
+        <div className="setup-callout">
+          <Settings2 size={18} aria-hidden="true" />
+          <div><strong>Before your first scan</strong><p>Use your organization’s approved Checkmarx CLI. Choose its executable and test access in Settings.</p></div>
+          <button className="btn small" onClick={() => setView('settings')}>Configure CLI</button>
+        </div>
+      )}
+
       <Dropzone folder={folder} onPick={(p) => void pickFolder(p)} hint=".git, dependencies, and build output are excluded by default" />
 
-      {error && <Banner kind="error">{error}</Banner>}
+      {error && <Banner kind="error" action={error.includes("CLI") ? <button className="btn small" onClick={() => setView("settings")}>Open CLI settings</button> : undefined}>{error}</Banner>}
 
       {!folder && settings && settings.recentFolders.length > 0 && (
         <div className="row" style={{ margin: '12px 0 0', flexWrap: 'wrap', gap: 6 }}>
@@ -258,8 +275,8 @@ export function ScanView() {
             <div className="grid-2">
               {projectMode === 'existing' ? (
                 <label className="field">Checkmarx One project
-                  <select aria-label="Checkmarx One project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-                    <option value="" disabled>{projects.length ? 'Choose a project' : 'No projects loaded'}</option>
+                  <select aria-label="Checkmarx One project" aria-busy={projectsLoading} disabled={projectsLoading} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                    <option value="" disabled>{projectsLoading ? 'Loading projects…' : projects.length ? 'Choose a project' : 'No projects loaded'}</option>
                     {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </label>

@@ -38,7 +38,7 @@ git diff --check
 bun run verify:privacy
 ```
 
-The privacy verifier inspects staged files and available release executables. Review screenshots and media separately. Use a GitHub noreply identity for commits when keeping your personal email private.
+The privacy verifier inspects staged files and available release executables for local home paths and credential/personal-email signatures without printing matched values. Use `bun run verify:privacy --all` to inspect all tracked files and add `--history` to audit author and committer identities reachable from HEAD. History correction is a separate coordinated operation because it changes shared commit IDs; do not rewrite another contributor’s public history without agreement. Review screenshots and media separately. Use a GitHub noreply identity for commits when keeping your personal email private.
 
 ## Project conventions
 

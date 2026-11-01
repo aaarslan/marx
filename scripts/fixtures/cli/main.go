@@ -46,7 +46,11 @@ func main() {
 			return
 		}
 	}
-	project := map[string]any{"ID": "p1", "Name": "synthetic-fixture", "MainBranch": "main"}
+	projectName := "synthetic-fixture"
+	if exists("showcase") {
+		projectName = "Demo service"
+	}
+	project := map[string]any{"ID": "p1", "Name": projectName, "MainBranch": "main"}
 	scan := func(id string) map[string]any {
 		created := "2026-10-30T12:00:00Z"
 		if id == "s2" {
@@ -72,7 +76,7 @@ func main() {
 		if exists("wrongProject") {
 			pid = "p2"
 		}
-		return map[string]any{"ID": id, "ProjectID": pid, "ProjectName": "synthetic-fixture", "Branch": "main", "Status": status, "CreatedAt": created}
+		return map[string]any{"ID": id, "ProjectID": pid, "ProjectName": projectName, "Branch": "main", "Status": status, "CreatedAt": created}
 	}
 	switch args[0] {
 	case "version":
@@ -139,6 +143,9 @@ func main() {
 			return
 		case "list":
 			items := []any{scan("s1"), scan("s2"), scan("large-paging")}
+			if exists("showcase") {
+				items = append(items, scan("showcase"))
+			}
 			if exists("intel-demo") {
 				items = append(items, scan("intel-demo"))
 			}
@@ -166,6 +173,9 @@ func main() {
 		}
 		id := value("scan-id")
 		count := 21
+		if id == "showcase" {
+			count = 8
+		}
 		if id == "large-paging" {
 			count = 5051
 		}
@@ -186,10 +196,32 @@ func main() {
 			extension = "sarif"
 		case "summaryJSON":
 			report = map[string]any{"CriticalIssues": 0, "HighIssues": count, "MediumIssues": 0, "LowIssues": 0, "InfoIssues": 0}
+			if id == "showcase" {
+				report = map[string]any{"CriticalIssues": 1, "HighIssues": 2, "MediumIssues": 2, "LowIssues": 2, "InfoIssues": 1}
+			}
 		default:
 			results := make([]any, count)
 			for i := range results {
 				results[i] = map[string]any{"id": fmt.Sprintf("finding-%d", i+1), "similarityId": fmt.Sprintf("stable-%d", i+1), "type": "sast", "severity": "HIGH", "state": "TO_VERIFY", "status": "NEW", "data": map[string]any{"queryName": fmt.Sprintf("Synthetic injection %d", i+1), "nodes": []any{map[string]any{"fileName": "index.js", "line": 1}}}}
+			}
+
+			if id == "showcase" {
+				samples := []struct {
+					title, severity, file, source, sink, description string
+					line                                             int
+				}{
+					{"SQL injection in account search", "CRITICAL", "src/api/accounts.ts", "req.query.search", "database.query", "Synthetic example: request input is concatenated into a database query. Use a parameterized query and validate the expected input shape.", 42},
+					{"Stored cross-site scripting", "HIGH", "src/components/Search.tsx", "savedSearch.description", "innerHTML", "Synthetic example: persisted search text reaches an HTML sink without context-appropriate encoding. Preserve the framework's built-in escaping.", 87},
+					{"Path traversal in file download", "HIGH", "src/api/files.ts", "req.params.filename", "readFile", "Synthetic example: a caller-controlled filename reaches a filesystem read. Restrict access to the intended root and validate the resolved target.", 66},
+					{"Unvalidated redirect target", "MEDIUM", "src/auth/callback.ts", "req.query.next", "response.redirect", "Synthetic example: a redirect target is accepted without an allowlist. Permit only the application's intended redirect destinations.", 31},
+					{"Overly broad cross-origin policy", "MEDIUM", "src/server/cors.ts", "request.origin", "accessControlAllowOrigin", "Synthetic example: a broad origin policy requires review against the application's authentication and cross-origin requirements.", 18},
+					{"Cookie missing secure attribute", "LOW", "src/auth/session.ts", "session.token", "response.cookie", "Synthetic example: review the session cookie's transport and same-site attributes against the deployment's HTTPS requirements.", 53},
+					{"Request metadata in diagnostic logs", "LOW", "src/observability/logger.ts", "request.headers", "logger.debug", "Synthetic example: diagnostic logs may retain request metadata. Minimize logged fields and exclude credentials and personal data.", 24},
+					{"Review development-only debug route", "INFO", "src/server/routes.ts", "environment", "debugRoute", "Synthetic example: confirm the diagnostic route is excluded from production configuration. This observation alone does not establish exposure.", 12},
+				}
+				for index, sample := range samples {
+					results[index] = map[string]any{"id": fmt.Sprintf("showcase-%d", index+1), "similarityId": fmt.Sprintf("showcase-stable-%d", index+1), "type": "sast", "severity": sample.severity, "state": "TO_VERIFY", "status": "NEW", "description": sample.description, "data": map[string]any{"queryName": sample.title, "languageName": "TypeScript", "group": "Web application security", "nodes": []any{map[string]any{"fileName": sample.file, "line": sample.line, "name": sample.source}, map[string]any{"fileName": sample.file, "line": sample.line + 9, "name": sample.sink}}}}
+				}
 			}
 			if id == "intel-demo" {
 				for index, cve := range []string{"CVE-2024-1234", "CVE-2021-44228"} {

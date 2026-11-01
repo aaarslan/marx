@@ -18,6 +18,7 @@ for (const name of [
   "workbench",
   "intelligence",
   "decisions",
+  "decision-baseline",
 ])
   fs.copyFileSync(
     `website/assets/${name}.webp`,

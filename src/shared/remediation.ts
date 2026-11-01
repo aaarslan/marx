@@ -115,7 +115,7 @@ export function createRemediationPrompts(input: RemediationInput): RemediationBa
   }
   groups.push(current);
   return groups.map((group, index) => ({
-    text: `${header}\n\n## Batch ${index + 1} of ${groups.length} · ${group.findingIds.length} findings\n\n${group.sections.join('\n\n')}\n`,
+    text: `${header}\n\n## Batch ${index + 1} of ${groups.length} · ${group.findingIds.length} ${group.findingIds.length === 1 ? 'finding' : 'findings'}\n\n${group.sections.join('\n\n')}\n`,
     findingIds: group.findingIds
   }));
 }

@@ -950,7 +950,6 @@ button.nav-item:not(.active):not(:hover) { background: transparent; }
 .connection-status > span:nth-child(2) { flex: 1; font-size: 11px; }
 .connection-status small { display: block; font-size: 10px; color: var(--text-faint); margin-top: 2px; }
 .connection-dot { height: 6px; width: 6px; background: var(--text-faint); border-radius: 50%; }
-.connection-dot.configured { background: var(--ok); }
 kbd { font: 10px var(--font); letter-spacing: 0; border: 1px solid var(--border-strong); padding: 2px 5px; border-radius: 4px; color: var(--text-dim); background: rgba(255,255,255,0.03); }
 .btn.primary kbd { color: inherit; border-color: rgba(0,0,0,0.22); }
 .workflow-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin-top: 32px; padding: 28px 4px 0; border-top: 1px solid var(--border); }
@@ -1347,3 +1346,14 @@ select {
 }
 
 .intel-signal { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text); background: var(--surface-hover); border-radius: 6px; padding: 3px 7px; font-variant-numeric: tabular-nums; }
+
+.setup-callout { display: flex; align-items: center; gap: 14px; padding: 16px 0; margin-bottom: 18px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.setup-callout > svg { flex-shrink: 0; color: var(--text-dim); }
+.setup-callout > div { flex: 1; min-width: 0; }
+.setup-callout strong { font-size: 12px; font-weight: 600; }
+.setup-callout p { color: var(--text-dim); margin-top: 4px; font-size: 12px; max-width: 610px; }
+@media (max-width: 1000px) { .setup-callout { flex-wrap: wrap; } .setup-callout > div { flex-basis: calc(100% - 40px); } .setup-callout > .btn { margin-left: 32px; } }
+
+.settings-connection-check { margin: 18px 0 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.settings-connection-check > .field-help { flex: 1; min-width: 220px; max-width: 680px; }
+.settings-connection-check > .banner { flex-basis: 100%; }

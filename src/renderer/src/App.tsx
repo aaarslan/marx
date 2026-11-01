@@ -82,8 +82,8 @@ export function App() {
           ))}
           <div className="nav-spacer" />
           <button className="connection-status" aria-label={hasScanCredentials(settings) ? 'Manage connection' : 'Set up connection'} title="Connection settings" onClick={() => setView('settings')}>
-            <span className={`connection-dot ${hasScanCredentials(settings) ? 'configured' : ''}`} />
-            <span>{hasScanCredentials(settings) ? 'Checkmarx CLI' : 'Set up connection'}<small>{hasScanCredentials(settings) ? 'Manage CLI and defaults' : 'Connect to start scanning'}</small></span>
+            <span className="connection-dot" />
+            <span>{hasScanCredentials(settings) ? 'CLI settings' : 'Set up connection'}<small>{hasScanCredentials(settings) ? 'Configure and test access' : 'Connect to start scanning'}</small></span>
             <SettingsIcon size={14} aria-hidden="true" />
           </button>
         </aside>

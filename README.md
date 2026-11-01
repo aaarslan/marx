@@ -23,11 +23,11 @@ Marx runs your installed, official Checkmarx CLI through a graphical workflow. T
 - Prepare local prompts for your coding assistant, pin original evidence, and record changes and verification results.
 - Scan workspace packages and export CSV, JSON, official SARIF, or remediation evidence bundles.
 
-The screenshots and film use synthetic data from the native application. Prompt generation stays local; Marx does not call a model or modify your repository.
+The screenshots and film use varied synthetic findings from the native application, separate from the paging stress fixture. Prompt generation stays local; Marx does not call a model or modify your repository.
 
 ## Get started
 
-Published installer downloads are not available yet. Build locally using Go 1.27.3 and Bun 1.4.4. macOS builds require Xcode Command Line Tools; Windows requires WebView2, and installer creation requires NSIS 3.12.
+**Developer preview.** Published installer downloads are not available yet. Build locally using Go 1.27.3 and Bun 1.4.4. macOS builds require Xcode Command Line Tools; Windows requires WebView2, and installer creation requires NSIS 3.12.
 
 ```sh
 bun install --frozen-lockfile
@@ -37,7 +37,7 @@ bun run start
 
 The build selects the host platform. Outputs are `dist/Marx.app` on macOS and `dist/Marx.exe` on Windows. Use `bun run dist:win` on Windows to create the per-user installer. See [building and verification](docs/building.md) for exact platform commands and toolchain setup.
 
-1. Open **Settings**, select the official CLI and optional configuration file, and test the connection. Existing CLI authentication is the default.
+1. Open **Settings**, select the official CLI and optional configuration file, and choose **Save connection and test**. Existing CLI authentication is the default.
 2. Choose a source folder, confirm its Checkmarx project, and review the scan options before upload.
 3. Open **Results** to investigate findings, prepare a handoff, or track remediation in **Workbench**.
 
@@ -50,7 +50,7 @@ Marx uses Wails 3.1.0, Go, SQLite and React with the system webview. No Bun, Nod
 | Platform | Current status |
 | --- | --- |
 | macOS Apple Silicon | Native synthetic workflow and locally built app verified; ad hoc signed, without notarization |
-| Windows 11 x64 | Prior revision passed native synthetic acceptance, race checks and install/uninstall; new CVE controls need final native validation |
+| Windows 11 x64 | Prior revision passed native synthetic acceptance, race checks and install/uninstall; latest interaction changes need native Windows follow-up |
 
 Linux, Intel macOS and Windows ARM64 are outside the supported targets. Windows packages are unsigned. Synthetic checks do not establish live tenant acceptance. See the [final acceptance checklist](docs/final-acceptance.md) before merging.
 

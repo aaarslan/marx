@@ -77,6 +77,18 @@ try {
  await wait(`!!document.querySelector('.settings-actions')`);
  const shellScroll=await evaluate(`(()=>{document.querySelector('.settings-actions button').scrollIntoView();for(const element of [document.documentElement,document.body,document.querySelector('#root')])element.scrollTop=10000;const sidebar=document.querySelector('.sidebar').getBoundingClientRect();return {top:sidebar.top,bottom:sidebar.bottom,height:innerHeight,outerScroll:document.scrollingElement.scrollTop,mainScroll:document.querySelector('main').scrollTop}})()`);
  assert.equal(shellScroll.outerScroll,0,'Settings focus scrolled the outer document');assert.ok(shellScroll.top>=-1&&shellScroll.bottom<=shellScroll.height+1,'Settings focus moved navigation outside the window');assert.ok(shellScroll.mainScroll>0,'Settings did not scroll within its content pane');
+ assert.equal(await evaluate(`document.querySelector('.connection-dot').classList.contains('configured')`),false,'CLI configuration used an unconditional success indicator');
+ fs.renameSync(cli,cli+'.offline');
+ try {
+  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Results').click()`);
+  await wait(`document.querySelector('.banner.warn')?.textContent.includes('Recent remote scans could not be refreshed')`);
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Load demo results').click()`);
+  await wait(`document.querySelector('main').textContent.includes('Demo scan')`);
+  assert.equal(await evaluate(`!!document.querySelector('.banner.warn')`),false,'A remote history warning leaked into the local demo');
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Close demo').click()`);
+  await wait(`!!document.querySelector('.banner.warn')`);
+ } finally { fs.renameSync(cli+'.offline',cli); }
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
  const settings=await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");assert.equal(settings.hasStoredApiKey,true);assert.ok(!fs.readFileSync(path.join(profile,'settings.key')).includes(Buffer.from('disposable-wails-test')));
  fs.writeFileSync(path.join(root,'expectedKey'),'disposable-wails-test');
  await evaluate("window.marx.settings.save({cliAuthMode:'marx'})");assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
@@ -236,7 +248,7 @@ try {
  }
  assert.equal((await evaluate('window.marx.intelligence.decisions()'))[0].reviewState,'needs_review');
  assert.equal(runtimeStderr.includes('DATA RACE'),false,'The native runtime reported a data race');
- console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','opt-in intelligence with synthetic providers','native decision dialog and assumptions','changed evidence review and immutable pins','watch events and decision persistence','CVE validation focus, watch toggle and decision return focus','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
+ console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','opt-in intelligence with synthetic providers','native decision dialog and assumptions','changed evidence review and immutable pins','watch events and decision persistence','CVE validation focus, watch toggle and decision return focus','honest CLI setup state and isolated demo warning recovery','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
  if(!mac)await command('Browser.close').catch(()=>{});
 } catch(error) {fs.writeFileSync(path.join(root,'runtime-stderr.log'),runtimeStderr);console.error('Wails acceptance failed:',String(error).replaceAll(root,'<fixture>').replaceAll(os.homedir(),'%USERPROFILE%').replaceAll(os.homedir().replaceAll('\\','/'),'%USERPROFILE%'));process.exitCode=1;} finally {
  socket?.close();

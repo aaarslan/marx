@@ -29,12 +29,8 @@
       font-size: 28px;
       color: #615c56;
     }
-    .intro-mark {
-      position: absolute;
-      right: 180px;
-      bottom: 158px;
-      width: 105px;
-    }
+    .intro-brand { position: absolute; left: 180px; top: 78px; display: flex; align-items: center; gap: 18px; font-size: 48px; letter-spacing: -0.04em; font-weight: 700; }
+    .intro-mark { width: 64px; height: 64px; }
   </style>
   <div
     id="root"
@@ -43,6 +39,14 @@
     data-height="1080"
     class="scene"
   >
+    <div class="intro-brand"><img
+      id="intro-image-1"
+      class="clip intro-mark"
+      src="assets/icon.png"
+      alt="Marx"
+      data-start="0"
+      data-duration="5"
+    /><span>Marx</span></div>
     <div class="intro-rule line"></div>
     <div class="intro-copy">
       <div class="kicker">A desktop workbench for Checkmarx One</div>
@@ -55,14 +59,7 @@
       <span>Scope the scan</span><span>Understand the finding</span
       ><span>Keep the evidence</span>
     </div>
-    <img
-      id="intro-image-1"
-      class="clip intro-mark"
-      src="assets/icon.png"
-      alt="Marx"
-      data-start="0"
-      data-duration="5"
-    />
+
   </div>
   <script>
     const tl = gsap.timeline({ paused: true });
@@ -85,10 +82,10 @@
         1.55,
       )
       .fromTo(
-        ".intro-mark",
+        ".intro-brand",
         { scale: 0.85, opacity: 0 },
         { scale: 1, opacity: 1, duration: 0.5 },
-        2.6,
+        0.05,
       )
       .to(".intro-copy", { y: -20, opacity: 0, duration: 0.4 }, 4.5);
     window.__timelines.intro = tl;

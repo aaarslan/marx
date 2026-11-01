@@ -16,7 +16,7 @@ Known exploitation. Published probability. Inspectable sources.
 Generate a local handoff for your chosen assistant.
 
 00:36.000 --> 00:43.000
-Revisit decisions when the facts change. Keep original evidence pinned.
+A decision needs review when exploitation evidence changes. Original evidence stays pinned.
 
 00:43.000 --> 00:48.000
 Official CLI scans. Opt-in public CVE context. No source code or credentials.

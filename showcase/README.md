@@ -9,7 +9,7 @@ bun run build
 bun scripts/capture-showcase.ts
 ```
 
-The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures seven actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,workbench,intelligence,decisions}.webp` with `cwebp`. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
+The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures eight actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,workbench,intelligence,decisions,decision-baseline}.webp` with `cwebp`. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
 
 ```sh
 bun scripts/build-showcase.ts
@@ -20,3 +20,5 @@ HYPERFRAMES_NO_TELEMETRY=1 HYPERFRAMES_NO_UPDATE_CHECK=1 bun scripts/build-showc
 Set `HYPERFRAMES_EXECUTABLE` to an existing pinned binary and `HYPERFRAMES_BROWSER_PATH` to Chrome if detection fails. Rendering also refreshes the poster and social image. Set `CWEBP_EXECUTABLE` if the encoder is not on PATH. The preparation script downloads checksum-verified GSAP 3.15.0 into ignored staging and retains its license header. Hyperframes is Apache-2.0; GSAP is distributed under its [standard license](https://gsap.com/standard-license/). No vendor code is added to the application. Hyperframes may cache render fonts locally. The site itself uses system fonts and makes no third-party requests.
 
 Inspect all scene snapshots and decoded final frames before replacing the published media. Keep temporary profiles and tooling outside version control. The site transcript and WebVTT track must match any revised edit.
+
+The public capture uses a dedicated eight-finding synthetic service rather than the 5,051-row paging stress fixture. The decision sequence uses two actual native states: the original active decision and its later evidence-triggered review.

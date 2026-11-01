@@ -4,6 +4,16 @@ Validate the exact PR head and record its commit, Windows/WebView2 versions, too
 
 ## Current evidence
 
+### Product experience review after `8b1839c`, November 1, 2026
+
+Production macOS inspection with disposable profiles found and corrected an unconditional green CLI indicator, project discovery errors before folder selection, a connection test placed before optional credentials, and remote-history warnings shown inside the local demo. The footer now names CLI settings without implying verified connectivity. Folder selection starts bounded project discovery with loading feedback. Settings places credentials before the explicitly named Save connection and test action and explains its persistence and network behavior. Local demo warnings remain scoped to local evidence. Existing scan, credential and provider boundaries are retained.
+
+Both TypeScript configurations, 46 frontend tests, production macOS build and packaging, and the Windows production cross-build passed. The race-instrumented native acceptance workflow passed at normal size and 960×640; the final minimum-size run includes regressions for honest CLI status and demo warning isolation, plus the existing intelligence, decisions, persistence and process containment checks. A fresh production bundle was inspected for first-run guidance, Settings scrolling, connection action order and accessible control names. Full screen-reader and production manual coverage remain unqualified.
+
+The landing page and walkthrough now identify the source-only developer preview and offer a direct build-guide action. Eight real native captures use a dedicated, varied synthetic service scan, with separate original and changed intelligence evidence. The 52-second film was rendered again and passed Hyperframes checks and full media decoding. Chrome playback, desktop layout, a 390-pixel mobile layout and the build-guide destination were inspected. No third-party reference artwork was copied and no dependency was added.
+
+Tracked content and available production executables passed home-path and credential/email signature checks. These checks are heuristic, not proof that every possible personal detail is absent. Historical commit identities are audited separately with `verify:privacy --history`; rewriting shared history requires coordination. Final Windows qualification must use the new head. Live Checkmarx verification remains **BLOCKED: needs API key**; distribution signing and the broader manual checklist below remain open.
+
 ### macOS UI follow-up after `558bca9`, November 1, 2026
 
 The Windows shell correction is retained. The macOS production bundle was launched through Launch Services with a fresh disposable profile. Native pointer and keyboard interaction verified Settings scrolling with anchored navigation, disabled initial intelligence sources, unsaved-preference feedback, invalid-CVE validation with input focus, lowercase CVE normalization and watched-state feedback. This is focused production coverage, not completion of the entire manual checklist.

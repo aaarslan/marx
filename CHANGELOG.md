@@ -2,6 +2,9 @@
 
 ## Unreleased — 0.9.0
 
+- Clarify first-run CLI setup, connection saving and project loading; keep remote-history errors outside the local demo.
+- Refresh the native showcase and developer-preview website with varied synthetic findings and original versus changed decision evidence.
+
 - Polish CVE lookup, watched states, decision review, source preferences and keyboard focus; keep investigation visible beside a bounded watchlist.
 
 - Keep the application shell anchored while scrolling or focusing lower Settings controls, preserving sidebar navigation on Windows.

@@ -20,6 +20,7 @@ const publicFiles = [
     "detail.webp",
     "intelligence.webp",
     "decisions.webp",
+    "decision-baseline.webp",
     "marx-showcase.mp4",
     "prompt.webp",
     "results.webp",

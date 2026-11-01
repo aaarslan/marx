@@ -33,6 +33,7 @@ execFileSync(go, [
   "./scripts/fixtures/cli",
 ]);
 fs.writeFileSync(path.join(root, "cli.yaml"), "{}");
+fs.writeFileSync(path.join(root, "showcase"), "Synthetic public product demonstration");
 fs.writeFileSync(
   path.join(profile, "settings.json"),
   JSON.stringify({
@@ -132,7 +133,7 @@ try {
   await wait("!!window.marx");
   await evaluate(`window.marx.bindings.save(${JSON.stringify(source)},'p1')`);
   console.log("Importing synthetic findings");
-  const large = await evaluate('window.marx.results.get("large-paging")');
+  const large = await evaluate('window.marx.results.get("showcase")');
   console.log("Opening Scan");
   await view("Scan");
   await evaluate(
@@ -141,15 +142,16 @@ try {
   await wait(
     '!!document.querySelector("input[aria-label=Branch]")||document.querySelectorAll("select").length>0',
   );
+  await wait(`!!document.querySelector('select[aria-label="Checkmarx One project"] option[value="p1"]') && !document.querySelector('select[aria-label="Checkmarx One project"]').disabled`);
   await capture("scan");
   await view("Results");
   await wait(
-    `!!document.querySelector('select[aria-label="Scan"] option[value="large-paging"]')`,
+    `!!document.querySelector('select[aria-label="Scan"] option[value="showcase"]')`,
   );
   await evaluate(
-    `(()=>{const e=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'large-paging');e.dispatchEvent(new Event('change',{bubbles:true}))})()`,
+    `(()=>{const e=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'showcase');e.dispatchEvent(new Event('change',{bubbles:true}))})()`,
   );
-  await wait('document.querySelectorAll(".finding-link").length===100');
+  await wait('document.querySelectorAll(".finding-link").length===8');
   await capture("results");
   await evaluate('document.querySelector(".finding-link").click()');
   await wait('!!document.querySelector(".investigation-detail")');
@@ -163,14 +165,14 @@ try {
     `document.querySelector('dialog button[aria-label="Close remediation prompt"]')?.click()`,
   );
   const session = await evaluate(
-    `window.marx.workbench.createSession({title:'Review the injection path',scanId:'large-paging',findingIds:${JSON.stringify(large.findings.slice(0, 2).map((f: any) => f.id))}})`,
+    `window.marx.workbench.createSession({title:'Parameterize account search',scanId:'showcase',findingIds:${JSON.stringify(large.findings.slice(0, 2).map((f: any) => f.id))}})`,
   );
   await evaluate(
     `window.marx.workbench.updateSession({id:${JSON.stringify(session.id)},notes:'Replace string-concatenated queries with parameterized statements. Keep the original findings pinned, then compare a verification scan.'})`,
   );
   await view("Workbench");
   await wait(
-    'document.querySelector("main").textContent.includes("Review the injection path")',
+    'document.querySelector("main").textContent.includes("Parameterize account search")',
   );
   await evaluate(`document.querySelector('.session-card').click()`);
   await wait('!!document.querySelector("textarea")');
@@ -197,6 +199,14 @@ try {
     `document.querySelector('.intel-facts')?.textContent.includes('97.00%')`,
   );
   await capture("intelligence");
+  await view("Workbench");
+  await wait(`!!document.querySelector('#decisions-tab')`);
+  await evaluate(`document.querySelector('#decisions-tab').click()`);
+  await wait(`!!document.querySelector('.session-list .session-card')`);
+  await evaluate(`document.querySelector('.session-list .session-card').click()`);
+  await wait(`document.querySelector('.decision-detail')?.textContent.includes('Decision history (1 revision)')`);
+  await capture("decision-baseline");
+  await view("CVE intelligence");
   fs.writeFileSync(
     path.join(root, "intel-escalate"),
     "Synthetic changed evidence",
@@ -235,6 +245,7 @@ for (const name of [
   "workbench",
   "intelligence",
   "decisions",
+  "decision-baseline",
 ]) {
   await writeAnimationRuntime(
     path.join(captureDir, name, "assets/gsap.min.js"),
@@ -266,4 +277,4 @@ for (const name of [
     `website/assets/${name}.webp`,
   );
 }
-console.log("Captured and encoded seven synthetic native application screens.");
+console.log("Captured and encoded eight synthetic native application screens.");

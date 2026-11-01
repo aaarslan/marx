@@ -16,7 +16,7 @@ The local macOS build is ad hoc signed, not notarized. There are currently no pu
 
 ## 2. Connect the official CLI
 
-Obtain your organization's approved Checkmarx CLI separately. Open **Settings**, select its executable and configuration, and choose existing CLI authentication or explicitly save an API key. Check your tenant and credentials before scanning. Existing CLI authentication avoids storing another key in Marx. Saved application keys use macOS Keychain-backed encryption or Windows DPAPI. Denied OS access fails closed; replace or remove and re-save the key through Settings if executable replacement makes an older credential inaccessible.
+Obtain your organization's approved Checkmarx CLI separately. Open **Settings**, select its executable and configuration, and choose existing CLI authentication or explicitly save an API key. Check your tenant and credentials before scanning. **Save connection and test** saves the connection fields, then checks CLI authentication and project access without starting a scan. Existing CLI authentication avoids storing another key in Marx. Saved application keys use macOS Keychain-backed encryption or Windows DPAPI. Denied OS access fails closed; replace or remove and re-save the key through Settings if executable replacement makes an older credential inaccessible.
 
 Never paste credentials into notes, prompts, screenshots or issue reports. API keys and existing CLI authentication are different modes; changing modes is an explicit action.
 
@@ -73,7 +73,7 @@ Read [CVE intelligence and decision reviews](cve-intelligence.md) for source con
 - **12–20:** Filter findings and inspect the available evidence.
 - **20–28:** Add known-exploitation and published-probability context, with visible sources and unknowns.
 - **28–36:** Generate a local remediation handoff for your chosen assistant.
-- **36–43:** Revisit a decision when its reasons change, while keeping original evidence pinned.
+- **36–43:** See an active decision move to needs review after exploitation evidence changes; original evidence stays pinned.
 - **43–48:** Scans through the official CLI. Optional public intelligence uses CVE IDs, without source code or credentials.
 - **48–52:** Marx. Explore the source and build guide.
 
