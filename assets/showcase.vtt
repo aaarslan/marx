@@ -10,13 +10,16 @@ Choose your source and scan settings.
 Filter findings and inspect the evidence.
 
 00:20.000 --> 00:28.000
+Known exploitation. Published probability. Inspectable sources.
+
+00:28.000 --> 00:36.000
 Generate a local handoff for your chosen assistant.
 
-00:28.000 --> 00:35.000
-Keep pinned findings and compare verification evidence.
+00:36.000 --> 00:43.000
+Revisit decisions when the facts change. Keep original evidence pinned.
 
-00:35.000 --> 00:40.000
-Official CLI uploads. Remote analysis. Explicit evidence boundaries.
+00:43.000 --> 00:48.000
+Official CLI scans. Opt-in public CVE context. No source code or credentials.
 
-00:40.000 --> 00:44.000
+00:48.000 --> 00:52.000
 Marx. Explore the source and build guide.

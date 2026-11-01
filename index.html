@@ -66,7 +66,7 @@
               <a class="button primary" href="walkthrough.html"
                 >Get started <span aria-hidden="true">↗</span></a
               ><a class="text-link" href="#film"
-                ><span class="play-icon" aria-hidden="true">▶</span> Watch 44
+                ><span class="play-icon" aria-hidden="true">▶</span> Watch 52
                 seconds</a
               >
             </div>
@@ -189,9 +189,78 @@
           </figure>
         </div>
       </section>
+      <section
+        class="intel-story shell"
+        id="intelligence"
+        aria-labelledby="intel-title"
+      >
+        <div class="section-index">02 / KNOW WHEN THE FACTS CHANGE</div>
+        <div class="section-heading">
+          <h2 id="intel-title">
+            Severity is one signal.<br /><span class="muted"
+              >Keep the context beside it.</span
+            >
+          </h2>
+          <p>
+            Add known exploitation, published probability and named sources to
+            an explicit CVE finding. Scanner severity stays intact. Missing
+            intelligence stays visible.
+          </p>
+        </div>
+        <div class="intel-story-grid">
+          <figure>
+            <a
+              href="assets/intelligence.webp"
+              aria-label="Open the full-size CVE intelligence screenshot"
+              ><img
+                src="assets/intelligence.webp"
+                width="1280"
+                height="840"
+                alt="Actual Marx CVE intelligence with synthetic known-exploitation and EPSS observations"
+                loading="lazy"
+            /></a>
+            <figcaption>
+              Opt-in sources. Explicit refresh. Synthetic provider data shown.
+            </figcaption>
+          </figure>
+          <div class="intel-story-copy">
+            <p class="eyebrow">A DECISION HAS A SHELF LIFE</p>
+            <h3>Remember the reason.<br />Revisit it when facts change.</h3>
+            <p>
+              Record a decision with a rationale, review date and explicit
+              assumptions. If a refresh finds that an assumption broke, Marx
+              keeps the triggering evidence and asks for a review.
+            </p>
+            <p>
+              The original snapshot stays pinned. Local decisions do not
+              silently change Checkmarx result states or declare a fix verified.
+            </p>
+            <a class="text-link" href="walkthrough.html#intelligence"
+              >Follow the intelligence workflow
+              <span aria-hidden="true">↗</span></a
+            >
+          </div>
+        </div>
+        <figure class="decision-story">
+          <a
+            href="assets/decisions.webp"
+            aria-label="Open the full-size decision review screenshot"
+            ><img
+              src="assets/decisions.webp"
+              width="1280"
+              height="840"
+              alt="Actual Marx decision review showing synthetic new KEV evidence and an EPSS threshold change"
+              loading="lazy"
+          /></a>
+          <figcaption>
+            A synthetic deferral flagged for review after the facts changed.
+            Original evidence and revision history are retained.
+          </figcaption>
+        </figure>
+      </section>
       <section class="film-section" id="film" aria-labelledby="film-title">
         <div class="shell">
-          <div class="section-index">02 / SEE IT IN MOTION</div>
+          <div class="section-index">03 / SEE IT IN MOTION</div>
           <div class="section-heading">
             <h2 id="film-title">From a finding<br />to a focused next step.</h2>
             <p>
@@ -208,7 +277,7 @@
               poster="assets/video-poster.webp"
               width="1920"
               height="1080"
-              aria-label="Marx product showcase, 44 seconds"
+              aria-label="Marx product showcase, 52 seconds"
             >
               <source src="assets/marx-showcase.mp4" type="video/mp4" />
               <track
@@ -223,7 +292,7 @@
           </div>
           <div class="film-links">
             <span
-              >44 seconds · synthetic demo data · original instrumental
+              >52 seconds · synthetic demo data · original instrumental
               score</span
             ><a href="walkthrough.html#video-transcript"
               >Read the video transcript <span aria-hidden="true">↗</span></a
@@ -232,7 +301,7 @@
         </div>
       </section>
       <section class="workflow-section shell" aria-labelledby="workflow-title">
-        <div class="section-index">03 / MADE FOR THE WHOLE LOOP</div>
+        <div class="section-index">04 / MADE FOR THE WHOLE LOOP</div>
         <div class="section-heading">
           <h2 id="workflow-title">
             The fix is the point.<br /><span class="muted"
@@ -297,7 +366,7 @@
       </section>
       <section class="trust-section shell" aria-labelledby="trust-title">
         <div class="trust-heading">
-          <div class="section-index">04 / CLEAR BOUNDARIES</div>
+          <div class="section-index">05 / CLEAR BOUNDARIES</div>
           <h2 id="trust-title">
             Your CLI connection.<br />Your local workbench.
           </h2>
@@ -305,8 +374,9 @@
         <div class="trust-copy">
           <p>
             The official CLI uploads your selected source to Checkmarx One for
-            analysis. Marx does not replace that service or add a separate
-            upload backend.
+            analysis. Optional public CVE intelligence sends selected CVE IDs to FIRST and
+            CVE.org and downloads the CISA catalog. Sources start disabled;
+            refresh is explicit. No source code or credentials go to these providers.
           </p>
           <p>
             Workbench evidence is stored locally. Optional saved keys use
@@ -322,7 +392,7 @@
           </p>
           <a
             class="text-link"
-            href="https://github.com/aaarslan/marx/blob/81419ec85929ed729859f82e8f6ded96310a6da2/SECURITY.md"
+            href="https://github.com/aaarslan/marx/blob/30ab3f6bdc158fd39a881bfe1d4f33d7c93cae33/SECURITY.md"
             rel="noopener noreferrer"
             >Read the security boundaries <span aria-hidden="true">↗</span></a
           >
@@ -354,7 +424,7 @@
       <p>Open source. MIT licensed. Built for deliberate security work.</p>
       <div>
         <a href="walkthrough.html">Guide</a
-        ><a href="https://github.com/aaarslan/marx/blob/81419ec85929ed729859f82e8f6ded96310a6da2/docs/hosting.md"
+        ><a href="https://github.com/aaarslan/marx/blob/30ab3f6bdc158fd39a881bfe1d4f33d7c93cae33/docs/hosting.md"
           >Host this site</a
         ><a href="https://github.com/aaarslan/marx" rel="noopener noreferrer"
           >Source ↗</a

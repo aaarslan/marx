@@ -320,7 +320,7 @@ h2 {
   margin-bottom: 0;
 }
 .muted {
-  color: #909287;
+  color: #74796c;
 }
 .section-heading > p {
   font-size: 14px;
@@ -976,4 +976,68 @@ pre code {
 }
 .guide-content p {
   max-width: 78ch;
+}
+
+.intel-story {
+  padding-top: 100px;
+}
+.intel-story-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 55px;
+  align-items: center;
+}
+.intel-story figure {
+  margin: 0;
+}
+.intel-story img {
+  display: block;
+  width: 100%;
+  border: 1px solid #34353a;
+  border-radius: 9px;
+}
+.intel-story figcaption {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #62685c;
+  margin-top: 13px;
+}
+.intel-story-copy h3 {
+  font-size: 31px;
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+  margin-bottom: 22px;
+}
+.intel-story-copy > p:not(.eyebrow) {
+  font-size: 14px;
+  line-height: 1.85;
+  color: #62685c;
+}
+.intel-story .decision-story {
+  margin-top: 40px;
+}
+.decision-story img {
+  max-height: 620px;
+  object-fit: cover;
+  object-position: center 38%;
+}
+.decision-story a {
+  display: block;
+}
+@media (max-width: 900px) {
+  .intel-story-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .intel-story-copy {
+    max-width: 650px;
+  }
+  .intel-story {
+    padding-top: 65px;
+  }
+  .decision-story img {
+    max-height: none;
+    object-fit: contain;
+  }
 }
