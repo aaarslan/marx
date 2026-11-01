@@ -90,14 +90,25 @@ func TestWindowsCLIStartsInsideJobBeforeSpawningChildren(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer windows.CloseHandle(child)
+	parent, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(cmd.Process.Pid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(parent)
+	for _, handle := range []windows.Handle{parent, child} {
+		if result, waitErr := windows.WaitForSingleObject(handle, 0); waitErr != nil || result != uint32(windows.WAIT_TIMEOUT) {
+			t.Fatal("The containment fixture exited before job cleanup")
+		}
+	}
 	err = guard.Close()
 	guard = nil
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = cmd.Wait(); err == nil {
+	if result, waitErr := windows.WaitForSingleObject(parent, 5000); waitErr != nil || result != windows.WAIT_OBJECT_0 {
 		t.Fatal("Closing the job left the parent alive")
 	}
+	cmd.Wait()
 	result, err := windows.WaitForSingleObject(child, 5000)
 	if err != nil || result != windows.WAIT_OBJECT_0 {
 		t.Fatal("A CLI descendant escaped job cleanup")

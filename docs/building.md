@@ -31,7 +31,7 @@ go build -race -trimpath -buildvcs=false -tags production,acceptance -ldflags '-
 MARX_TEST_EXECUTABLE=/tmp/Marx-acceptance bun run verify:runtime
 ```
 
-The macOS harness uses a token-authenticated loopback evaluation transport compiled only with the acceptance tag. CSP remains enabled. Never distribute acceptance binaries. The regular packaging verifier rejects binaries containing the acceptance endpoint. The Windows harness continues to use WebView2 debugging. Set `MARX_VERIFY_MINIMUM_SIZE=1` when running the macOS harness to exercise the 960×640 minimum window and toolbar alignment.
+The macOS harness uses a token-authenticated loopback evaluation transport compiled only with the acceptance tag. CSP remains enabled. Never distribute acceptance binaries. The regular packaging verifier rejects binaries containing the acceptance endpoint. The Windows harness continues to use WebView2 debugging. Set `MARX_VERIFY_MINIMUM_SIZE=1` when running either platform harness to exercise the 960×640 minimum window and toolbar alignment.
 
 ## Prerequisites
 
@@ -102,10 +102,10 @@ Keep profiles, detailed logs, screenshots, customer evidence, local account path
 
 The macOS runtime harness can replace its private copy of the executable while keeping the same disposable profile. Build two acceptance binaries with different bytes (for example, one with `-s -w` and one without), then set `MARX_UPGRADE_TEST_EXECUTABLE` alongside `MARX_TEST_EXECUTABLE`. The harness checks saved credential access after replacement and tests explicit recovery if macOS denies access. `MARX_UPGRADE_RELOCATE=1` exercises moving the app to another path. The input binaries and real profiles are never overwritten.
 
-Windows guarded CLI commands now start suspended, enter their kill-on-close job object, and resume only after the primary thread's owner has been verified. This prevents CLI user code from spawning a descendant before assignment. Cross-compilation of both application and regression test binaries passed on macOS. The new native regression test remains to be executed on Windows:
+Windows guarded CLI commands now start suspended, enter their kill-on-close job object, and resume only after the primary thread's owner has been verified. This prevents CLI user code from spawning a descendant before assignment. Cross-compilation of both application and regression test binaries passed on macOS. The native regression test passed on Windows on November 1, 2026:
 
 ```powershell
 go test ./native -run '^TestWindowsCLIStartsInsideJobBeforeSpawningChildren$' -count=1
 ```
 
-This test verifies the CLI cannot execute before job assignment and that closing the job terminates a child spawned immediately after resumption. It is not a claim of native Windows runtime acceptance. A host crash before assigning the newly created suspended process remains a narrow startup boundary; that process has not executed CLI code or spawned descendants.
+This test verifies the CLI cannot execute before job assignment and that closing the job terminates a child spawned immediately after resumption. The separate native runtime acceptance results are recorded in the migration report. A host crash before assigning the newly created suspended process remains a narrow startup boundary; that process has not executed CLI code or spawned descendants.

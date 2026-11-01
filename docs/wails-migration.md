@@ -1,5 +1,19 @@
 # Wails and Go engine verification
 
+## Windows Wails 3.1.0 validation, November 1, 2026
+
+Fetched `feature/wails-desktop` and confirmed the required starting commit `81419ec85929ed729859f82e8f6ded96310a6da2`. Validation ran natively on Windows 11 x64 with Go 1.27.3, Bun 1.4.4, WebView2 and NSIS 3.12. All fixtures and saved credentials were synthetic and disposable.
+
+Frozen dependency installation, both TypeScript projects, 42 frontend tests, the native Go suite, vet, the dedicated Windows process regression, release build, both Windows distribution commands, packaging, site verification and Bun audit passed. Fresh govulncheck source/resource-tool and release-binary analysis reported no vulnerabilities. The native race suite passed with portable LLVM-MinGW UCRT; the race-instrumented WebView2 workflow also passed without a reported race. No compiler blocker was encountered.
+
+Private acceptance-tagged WebView2 runs passed all views, frame/remote-script CSP probes, DPAPI encrypted credential round trips, clipboard IPC, SQLite persistence, 5,051-finding import, 100-row paging, scan submission/events, notes, JSON export, inconclusive verification, uncertain cancellation, known-ID restart recovery without resubmission and CLI cleanup after host termination. A further full run passed at the 960×640 minimum size, including equal toolbar button/select heights and vertical edges. Windows acceptance now honors the existing minimum-size environment switch.
+
+The containment regression initially failed because it interpreted a zero process exit status as survival after job closure. It now verifies both processes are alive before closure and waits directly on process handles afterward. The corrected regression passed ten consecutive runs and the requested single run. Production containment code was unchanged.
+
+The production executable opened saved synthetic results and finding details. Ctrl+O opened the native folder picker; selecting a recent synthetic folder restored its explicit project mapping; Ctrl+R initiated submission. Completion of that particular production shortcut submission was not established. The installer silently installed into a disposable destination with exit zero; its installed executable matched the release hash, launched, and displayed persisted history. Silent uninstall returned zero, removed the executable and uninstall registration, and retained the disposable profile. No pre-existing installation was present at the standard destination or uninstall registration.
+
+This pass does not qualify the entire production manual checklist: physical folder drop, complete picker selection, keyboard traversal, local prompt preview/copy, native save-dialog exports, production Workbench note editing/restart and interactive installer page navigation remain to be repeated on this revision. Their automated acceptance coverage and earlier manual results above must not be presented as a fresh complete production GUI pass. Live Checkmarx tenant access and distribution signing remain external requirements. No real source was uploaded, no tenant credentials were used, and no website deployment or merge was performed. Raw profiles and local evidence remain outside Git.
+
 Verified natively on Windows 11 x64 on October 31, 2026, on `feature/wails-desktop` for PR #4. All workflow data and credentials were disposable and synthetic. No live Checkmarx tenant scan is claimed.
 
 ## Shipped architecture

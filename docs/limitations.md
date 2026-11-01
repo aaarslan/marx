@@ -1,6 +1,6 @@
 # Current limitations
 
-The current targets are native Windows 11 x64 with WebView2 and macOS Apple Silicon with WKWebView, using Wails 3.1.0 and Go 1.27.3. Native macOS acceptance is current. The Windows engine and NSIS evidence describe an earlier Wails revision; the current dependency and security changes require a new Windows run. Earlier Electron verification records are historical. See [the current verification report](wails-migration.md).
+The current targets are native Windows 11 x64 with WebView2 and macOS Apple Silicon with WKWebView, using Wails 3.1.0 and Go 1.27.3. Native macOS acceptance is current. The November 1 Windows run repeated Wails 3.1.0 synthetic acceptance, race checks and isolated installation, with a limited production GUI pass. The complete earlier manual checklist was not repeated. Earlier Electron verification records are historical. See [the current verification report](wails-migration.md).
 
 ## Integration boundaries
 

@@ -13,4 +13,8 @@ func browserOptions() application.WindowsOptions {
 }
 
 func acceptanceAssets(next http.Handler) http.Handler { return next }
-func startAcceptance(win *application.WebviewWindow)  {}
+func startAcceptance(win *application.WebviewWindow) {
+	if os.Getenv("MARX_ACCEPTANCE_MINIMUM_SIZE") == "1" {
+		win.SetSize(960, 640)
+	}
+}
