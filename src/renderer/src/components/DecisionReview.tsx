@@ -1,12 +1,18 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Download, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  ClipboardCheck,
+  Download,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import {
   DECISION_LABELS,
   type IntelligenceDecision,
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, timeAgo } from "./ui";
+import { Banner, Empty, Spinner, timeAgo } from "./ui";
 import {
   DecisionDialog,
   IntelligenceFacts,
@@ -24,7 +30,9 @@ export function DecisionReview() {
     [history, setHistory] = useState<IntelligenceDecision[]>([]),
     [historyLoading, setHistoryLoading] = useState(false),
     [reason, setReason] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [loading, setLoading] = useState(true);
+  const returnFocus = useRef<string | null>(null);
   const loadVersion = useRef(0);
   const load = () => {
     const request = ++loadVersion.current;
@@ -36,6 +44,8 @@ export function DecisionReview() {
           connection !== useApp.getState().connectionId
         )
           return;
+        setError(null);
+        setLoading(false);
         setItems(data);
         setSelected((current) =>
           current
@@ -44,13 +54,17 @@ export function DecisionReview() {
         );
       })
       .catch((error) => {
-        if (request === loadVersion.current) setError(error.message);
+        if (request === loadVersion.current) {
+          setError(error.message);
+          setLoading(false);
+        }
       });
   };
   useEffect(() => {
     setSelected(null);
     setEditing(false);
     setItems([]);
+    setLoading(true);
     load();
     const timer = setInterval(load, 60000);
     window.addEventListener("marx-intelligence-changed", load);
@@ -79,6 +93,20 @@ export function DecisionReview() {
     setHistory([]);
     setHistoryLoading(!!selected);
     setReason("");
+    const attention = items.filter(
+      (item) => !["active", "closed"].includes(item.reviewState),
+    ).length;
+    const back = () => {
+      setSelected(null);
+      requestAnimationFrame(() => {
+        if (returnFocus.current)
+          document
+            .querySelector<HTMLButtonElement>(
+              `[data-decision-id="${CSS.escape(returnFocus.current)}"]`,
+            )
+            ?.focus({ preventScroll: true });
+      });
+    };
     if (selected)
       void api.intelligence
         .history(selected.id)
@@ -96,6 +124,7 @@ export function DecisionReview() {
     };
   }, [selected?.id, selected?.revision]);
   const open = (item: IntelligenceDecision) => {
+    returnFocus.current = item.id;
     setSelected(item);
   };
   const visible = items.filter(
@@ -105,29 +134,45 @@ export function DecisionReview() {
         ? !["active", "closed"].includes(item.reviewState)
         : !item.closed),
   );
+  const attention = items.filter(
+    (item) => !["active", "closed"].includes(item.reviewState),
+  ).length;
+  const back = () => {
+    setSelected(null);
+    requestAnimationFrame(() => {
+      if (returnFocus.current)
+        document
+          .querySelector<HTMLButtonElement>(
+            `[data-decision-id="${CSS.escape(returnFocus.current)}"]`,
+          )
+          ?.focus({ preventScroll: true });
+    });
+  };
   if (selected)
     return (
       <section className="card decision-detail">
         <div className="row between">
-          <button className="btn ghost small" onClick={() => setSelected(null)}>
-            ← All decisions
+          <button className="btn ghost small" onClick={back}>
+            <ArrowLeft size={13} /> All decisions
           </button>
           <span className={`intel-state ${selected.reviewState}`}>
             {selected.reviewState.replaceAll("_", " ")}
           </span>
         </div>
-        <h2>{selected.title}</h2>
-        <p className="mono">
-          {selected.cve}
-          {selected.packageName
-            ? ` · ${selected.packageName}@${selected.packageVersion}`
-            : ""}
-        </p>
-        <p>
-          <strong>{DECISION_LABELS[selected.verdict]}</strong> · Review{" "}
-          {selected.reviewAt} · Revision {selected.revision}
-        </p>
-        <p className="decision-note">{selected.note}</p>
+        <div className="decision-heading">
+          <h2>{selected.title}</h2>
+          <p className="mono">
+            {selected.cve}
+            {selected.packageName
+              ? ` · ${selected.packageName}@${selected.packageVersion}`
+              : ""}
+          </p>
+          <p>
+            <strong>{DECISION_LABELS[selected.verdict]}</strong> · Review{" "}
+            {selected.reviewAt} · Revision {selected.revision}
+          </p>
+        </div>
+        <p className="decision-note decision-rationale">{selected.note}</p>
         <p className="field-help">
           This local decision does not update Checkmarx or certify that a fix is
           effective.
@@ -264,6 +309,25 @@ export function DecisionReview() {
     );
   return (
     <>
+      <div className="decision-overview">
+        <div>
+          <h2>Decision reviews</h2>
+          <p className="field-help">
+            Keep the rationale. Revisit it when the evidence changes.
+          </p>
+        </div>
+        {!loading && (
+          <div className="decision-counts">
+            <span>
+              <strong>{items.filter((item) => !item.closed).length}</strong>{" "}
+              open
+            </span>
+            <span className={attention ? "attention" : ""}>
+              <strong>{attention}</strong> to revisit
+            </span>
+          </div>
+        )}
+      </div>
       <div className="toolbar">
         <select
           aria-label="Decision review filter"
@@ -275,7 +339,7 @@ export function DecisionReview() {
           <option value="all">All decisions</option>
         </select>
         <button className="btn ghost small" onClick={load}>
-          <RefreshCw size={13} />
+          {loading ? <Spinner size={13} /> : <RefreshCw size={13} />}
           Recheck cached evidence
         </button>
         <button
@@ -293,20 +357,53 @@ export function DecisionReview() {
         assumptions; scanner states and verified outcomes remain separate.
       </p>
       {error && <Banner kind="error">{error}</Banner>}
-      {!visible.length && (
-        <div className="card">
-          <h2>No decisions in this view</h2>
-          <p className="field-help">
-            Open a CVE finding in Results and choose Record decision. A
-            rationale and review date are required.
-          </p>
-        </div>
+      {loading ? (
+        <p className="intel-loading" role="status">
+          <Spinner /> Reading local decisions…
+        </p>
+      ) : (
+        !visible.length && (
+          <Empty
+            icon={
+              items.length ? (
+                <Search size={30} strokeWidth={1.5} />
+              ) : (
+                <ClipboardCheck size={34} strokeWidth={1.4} />
+              )
+            }
+            title={
+              items.length
+                ? "No decisions in this view"
+                : "Record your first decision"
+            }
+            hint={
+              items.length
+                ? "Choose another filter to see your other decisions."
+                : "Open a CVE finding in Results and choose Record decision. Keep the rationale, review date and evidence together."
+            }
+            action={
+              items.length ? (
+                <button className="btn small" onClick={() => setFilter("all")}>
+                  Show all decisions
+                </button>
+              ) : (
+                <button
+                  className="btn small"
+                  onClick={() => useApp.getState().setView("results")}
+                >
+                  Open Results
+                </button>
+              )
+            }
+          />
+        )
       )}
       <div className="session-list">
         {visible.map((item) => (
           <button
             className="session-card"
             key={item.id}
+            data-decision-id={item.id}
             onClick={() => open(item)}
           >
             <div className="row between">

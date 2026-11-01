@@ -62,7 +62,7 @@ Open **Settings → Public CVE intelligence** to enable the sources you want, th
 
 In **Results**, expand a CVE finding's intelligence panel or refresh the scan's CVEs. Inspect KEV membership, EPSS probability and date, named CVSS scorers and reference tags. Source errors and stale values stay visible. Intelligence filters are separate from scanner severity.
 
-Use **Watch CVE** to track later observed changes in the **CVE intelligence** view. Choose **Record decision** to save a scoped rationale, review date and optional evidence assumptions. **Workbench → Decisions** flags broken assumptions and retains both the original observation and the evidence that prompted review. Revise or close the decision explicitly; none of these actions change Checkmarx result states or verify a fix.
+Use **Watch CVE** to track later observed changes in the **CVE intelligence** view. Its **Watching** state confirms the watch and lets you stop watching. Choose **Record decision** to save a scoped rationale, review date and optional evidence assumptions. **Workbench → Decisions** flags broken assumptions and retains both the original observation and the evidence that prompted review. Revise or close the decision explicitly; none of these actions change Checkmarx result states or verify a fix.
 
 Read [CVE intelligence and decision reviews](cve-intelligence.md) for source controls, exact disclosure, export semantics, retention and limits.
 

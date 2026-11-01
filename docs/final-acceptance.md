@@ -4,6 +4,16 @@ Validate the exact PR head and record its commit, Windows/WebView2 versions, too
 
 ## Current evidence
 
+### macOS UI follow-up after `558bca9`, November 1, 2026
+
+The Windows shell correction is retained. The macOS production bundle was launched through Launch Services with a fresh disposable profile. Native pointer and keyboard interaction verified Settings scrolling with anchored navigation, disabled initial intelligence sources, unsaved-preference feedback, invalid-CVE validation with input focus, lowercase CVE normalization and watched-state feedback. This is focused production coverage, not completion of the entire manual checklist.
+
+The UI follow-up adds a bounded watchlist beside the investigation, neutral selected rows, loading and error states, source-operation feedback, decision review counts and clearer evidence grouping. Keyboard actions remain immediate. The source and scan boundaries are unchanged. External design skills were consulted outside the repository; no skill installation or new application dependency is included.
+
+Both TypeScript configurations, 46 frontend tests, production macOS packaging, Windows production cross-build and privacy checks pass. The updated native regression covers validation focus, watch toggling without losing keyboard focus, decision return focus and the existing shell-scroll invariant at 960×640. A malformed expression in the new test probe initially timed out; the probe was corrected. The full race-instrumented native workflow passed with the corrected probe. Screenshots and the 52-second film were refreshed from synthetic native states; media decoding and Hyperframes checks pass.
+
+The Windows results below qualify their recorded source revisions. The new UI controls and focus behavior require Windows follow-up on the final head. Native-dialog targeting limitations, broader manual acceptance, live tenant verification and distribution signing remain open.
+
 ### Windows scroll repair follow-up, November 1, 2026
 
 The production retry exposed a real shell-scrolling defect: moving to lower Settings controls could scroll the outer document and move sidebar navigation offscreen, leaving a large blank area. The initial input-blocker diagnosis below was incomplete. A native regression reproduced an outer-document scroll of approximately 557 pixels on the original binary. The repair clips outer roots and fixes the application root to the viewport; Settings retains its own scrolling pane. The regression checks outer scroll position and sidebar bounds after focusing lower Settings actions and attempting outer scrolling. It failed against the original binary and passed in complete race-instrumented WebView2 runs at both normal size and 960×640 after the repair. Both full runs retained all intelligence, decision, persistence and containment checks without reported races.

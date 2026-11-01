@@ -2,6 +2,8 @@
 
 ## Unreleased — 0.9.0
 
+- Polish CVE lookup, watched states, decision review, source preferences and keyboard focus; keep investigation visible beside a bounded watchlist.
+
 - Keep the application shell anchored while scrolling or focusing lower Settings controls, preserving sidebar navigation on Windows.
 - Add opt-in public CVE intelligence with CISA KEV, FIRST EPSS, CVE.org source context, transparent freshness, exploit-tagged references and scan filters.
 - Add a local CVE watchlist and scoped decision ledger with review dates, explicit assumptions, immutable revisions and persistent alerts when evidence changes.

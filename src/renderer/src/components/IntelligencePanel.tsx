@@ -210,6 +210,9 @@ export function IntelligenceFacts({
       <div className="intel-headline">
         <ShieldAlert size={16} />
         <strong>{intelligenceLabel(snapshot)}</strong>
+        {kev?.value?.listed && epss?.state === "fresh" && epss.value?.probability != null && (
+          <span className="intel-signal" title="Published 30-day exploitation probability, not proof of local exposure">EPSS {(epss.value.probability * 100).toFixed(2)}%</span>
+        )}
       </div>
       <p className="field-help">
         {historical

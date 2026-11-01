@@ -6,17 +6,20 @@ export function Toggle({
   checked,
   onChange,
   label,
-  sub
+  sub,
+  disabled = false
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: React.ReactNode;
   sub?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="toggle">
       <input
         type="checkbox"
+        disabled={disabled}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />

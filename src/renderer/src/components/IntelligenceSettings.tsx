@@ -1,20 +1,25 @@
 import React, { useEffect, useState } from "react";
 import type { IntelligenceSettings as Settings } from "@shared/intelligence";
 import { api } from "../api";
-import { Banner, Toggle } from "./ui";
+import { Banner, Spinner, Toggle } from "./ui";
 import { notifyIntelligence } from "./IntelligencePanel";
 
 export function IntelligenceSettings() {
   const [settings, setSettings] = useState<Settings | null>(null),
     [error, setError] = useState<string | null>(null),
-    [busy, setBusy] = useState(false),
+    [busy, setBusy] = useState<"save" | "clear" | null>(null),
+    [savedSources, setSavedSources] = useState(""),
+    [notice, setNotice] = useState(""),
     [saved, setSaved] = useState(false);
   useEffect(() => {
     let current = true;
     void api.intelligence
       .settings()
       .then((value) => {
-        if (current) setSettings(value);
+        if (current) {
+          setSettings(value);
+          setSavedSources([...value.enabledSources].sort().join(","));
+        }
       })
       .catch((error) => {
         if (current) setError(error.message);
@@ -23,24 +28,32 @@ export function IntelligenceSettings() {
       current = false;
     };
   }, []);
+  const dirty =
+    !!settings &&
+    [...settings.enabledSources].sort().join(",") !== savedSources;
   const save = async () => {
     if (!settings || busy) return;
-    setBusy(true);
+    setBusy("save");
     setError(null);
     setSaved(false);
     try {
-      setSettings(await api.intelligence.configure(settings.enabledSources));
+      const value = await api.intelligence.configure(settings.enabledSources);
+      setSettings(value);
+      setSavedSources([...value.enabledSources].sort().join(","));
       notifyIntelligence();
       setSaved(true);
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
   return (
     <section className="card intel-settings">
-      <h2>Public CVE intelligence</h2>
+      <div className="row between">
+        <h2>Public CVE intelligence</h2>
+        {dirty && <span className="intel-state">Unsaved changes</span>}
+      </div>
       <p className="field-help">
         Optional, independent sources for findings with a CVE ID. All sources
         start disabled. Saving enables a source; network lookups happen only
@@ -55,15 +68,22 @@ export function IntelligenceSettings() {
         bypass or paid fallback.
       </p>
       {error && <Banner kind="error">{error}</Banner>}
+      {!settings && !error && (
+        <p className="intel-loading" role="status">
+          <Spinner /> Loading source preferences…
+        </p>
+      )}
       {settings?.providers.map((source) => (
         <div key={source.id} className="intel-source">
           <Toggle
             checked={settings.enabledSources.includes(source.id)}
+            disabled={!!busy}
             label={source.name}
             sub={source.description}
             onChange={(checked) => {
               if (busy) return;
               setSaved(false);
+              setNotice("");
               setSettings({
                 ...settings,
                 enabledSources: checked
@@ -80,31 +100,42 @@ export function IntelligenceSettings() {
       <div className="row">
         <button
           className="btn small"
-          disabled={!settings || busy}
+          disabled={!settings || !!busy || !dirty}
           onClick={() => void save()}
         >
-          {busy ? "Saving…" : "Save intelligence preferences"}
+          {busy === "save" && <Spinner size={13} />}
+          {busy === "save" ? "Saving…" : "Save intelligence preferences"}
         </button>
         <button
           className="btn ghost small"
-          disabled={busy}
+          disabled={!!busy || !settings}
           onClick={() => {
-            setBusy(true);
+            setBusy("clear");
+            setNotice("");
             setError(null);
             void api.intelligence
               .clearCache()
               .then(() => {
                 notifyIntelligence();
                 setSaved(false);
+                setNotice(
+                  "Fetched cache cleared. Pinned evidence and watch history were kept.",
+                );
               })
               .catch((error) => setError(error.message))
-              .finally(() => setBusy(false));
+              .finally(() => setBusy(null));
           }}
         >
-          Clear fetched cache
+          {busy === "clear" && <Spinner size={13} />}
+          {busy === "clear" ? "Clearing…" : "Clear fetched cache"}
         </button>
         <span className="field-help" role="status">
-          {saved ? "Intelligence preferences saved." : ""}
+          {notice ||
+            (saved
+              ? "Intelligence preferences saved."
+              : dirty
+                ? "Save to apply source changes."
+                : "")}
         </span>
       </div>
     </section>
