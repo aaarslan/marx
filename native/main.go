@@ -112,6 +112,7 @@ func (s *DesktopService) native(name string, values engine.Object) (any, error) 
 		}
 		var selected string
 		selected, err = s.app.Dialog.OpenFile().CanChooseDirectories(directory).CanChooseFiles(!directory).SetTitle(p.Title).AttachToWindow(s.win).PromptForSingleSelection()
+		err = dialogSelectionError(selected, err)
 		paths := []string{}
 		if selected != "" {
 			paths = append(paths, selected)
@@ -120,11 +121,18 @@ func (s *DesktopService) native(name string, values engine.Object) (any, error) 
 	case "save":
 		var selected string
 		selected, err = s.app.Dialog.SaveFile().SetDirectory(filepath.Dir(p.DefaultPath)).SetFilename(filepath.Base(p.DefaultPath)).AttachToWindow(s.win).PromptForSingleSelection()
+		err = dialogSelectionError(selected, err)
 		value = map[string]any{"canceled": selected == "", "filePath": selected}
 	default:
 		err = errors.New("Unknown native operation.")
 	}
 	return value, err
+}
+func dialogSelectionError(selected string, err error) error {
+	if selected == "" && err != nil && err.Error() == "cancelled by user" {
+		return nil
+	}
+	return err
 }
 func downloadsDirectory() string {
 	if directory, err := nativeDownloadsDirectory(); err == nil {

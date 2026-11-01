@@ -69,6 +69,8 @@ The profile is `%APPDATA%/MarxWails`, overridable with `MARX_USER_DATA_DIR`. Web
 
 ## Native acceptance
 
+After removing generated output, run `bun run build` before native Go tests or acceptance-host compilation. The Go host embeds `native/frontend/dist`, so a clean checkout without those generated assets cannot compile the native package yet.
+
 ```powershell
 $testExe = Join-Path $env:TEMP 'Marx-test.exe'
 go build -trimpath -buildvcs=false -tags 'production,acceptance' -ldflags '-s -w -H windowsgui' -o $testExe ./native

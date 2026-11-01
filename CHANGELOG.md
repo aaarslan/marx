@@ -2,6 +2,7 @@
 
 ## Unreleased — 0.9.0
 
+- Treat native file-dialog cancellation as a normal canceled operation instead of displaying a save failure.
 - Clarify first-run CLI setup, connection saving and project loading; keep remote-history errors outside the local demo.
 - Refresh the native showcase and developer-preview website with varied synthetic findings and original versus changed decision evidence.
 
