@@ -224,7 +224,7 @@ func (e *Engine) deleteSession(id string) error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, kind := range []string{"session", "baseline", "verification"} {
+	for _, kind := range []string{"session", "baseline", "verification", "session-intelligence"} {
 		if _, err = tx.Exec("DELETE FROM records WHERE kind=? AND scope=? AND id=?", kind, str(s, "connectionId"), id); err != nil {
 			return err
 		}

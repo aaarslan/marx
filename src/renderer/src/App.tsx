@@ -7,6 +7,7 @@ import { api, isMac } from './api';
 import { ScanView } from './views/ScanView';
 import { desktopShortcut } from '@shared/desktopShortcuts';
 
+const IntelligenceView = lazy(() => import('./views/IntelligenceView').then(m => ({default:m.IntelligenceView})));
 const BatchView = lazy(() => import('./views/BatchView').then((m) => ({ default: m.BatchView })));
 const ResultsView = lazy(() => import('./views/ResultsView').then((m) => ({ default: m.ResultsView })));
 const HistoryView = lazy(() => import('./views/HistoryView').then((m) => ({ default: m.HistoryView })));
@@ -18,6 +19,7 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
   { id: 'batch', label: 'Batch Scan', icon: <Layers size={16} /> },
   { id: 'results', label: 'Results', icon: <ListChecks size={16} /> },
   { id: 'workbench', label: 'Workbench', icon: <Wrench size={16} /> },
+  { id: 'intelligence', label: 'CVE intelligence', icon: <ShieldCheck size={16} /> },
   { id: 'history', label: 'History', icon: <FolderSearch size={16} /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon size={16} /> }
 ];
@@ -89,6 +91,7 @@ export function App() {
           <div className="page-content">
           <div hidden={view !== 'scan'}><ScanView /></div>
           <Suspense fallback={<div className="field-help" role="status">Loading view…</div>}>
+          {view === 'intelligence' && <IntelligenceView />}
           {view === 'batch' && <BatchView />}
           {view === 'results' && <ResultsView />}
           {view === 'history' && <HistoryView />}

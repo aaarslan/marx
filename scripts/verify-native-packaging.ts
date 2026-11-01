@@ -22,12 +22,13 @@ assert.equal(executable.readUInt16LE(pe+24),0x20b,'Application must be PE32+');
 assert.equal(existsSync('dist/marx-core.exe'),false,'A stale workflow sidecar remains in dist');
 assert.equal(executable.includes(Buffer.from('/$bunfs/')),false,'A Bun runtime was embedded');
 assert.equal(executable.includes(Buffer.from('MARX_FIXTURE_ROOT')),false,'The test CLI fixture was packaged');
+assert.equal(executable.includes(Buffer.from('MARX_INTEL_FIXTURE')),false,'Synthetic intelligence adapters must never be distributed');
 if(!mac){
 const nsis=readFileSync('build/windows.nsi','utf8');
 assert.deepEqual([...nsis.matchAll(/^\s*File\s+"([^"]+)"/gm)].map(match=>match[1]),['..\\dist\\Marx.exe']);
 }
 const assets='native/frontend/dist/assets';
-for(const view of ['ResultsView','BatchView','WorkbenchView','SettingsView','RemediationDialog']) {
+for(const view of ['ResultsView','BatchView','WorkbenchView','IntelligenceView','SettingsView','RemediationDialog']) {
  const file=readdirSync(assets).find(file=>file.startsWith(view+'-')&&file.endsWith('.js'));
  assert.ok(file,`${view} chunk is missing`);assert.ok(executable.includes(readFileSync(join(assets,file))),`${view} was not embedded`);
 }

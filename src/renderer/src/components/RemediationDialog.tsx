@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, Download, X } from 'lucide-react';
 import type { Finding, Severity } from '@shared/types';
 import { SEVERITIES, SEVERITY_COLOR, SEVERITY_LABEL } from '@shared/severity';
+import { useIntelligence } from './IntelligencePanel';
+import { findingCVE } from '@shared/intelligence';
 import { createRemediationPrompts, PROMPT_CHARACTER_TARGET, REMEDIATION_TARGETS, type RemediationContext, type RemediationTarget } from '@shared/remediation';
 import { api } from '../api';
 import { Banner, Spinner } from './ui';
@@ -33,7 +35,8 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
   const [error, setError] = useState<string | null>(null);
   const actionLock = useRef(false);
   const scope = selection.scopes.find((item) => item.id === scopeId) ?? selection.scopes[0];
-  const batches = useMemo(() => createRemediationPrompts({ findings: scope.findings, severities, target, batchSize, instructions, context: { ...selection.context, scope: scope.name } }), [scope, severities, target, batchSize, instructions, selection]);
+  const {snapshots: intelligence, error: intelligenceError, loading: intelligenceLoading} = useIntelligence(selection.context.demo ? [] : scope.findings.map(f=>findingCVE(f.cve)).filter((value): value is string=>!!value));
+  const batches = useMemo(() => createRemediationPrompts({ findings: scope.findings, severities, target, batchSize, instructions, context: { ...selection.context, intelligence, intelligenceUnavailable:!!intelligenceError, scope: scope.name } }), [scope, severities, target, batchSize, instructions, selection, intelligence, intelligenceError]);
   const batchIndex = Math.min(index, Math.max(0, batches.length - 1));
   const batch = batches[batchIndex];
   const count = batches.reduce((total, item) => total + item.findingIds.length, 0);
@@ -100,6 +103,8 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
         <label className="field">Findings per batch<select aria-label="Findings per prompt batch" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))} disabled={Boolean(busy)}>{[10, 20, 40].map((size) => <option value={size} key={size}>Up to {size} findings</option>)}</select><span className="field-help">Large evidence is split into additional batches without dropping findings.</span></label>
         <label className="field">Additional instructions (optional)<input type="text" aria-label="Additional remediation instructions" value={instructions} maxLength={4000} onChange={(event) => setInstructions(event.target.value)} placeholder="e.g. Keep the current Node.js version" disabled={Boolean(busy)} /></label>
       </div>
+      {intelligenceLoading && <p className="field-help" role="status">Loading cached intelligence for this handoff…</p>}
+      {intelligenceError && <Banner kind="warn">Cached intelligence could not be attached: {intelligenceError}. This is disclosed in the prompt.</Banner>}
       {selection.context.truncated && <Banner kind="warn">This scan is only partly loaded. The prompt includes selected loaded findings, not the entire scan.</Banner>}
       {selection.context.demo && <Banner kind="info">Demo evidence is clearly labeled in the generated prompt.</Banner>}
       <div className="remediation-preview-heading"><strong>{count} {count === 1 ? 'finding' : 'findings'} selected</strong><span className="faint">{batch ? `${batch.text.length.toLocaleString()} characters in this batch` : 'Choose at least one severity level'}</span></div>
@@ -107,10 +112,10 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
       {batch && batch.text.length > PROMPT_CHARACTER_TARGET && <Banner kind="warn">One finding has unusually large evidence. Its full content is preserved; check your assistant’s input limit before pasting.</Banner>}
       {error && <Banner kind="error">{error}</Banner>}
       {feedback && <div className="remediation-feedback" role="status">{feedback}</div>}
-      {onTrack && !selection.context.demo && <div className="remediation-track"><span className="field-help">Keep this evidence and handoff together, then verify the change with a fresh scan.</span><button className="btn" disabled={!batch || Boolean(busy)} onClick={() => void run('track')}>{busy === 'track' ? <Spinner size={13} /> : <Check size={14} />}{trackLabel}</button></div>}
+      {onTrack && !selection.context.demo && <div className="remediation-track"><span className="field-help">Keep this evidence and handoff together, then verify the change with a fresh scan.</span><button className="btn" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={() => void run('track')}>{busy === 'track' ? <Spinner size={13} /> : <Check size={14} />}{trackLabel}</button></div>}
       <div className="remediation-footer">
         <div className="row"><button className="btn ghost small" aria-label="Previous prompt batch" disabled={!batch || batchIndex === 0 || Boolean(busy)} onClick={() => setIndex(batchIndex - 1)}><ChevronLeft size={15} /></button><span aria-live="polite">Batch {batches.length ? batchIndex + 1 : 0} of {batches.length}</span><button className="btn ghost small" aria-label="Next prompt batch" disabled={!batch || batchIndex >= batches.length - 1 || Boolean(busy)} onClick={() => setIndex(batchIndex + 1)}><ChevronRight size={15} /></button></div>
-        <div className="row"><button className="btn" disabled={!batch || Boolean(busy)} onClick={() => void run('save')}>{busy === 'save' ? <Spinner size={13} /> : <Download size={14} />}Save {batches.length > 1 ? 'all batches' : 'prompt'}</button><button className="btn primary" disabled={!batch || Boolean(busy)} onClick={() => void run('copy')}>{busy === 'copy' ? <Spinner size={13} /> : copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : batches.length > 1 ? 'Copy this batch' : 'Copy prompt'}</button></div>
+        <div className="row"><button className="btn" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={() => void run('save')}>{busy === 'save' ? <Spinner size={13} /> : <Download size={14} />}Save {batches.length > 1 ? 'all batches' : 'prompt'}</button><button className="btn primary" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={() => void run('copy')}>{busy === 'copy' ? <Spinner size={13} /> : copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : batches.length > 1 ? 'Copy this batch' : 'Copy prompt'}</button></div>
       </div>
     </dialog>
   );

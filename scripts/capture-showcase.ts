@@ -60,6 +60,7 @@ execFileSync(go, [
 const child = spawn(host, [], {
   env: {
     ...environment,
+    MARX_INTEL_FIXTURE: "1",
     MARX_USER_DATA_DIR: profile,
     MARX_FIXTURE_ROOT: root,
     MARX_ACCEPTANCE_PORT: "19334",
@@ -174,6 +175,49 @@ try {
   await evaluate(`document.querySelector('.session-card').click()`);
   await wait('!!document.querySelector("textarea")');
   await capture("workbench");
+  fs.writeFileSync(path.join(root, "intel-demo"), "Synthetic CVE findings");
+  const intelPage = await evaluate('window.marx.results.get("intel-demo")');
+  await evaluate('window.marx.intelligence.configure(["kev","epss","cve"])');
+  await evaluate('window.marx.intelligence.watch("CVE-2024-1234")');
+  await evaluate('window.marx.intelligence.watch("CVE-2021-44228")');
+  await evaluate(
+    'window.marx.intelligence.refresh({cves:["CVE-2024-1234","CVE-2021-44228"],requestId:"showcase-baseline",force:true})',
+  );
+  await evaluate(
+    `window.marx.intelligence.decide(${JSON.stringify({ connectionId: intelPage.connectionId, scanId: "intel-demo", findingId: intelPage.findings[0].id, expectedRevision: 0, verdict: "defer", note: "A compatible dependency update is planned. Revisit this decision if exploitation evidence changes.", reviewAt: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10), assumptions: { notInKev: true, epssBelow: 0.1, manual: "Confirm the affected component remains isolated from untrusted input." } })})`,
+  );
+  await view("CVE intelligence");
+  await wait(
+    `document.querySelector('.intel-watch')?.textContent.includes('CVE-2021-44228')`,
+  );
+  await evaluate(
+    `Array.from(document.querySelectorAll('.intel-watch-row button')).find(button=>button.textContent.includes('CVE-2021-44228')).click()`,
+  );
+  await wait(
+    `document.querySelector('.intel-facts')?.textContent.includes('97.00%')`,
+  );
+  await capture("intelligence");
+  fs.writeFileSync(
+    path.join(root, "intel-escalate"),
+    "Synthetic changed evidence",
+  );
+  await evaluate(
+    'window.marx.intelligence.refresh({cves:["CVE-2024-1234"],requestId:"showcase-changed-evidence",force:true})',
+  );
+  await view("Workbench");
+  await wait(`!!document.querySelector('#decisions-tab')`);
+  await evaluate(`document.querySelector('#decisions-tab').click()`);
+  await wait(
+    `document.querySelector('.session-list')?.textContent.includes('needs review')`,
+  );
+  await evaluate(`document.querySelector('.session-card').click()`);
+  await wait(
+    `document.querySelector('.decision-detail')?.textContent.includes('EPSS has reached')`,
+  );
+  await wait(
+    `document.querySelector('.decision-detail')?.textContent.includes('Decision history (1 revision)')`,
+  );
+  await capture("decisions");
 } finally {
   if (child.exitCode === null && child.signalCode === null) {
     const done = new Promise((resolve) => child.once("exit", resolve));
@@ -183,7 +227,15 @@ try {
 }
 
 const binary = process.env.HYPERFRAMES_EXECUTABLE;
-for (const name of ["scan", "results", "detail", "prompt", "workbench"]) {
+for (const name of [
+  "scan",
+  "results",
+  "detail",
+  "prompt",
+  "workbench",
+  "intelligence",
+  "decisions",
+]) {
   await writeAnimationRuntime(
     path.join(captureDir, name, "assets/gsap.min.js"),
   );
@@ -214,4 +266,4 @@ for (const name of ["scan", "results", "detail", "prompt", "workbench"]) {
     `website/assets/${name}.webp`,
   );
 }
-console.log("Captured and encoded five synthetic native application screens.");
+console.log("Captured and encoded seven synthetic native application screens.");

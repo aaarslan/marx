@@ -80,3 +80,7 @@ Evidence is separated by CLI configuration fingerprint and project identity. The
 CLI JSON and SARIF reports are limited to 64 MiB. Parsing runs in a worker with cancellation and a 60-second processing bound. There is no 5,000-finding slice; incomplete counts stay explicit. The full normalized scan is still loaded into renderer memory, so paging the DOM is not an unlimited-memory guarantee. Oversized or malformed reports fail visibly without replacing saved evidence.
 
 The CLI scheduler bounds ordinary execution, reserves capacity for control operations, and cancels queued work without spawning it. It does not automatically retry scan creation or triage. Exports and local evidence can contain sensitive project information. See [Security](../SECURITY.md) and [current validation boundaries](limitations.md).
+
+## Local CVE decisions
+
+The **Decisions** tab records scoped verdicts with rationale, review dates, assumptions and immutable revisions. Changes to KEV, EPSS or publication state can retain an evidence-backed review flag; they never change remote finding state. Remediation evidence bundles keep original and current intelligence separately. See [CVE intelligence and decision reviews](cve-intelligence.md) for the complete workflow and export semantics.

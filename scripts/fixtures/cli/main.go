@@ -138,7 +138,11 @@ func main() {
 			emit(scan(id))
 			return
 		case "list":
-			emit([]any{scan("s1"), scan("s2"), scan("large-paging")})
+			items := []any{scan("s1"), scan("s2"), scan("large-paging")}
+			if exists("intel-demo") {
+				items = append(items, scan("intel-demo"))
+			}
+			emit(items)
 			return
 		case "cancel":
 			if exists("cancelFails") {
@@ -165,6 +169,9 @@ func main() {
 		if id == "large-paging" {
 			count = 5051
 		}
+		if id == "intel-demo" {
+			count = 2
+		}
 		if id == "s2" {
 			count = 0
 		}
@@ -183,6 +190,11 @@ func main() {
 			results := make([]any, count)
 			for i := range results {
 				results[i] = map[string]any{"id": fmt.Sprintf("finding-%d", i+1), "similarityId": fmt.Sprintf("stable-%d", i+1), "type": "sast", "severity": "HIGH", "state": "TO_VERIFY", "status": "NEW", "data": map[string]any{"queryName": fmt.Sprintf("Synthetic injection %d", i+1), "nodes": []any{map[string]any{"fileName": "index.js", "line": 1}}}}
+			}
+			if id == "intel-demo" {
+				for index, cve := range []string{"CVE-2024-1234", "CVE-2021-44228"} {
+					results[index] = map[string]any{"id": fmt.Sprintf("sca-finding-%d", index+1), "similarityId": fmt.Sprintf("sca-stable-%d", index+1), "type": "sca", "severity": "HIGH", "state": "TO_VERIFY", "status": "NEW", "vulnerabilityDetails": map[string]any{"cveName": cve, "cvssScore": 8.1, "description": "Synthetic dependency finding for isolated intelligence verification."}, "data": map[string]any{"packageIdentifier": map[string]any{"name": "synthetic-component", "version": "1.0.0", "packageManager": "npm"}, "scaPackageData": map[string]any{"locations": []any{map[string]any{"path": "package.json"}}, "dependencyPaths": []any{}}}}
+				}
 			}
 			report = map[string]any{"scanID": id, "totalCount": count, "results": results}
 			if exists("wrongReport") {

@@ -18,6 +18,8 @@ const publicFiles = [
   ".nojekyll",
   ...[
     "detail.webp",
+    "intelligence.webp",
+    "decisions.webp",
     "marx-showcase.mp4",
     "prompt.webp",
     "results.webp",

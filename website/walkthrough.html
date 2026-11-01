@@ -152,39 +152,77 @@ bun run start
           only for isolated synthetic verification and must never be
           distributed.
         </p>
+        <h2 id="intelligence">CVE intelligence and decision review</h2>
+        <p>
+          In <strong>Settings → Public CVE intelligence</strong>, enable the
+          public sources you want and save the preferences. All sources start
+          disabled. Requests happen only when you choose Refresh intelligence.
+        </p>
+        <p>
+          FIRST and CVE.org receive only the requested CVE IDs. CISA's complete
+          public catalog is downloaded without finding identifiers. No source
+          code, paths, package inventory, tenant details or Checkmarx
+          credentials are sent.
+        </p>
+        <p>
+          In Results, expand a CVE finding's intelligence panel. Inspect KEV
+          membership, EPSS probability and date, named CVSS scorers and
+          reference tags. Missing or stale data remains visible; intelligence
+          filters do not replace scanner severity.
+        </p>
+        <p>
+          Watch CVEs in the intelligence view. Record a decision with its
+          rationale, review date and optional assumptions. Workbench → Decisions
+          retains original evidence, highlights broken assumptions, and lets you
+          explicitly revise or close the local decision. These actions never
+          change Checkmarx result states or certify a fix.
+        </p>
+        <p>
+          <a
+            href="https://github.com/aaarslan/marx/blob/main/docs/cve-intelligence.md"
+            >Read the complete intelligence guide, data disclosures and
+            limits</a
+          >.
+        </p>
+        <img
+          src="assets/decisions.webp"
+          width="1280"
+          height="840"
+          alt="Synthetic native decision review after exploitation evidence changed"
+          loading="lazy"
+        />
         <h2 id="video-transcript">Showcase transcript</h2>
         <p>
-          - <strong>0–5 seconds:</strong> Less flag wrangling. More fixing.
-          Marx, a desktop workspace for Checkmarx One.
+          <strong>0–5 seconds:</strong> Less flag wrangling. More fixing. Marx,
+          a desktop workspace for Checkmarx One.
         </p>
         <p>
-          - <strong>5–12:</strong> Choose your source and settings through a
-          graphical scan workflow.
+          <strong>5–12:</strong> Choose source and scan settings through a
+          graphical workflow.
+        </p>
+        <p><strong>12–20:</strong> Filter findings and inspect the evidence.</p>
+        <p>
+          <strong>20–28:</strong> Add known exploitation, published probability
+          and named sources. Keep unknowns visible.
         </p>
         <p>
-          - <strong>12–20:</strong> Filter findings and inspect the available
-          evidence.
+          <strong>28–36:</strong> Generate a local handoff for your chosen
+          assistant.
         </p>
         <p>
-          - <strong>20–28:</strong> Generate a local remediation handoff for
-          your chosen assistant.
+          <strong>36–43:</strong> Revisit a decision when its reasons change.
+          Keep original evidence pinned.
         </p>
         <p>
-          - <strong>28–35:</strong> Keep pinned findings and notes; compare a
-          verification scan.
+          <strong>43–48:</strong> Scans through the official CLI. Optional
+          public intelligence uses CVE IDs, without source code or credentials.
         </p>
+        <p><strong>48–52:</strong> Marx. Explore the source and build guide.</p>
         <p>
-          - <strong>35–40:</strong> Official CLI uploads, remote analysis,
-          explicit evidence boundaries.
-        </p>
-        <p>
-          - <strong>40–44:</strong> Marx. Explore the source and build guide.
-        </p>
-        <p>
-          The 44-second film is an edited product showcase, not an uninterrupted
-          recording or live tenant verification. Its screens were captured from
-          the actual native application using the isolated synthetic CLI
-          fixture. Music is generated locally from the checked-in score script.
+          The 52-second film is an edited showcase of the actual native
+          interface using synthetic CLI and intelligence data. It does not
+          demonstrate a live Checkmarx tenant. The original instrumental score
+          is generated locally from the checked-in source.
         </p>
       </article>
     </main>

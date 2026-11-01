@@ -10,6 +10,7 @@ const root=fs.mkdtempSync(path.join(os.tmpdir(),'marx-wails-test-'));
 const source=path.join(root,'source (native) [1] 日本語');fs.mkdirSync(source);fs.writeFileSync(path.join(source,'index.js'),'const synthetic = true;');
 const uncSource=process.env.MARX_VERIFY_UNC==='1'?`\\\\localhost\\${source[0]}$${source.slice(2)}`:null;
 if(uncSource)assert.ok(fs.statSync(uncSource).isDirectory(),'Disposable loopback SMB source is unavailable');
+fs.writeFileSync(path.join(root,'.synthetic-marx-fixture'),'Isolated synthetic acceptance');
 const profile=path.join(root,'profile');fs.mkdirSync(profile);
 const cli=path.join(root,mac?'cx':'cx.exe');
 let proc: ReturnType<typeof spawn>|undefined;
@@ -22,7 +23,7 @@ function keychainAccount(){
 }
 function removeKeychainEntry(){execFileSync('/usr/bin/security',['delete-generic-password','-s','com.marx.scanner.credentials','-a',keychainAccount()],{stdio:'ignore',timeout:5000});}
 function launch(executable:string){
- const child=spawn(executable,[],{cwd:os.tmpdir(),stdio:['ignore','ignore','pipe'],env:{...process.env,MARX_USER_DATA_DIR:profile,MARX_FIXTURE_ROOT:root,MARX_ACCEPTANCE_PORT:'19332',MARX_ACCEPTANCE_TOKEN:token,MARX_ACCEPTANCE_MINIMUM_SIZE:process.env.MARX_VERIFY_MINIMUM_SIZE||'',GORACE:'halt_on_error=1'}});
+ const child=spawn(executable,[],{cwd:os.tmpdir(),stdio:['ignore','ignore','pipe'],env:{...process.env,MARX_INTEL_FIXTURE:'1',MARX_USER_DATA_DIR:profile,MARX_FIXTURE_ROOT:root,MARX_ACCEPTANCE_PORT:'19332',MARX_ACCEPTANCE_TOKEN:token,MARX_ACCEPTANCE_MINIMUM_SIZE:process.env.MARX_VERIFY_MINIMUM_SIZE||'',GORACE:'halt_on_error=1'}});
  child.stderr.on('data',chunk=>{runtimeStderr=(runtimeStderr+String(chunk)).slice(-1024*1024)});
  return child;
 }
@@ -56,7 +57,7 @@ try {
  const onMessage=(e:MessageEvent)=>{const m=JSON.parse(String(e.data));if(m.id){pending.get(m.id)?.(m);pending.delete(m.id)}};if(socket)socket.onmessage=onMessage;
  const command=(method:string,params:any={})=>new Promise<any>((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('WebView operation timed out'))},60000);pending.set(id,result=>{clearTimeout(timer);resolve(result)});socket!.send(JSON.stringify({id,method,params}))});
  const evaluate=async(expression:string)=>{if(mac)return macEvaluate(expression);const r=await command('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.result?.exceptionDetails)throw new Error(r.result.exceptionDetails.exception?.description||r.result.exceptionDetails.text);return r.result?.result?.value};
- const wait=async(expression:string)=>{const end=Date.now()+30000;while(Date.now()<end){if(await evaluate(expression))return;await Bun.sleep(100)}throw new Error('Workflow did not settle')};
+ const wait=async(expression:string)=>{const end=Date.now()+30000;while(Date.now()<end){if(await evaluate(expression))return;await Bun.sleep(100)}throw new Error('Workflow did not settle: '+expression)};
  await wait('!!window.marx');assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
  await evaluate(`(()=>{
   window.frameProbeRan=false;window.policyViolations=[];
@@ -110,6 +111,46 @@ try {
   const uncJob=await evaluate(`window.marx.scan.run(${JSON.stringify({...input,folderPath:uncSource})})`);
   await wait(`window.marx.scan.jobs().then(jobs=>jobs.some(job=>job.id===${JSON.stringify(uncJob.id)}&&job.status==='Completed'))`);
  }
+ assert.deepEqual((await evaluate('window.marx.intelligence.settings()')).enabledSources,[]);
+ fs.writeFileSync(path.join(root,'intel-demo'),'synthetic intelligence scan');
+ const intelPage=await evaluate('window.marx.results.get("intel-demo")');
+ assert.equal(intelPage.findings.length,2);
+ assert.equal(await evaluate('window.marx.intelligence.refresh({cves:["CVE-2024-1234"],requestId:"disabled"}).then(()=>false,()=>true)'),true);
+ await evaluate('window.marx.intelligence.configure(["kev","epss","cve"])');
+ await evaluate('window.marx.intelligence.watch("CVE-2024-1234")');
+ const intelData=await evaluate('window.marx.intelligence.refresh({cves:["CVE-2024-1234","CVE-2021-44228"],requestId:"native-intel",force:true})');
+ assert.equal(intelData['CVE-2024-1234'].synthetic,true);
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='CVE intelligence').click()`);
+ assert.equal(intelData['CVE-2024-1234'].sources.find((item:any)=>item.source==='kev').value.listed,false);
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Results').click()`);
+ await wait(`!!document.querySelector('select[aria-label="Scan"] option[value="intel-demo"]')`);
+ await evaluate(`(()=>{const e=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'intel-demo');e.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+ await wait(`document.querySelectorAll('.finding-link').length===2`);
+ await evaluate(`document.querySelector('.finding-link').click()`);
+ await wait(`!!document.querySelector('.intel-panel > summary')`);
+ await evaluate(`document.querySelector('.intel-panel > summary').click()`);
+ await wait(`document.querySelector('.intel-panel').textContent.includes('2.00%')`);
+ await evaluate(`Array.from(document.querySelectorAll('.intel-panel button')).find(b=>b.textContent.trim()==='Record decision').click()`);
+ await wait(`!!document.querySelector('dialog[open] textarea[aria-label="Decision rationale"]')`);
+ await evaluate(`(()=>{const e=document.querySelector('textarea[aria-label="Decision rationale"]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Synthetic deferral pending compatible update; review if exploitation changes.');e.dispatchEvent(new Event('input',{bubbles:true}));const inputs=document.querySelectorAll('.decision-dialog fieldset input[type="checkbox"]');inputs[0].click();inputs[1].click();})()`);
+ await evaluate(`Array.from(document.querySelectorAll('.decision-dialog button')).find(b=>b.textContent.trim()==='Save decision').click()`);
+ await wait(`!document.querySelector('dialog[open]')`);
+ const nativeDecision=(await evaluate('window.marx.intelligence.decisions()'))[0];assert.equal(nativeDecision.verdict,'defer');assert.equal(nativeDecision.revision,1);
+ assert.equal(nativeDecision.evidence.sources.find((item:any)=>item.source==='epss').value.probability,0.02);
+ fs.writeFileSync(path.join(root,'intel-escalate'),'synthetic escalation');
+ await evaluate('window.marx.intelligence.refresh({cves:["CVE-2024-1234"],requestId:"native-escalation",force:true})');
+ const reviewedDecision=(await evaluate('window.marx.intelligence.decisions()'))[0];assert.equal(reviewedDecision.reviewState,'needs_review');assert.equal(reviewedDecision.reviewReasons.length,2);
+ assert.equal(reviewedDecision.evidence.sources.find((item:any)=>item.source==='epss').value.probability,0.02);
+ assert.equal(reviewedDecision.currentEvidence.sources.find((item:any)=>item.source==='epss').value.probability,0.42);
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Workbench').click()`);
+ await wait(`!!document.querySelector('#decisions-tab')`);await evaluate(`document.querySelector('#decisions-tab').click()`);
+ await wait(`document.querySelector('.session-list')?.textContent.includes('needs review')`);
+ await evaluate(`document.querySelector('.session-card').click()`);
+ await wait(`document.querySelector('.decision-detail')?.textContent.includes('The CVE is now listed in CISA KEV')`);
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='CVE intelligence').click()`);
+ await wait(`document.querySelector('.intel-watch')?.textContent.includes('CVE-2024-1234')`);
+ assert.ok((await evaluate('window.marx.intelligence.watchlist()')).events.length>0);
+ assert.equal(await evaluate(`Array.from(document.querySelectorAll('.page-content *')).some(e=>e.getBoundingClientRect().right>innerWidth+2)`),false,'CVE intelligence layout exceeds the native window');
  fs.rmSync(path.join(root,'submissionStarted'),{force:true});
  fs.writeFileSync(path.join(root,'holdSubmission'),'hold');
  const held=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);const submissionDeadline=Date.now()+15000;while(!fs.existsSync(path.join(root,'submissionStarted'))&&Date.now()<submissionDeadline)await Bun.sleep(50);assert.ok(fs.existsSync(path.join(root,'submissionStarted')));
@@ -169,8 +210,9 @@ try {
   await evaluate("window.marx.settings.setApiKey('')");
   assert.equal((await evaluate('window.marx.settings.get()')).hasStoredApiKey,false);
  }
+ assert.equal((await evaluate('window.marx.intelligence.decisions()'))[0].reviewState,'needs_review');
  assert.equal(runtimeStderr.includes('DATA RACE'),false,'The native runtime reported a data race');
- console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
+ console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','opt-in intelligence with synthetic providers','native decision dialog and assumptions','changed evidence review and immutable pins','watch events and decision persistence','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
  if(!mac)await command('Browser.close').catch(()=>{});
 } catch(error) {fs.writeFileSync(path.join(root,'runtime-stderr.log'),runtimeStderr);console.error('Wails acceptance failed:',String(error).replaceAll(root,'<fixture>').replaceAll(os.homedir(),'%USERPROFILE%').replaceAll(os.homedir().replaceAll('\\','/'),'%USERPROFILE%'));process.exitCode=1;} finally {
  socket?.close();

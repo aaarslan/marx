@@ -32,6 +32,22 @@ async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: MarxApi = {
+  intelligence: {
+    settings: () => call('intel:settings'),
+    clearCache: () => call('intel:clear-cache'),
+    configure: (enabledSources) => call('intel:configure', {enabledSources}),
+    get: (cves) => call('intel:get', cves),
+    refresh: (input) => call('intel:refresh', input),
+    cancel: (requestId) => call('intel:cancel', requestId),
+    watch: (cve) => call('intel:watch', {cve}),
+    unwatch: (cve) => call('intel:unwatch', {cve}),
+    watchlist: () => call('intel:watchlist'),
+    decisions: () => call('intel:decisions'),
+    decide: (input) => call('intel:decide', input),
+    closeDecision: (input) => call('intel:close-decision', input),
+    history: (id) => call('intel:decision-history', id),
+    exportDecisions: () => call('intel:export-decisions')
+  },
   platform: System.IsMac() ? 'darwin' : 'win32',
   settings: {
     get: () => call<Settings>(IPC.settingsGet),

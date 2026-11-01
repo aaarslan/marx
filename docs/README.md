@@ -3,6 +3,7 @@
 ## Use Marx
 
 - [Walkthrough](walkthrough.md): setup, scanning, investigation, handoffs and verification.
+- [CVE intelligence and decision reviews](cve-intelligence.md): public context, watch changes and evidence-backed review.
 - [Remediation workbench](workbench.md): pinned evidence and comparison rules.
 - [Remediation prompts](remediation-prompts.md): local assistant handoffs and batch selection.
 - [Current limitations](limitations.md): platform, evidence and integration boundaries.

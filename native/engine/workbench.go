@@ -244,7 +244,19 @@ func (e *Engine) createSession(ctx context.Context, input Object) (Object, error
 		}
 		s["handoff"] = handoff
 	}
-	err = e.store.save(record{kind: "session", scope: pageConnection(page), id: str(s, "id"), value: s}, record{kind: "baseline", scope: pageConnection(page), id: str(s, "id"), value: page, immutable: true})
+	cves := []string{}
+	for _, f := range objects(page["findings"]) {
+		if seen[str(f, "id")] {
+			if cve, err := normalizeCVE(str(f, "cve")); err == nil {
+				cves = append(cves, cve)
+			}
+		}
+	}
+	intelligence, err := e.cachedIntelligence(cves)
+	if err != nil {
+		return nil, err
+	}
+	err = e.store.save(record{kind: "session", scope: pageConnection(page), id: str(s, "id"), value: s}, record{kind: "baseline", scope: pageConnection(page), id: str(s, "id"), value: page, immutable: true}, record{kind: "session-intelligence", scope: pageConnection(page), id: str(s, "id"), value: intelligence, immutable: true})
 	return s, err
 }
 func (e *Engine) updateSession(input Object) (Object, error) {
@@ -352,7 +364,19 @@ func (e *Engine) bundle(id string) (Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := Object{"format": "marx-remediation", "version": 1, "exportedAt": time.Now().UTC().Format(time.RFC3339Nano), "session": s, "baseline": baseline}
+	intelligence, err := e.store.get("session-intelligence", str(s, "connectionId"), id)
+	if err != nil {
+		return nil, err
+	}
+	ids := []string{}
+	for cve := range intelligence {
+		ids = append(ids, cve)
+	}
+	currentIntelligence, err := e.cachedIntelligence(ids)
+	if err != nil {
+		return nil, err
+	}
+	b := Object{"currentIntelligence": currentIntelligence, "intelligence": intelligence, "format": "marx-remediation", "version": 1, "exportedAt": time.Now().UTC().Format(time.RFC3339Nano), "session": s, "baseline": baseline}
 	if verification != nil {
 		b["verification"] = verification
 	}
@@ -388,4 +412,26 @@ func (e *Engine) bootstrap() (Object, error) {
 		logs[str(j, "id")] = lines
 	}
 	return Object{"connectionId": connection, "jobs": jobs, "sessions": sessions, "scans": scans, "logs": logs}, nil
+}
+
+func (e *Engine) cachedIntelligence(cves []string) (Object, error) {
+	ids := []string{}
+	seen := map[string]bool{}
+	for _, cve := range cves {
+		if !seen[cve] {
+			seen[cve] = true
+			ids = append(ids, cve)
+		}
+	}
+	result := Object{}
+	for start := 0; start < len(ids); start += 5000 {
+		values, err := e.intel.get(ids[start:min(start+5000, len(ids))])
+		if err != nil {
+			return nil, err
+		}
+		for key, value := range values {
+			result[key] = value
+		}
+	}
+	return result, nil
 }

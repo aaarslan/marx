@@ -38,6 +38,7 @@ type Engine struct {
 	profile           string
 	host              Host
 	store             *Store
+	intel             *Intelligence
 	settings          Object
 	folders           map[string]bool
 	active            map[string]*activeJob
@@ -63,6 +64,8 @@ func Open(profile string, host Host) (*Engine, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	e := &Engine{profile: profile, host: host, store: store, folders: map[string]bool{}, active: map[string]*activeJob{}, imports: map[string]*importTask{}, requests: map[string]*importTask{}, queue: make(chan struct{}, 128), capacity: make(chan struct{}, 10), control: make(chan struct{}, 2), ctx: ctx, cancel: cancel, preparing: map[string]bool{}, canceled: map[string]bool{}}
+	e.intel = newIntelligence(ctx, store)
+	e.intel.commitSnapshot = e.commitIntelSnapshot
 	e.settings = defaultSettings()
 	data, err := readBounded(filepath.Join(profile, "settings.json"), 1<<20)
 	if err == nil {
@@ -144,6 +147,9 @@ func (e *Engine) Close() {
 	}
 	e.mu.Unlock()
 	e.wg.Wait()
+	if e.intel != nil {
+		e.intel.client.CloseIdleConnections()
+	}
 	e.store.Close()
 }
 func defaultSettings() Object {

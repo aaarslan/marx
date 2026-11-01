@@ -1,6 +1,6 @@
 # Website hosting
 
-The public site lives in `website/`, separate from developer documentation and historical evidence. It uses system fonts, local scripts, synthetic screenshots and a committed 44-second MP4. No backend, API keys, analytics or remote render job is required.
+The public site lives in `website/`, separate from developer documentation and historical evidence. It uses system fonts, local scripts, synthetic screenshots and a committed 52-second MP4. No backend, API keys, analytics or remote render job is required.
 
 ## Preview and check
 

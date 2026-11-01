@@ -24,3 +24,9 @@ The Wails child-frame/native-bridge limitation remains disclosed in [SECURITY.md
 - Electron and earlier prototype databases are not migrated. Unsupported schema versions and corrupt databases are preserved and rejected. Restart and recovery of committed evidence from an interrupted WAL snapshot with an incomplete tail were tested. A real SQLite `SQLITE_FULL` error induced with a page limit rolled back the whole evidence transaction. Arbitrary damaged-page repair and exhaustion of the physical disk remain unqualified.
 
 The native Go suite and acceptance-tagged desktop workflow ran with Go's race detector using a private portable LLVM-MinGW compiler; neither run reported a race. This supplements functional concurrency coverage and does not prove the absence of every possible race.
+
+## CVE intelligence
+
+Public intelligence is optional and applies only to explicit CVE IDs. It does not infer repository reachability, execute exploit references, replace scanner severity, validate a manual risk acceptance or establish a fixed finding. Sources can disagree or be unavailable; CISA absence is scoped to the fetched complete catalog, and missing EPSS stays unknown. A provider request reveals the requested CVE IDs and ordinary network metadata, even though repository and tenant details are excluded.
+
+The new intelligence workflow has macOS synthetic native acceptance and an explicit public-source smoke check. The preceding Windows acceptance at `e1964ad` predates this feature and does not qualify these new controls on Windows. Full production manual checks, live tenant compatibility and signing remain separate. See [the intelligence guide](cve-intelligence.md) for retention, limits and evidence semantics.

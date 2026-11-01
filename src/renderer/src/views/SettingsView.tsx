@@ -4,6 +4,7 @@ import { CheckCircle2, KeyRound, Plug } from 'lucide-react';
 import type { ScanDefaults, Settings, TestConnectionResult } from '@shared/types';
 import { api } from '../api';
 import { useApp } from '../store';
+import { IntelligenceSettings } from '../components/IntelligenceSettings';
 import { Banner, Spinner, Toggle } from '../components/ui';
 
 export function SettingsView() {
@@ -258,6 +259,7 @@ export function SettingsView() {
         </div>
       </div>
 
+      <IntelligenceSettings />
       {saveError && <Banner kind="error">{saveError}</Banner>}
       <div className="settings-actions">
         <button className="btn primary" disabled={saving || savingKey || testing} onClick={() => void save()}>

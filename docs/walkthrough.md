@@ -56,14 +56,25 @@ If the CLI is missing, correct its executable path in Settings. For authenticati
 
 Production builds have no acceptance server. The acceptance build is only for isolated synthetic verification and must never be distributed.
 
+## CVE intelligence and decision review
+
+Open **Settings → Public CVE intelligence** to enable the sources you want, then save those preferences. Sources start disabled and fetch only when you explicitly refresh. FIRST and CVE.org receive the requested CVE IDs; CISA's public catalog is downloaded as a whole. No source code, paths, package inventory, tenant details or Checkmarx credentials are sent.
+
+In **Results**, expand a CVE finding's intelligence panel or refresh the scan's CVEs. Inspect KEV membership, EPSS probability and date, named CVSS scorers and reference tags. Source errors and stale values stay visible. Intelligence filters are separate from scanner severity.
+
+Use **Watch CVE** to track later observed changes in the **CVE intelligence** view. Choose **Record decision** to save a scoped rationale, review date and optional evidence assumptions. **Workbench → Decisions** flags broken assumptions and retains both the original observation and the evidence that prompted review. Revise or close the decision explicitly; none of these actions change Checkmarx result states or verify a fix.
+
+Read [CVE intelligence and decision reviews](cve-intelligence.md) for source controls, exact disclosure, export semantics, retention and limits.
+
 ## Showcase transcript
 
 - **0–5 seconds:** Less flag wrangling. More fixing. Marx, a desktop workspace for Checkmarx One.
 - **5–12:** Choose your source and settings through a graphical scan workflow.
 - **12–20:** Filter findings and inspect the available evidence.
-- **20–28:** Generate a local remediation handoff for your chosen assistant.
-- **28–35:** Keep pinned findings and notes; compare a verification scan.
-- **35–40:** Official CLI uploads, remote analysis, explicit evidence boundaries.
-- **40–44:** Marx. Explore the source and build guide.
+- **20–28:** Add known-exploitation and published-probability context, with visible sources and unknowns.
+- **28–36:** Generate a local remediation handoff for your chosen assistant.
+- **36–43:** Revisit a decision when its reasons change, while keeping original evidence pinned.
+- **43–48:** Scans through the official CLI. Optional public intelligence uses CVE IDs, without source code or credentials.
+- **48–52:** Marx. Explore the source and build guide.
 
-The 44-second film is an edited product showcase, not an uninterrupted recording or live tenant verification. Its screens were captured from the actual native application using the isolated synthetic CLI fixture. Music is generated locally from the checked-in score script.
+The 52-second film is an edited product showcase, not an uninterrupted recording or live tenant verification. Its screens were captured from the actual native application using an isolated synthetic CLI and acceptance-only intelligence fixture. Music is generated locally from the checked-in score script.

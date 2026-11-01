@@ -10,7 +10,15 @@ fs.cpSync("showcase/compositions", path.join(root, "compositions"), {
 fs.copyFileSync("showcase/index.html", path.join(root, "index.html"));
 fs.copyFileSync("showcase/film.css", path.join(root, "assets/film.css"));
 fs.copyFileSync("website/icon.png", path.join(root, "assets/icon.png"));
-for (const name of ["scan", "results", "detail", "prompt", "workbench"])
+for (const name of [
+  "scan",
+  "results",
+  "detail",
+  "prompt",
+  "workbench",
+  "intelligence",
+  "decisions",
+])
   fs.copyFileSync(
     `website/assets/${name}.webp`,
     path.join(root, `assets/${name}.webp`),
@@ -77,7 +85,7 @@ if (process.argv.includes("--render")) {
     "-v",
     "error",
     "-ss",
-    "42",
+    "50",
     "-i",
     video,
     "-vf",

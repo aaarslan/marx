@@ -1,12 +1,9 @@
 <!doctype html>
-<html
-  lang="en"
-  data-composition-variables='[{"id":"accent","type":"color","label":"Accent","default":"#ff8a4c"}]'
->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920,height=1080" />
-    <title>Marx — from findings to fixes</title>
+    <title>Marx — from findings to informed fixes</title>
     <script src="assets/gsap.min.js"></script>
     <link rel="stylesheet" href="assets/film.css" />
   </head>
@@ -17,7 +14,7 @@
       data-width="1920"
       data-height="1080"
       data-fps="30"
-      data-duration="44"
+      data-duration="52"
     >
       <div
         id="intro"
@@ -50,11 +47,21 @@
         data-track-kind="graphics"
       ></div>
       <div
+        id="intelligence"
+        class="clip"
+        data-composition-id="intelligence"
+        data-composition-src="compositions/intelligence.html"
+        data-start="20"
+        data-duration="8"
+        data-track-index="1"
+        data-track-kind="graphics"
+      ></div>
+      <div
         id="handoff"
         class="clip"
         data-composition-id="handoff"
         data-composition-src="compositions/handoff.html"
-        data-start="20"
+        data-start="28"
         data-duration="8"
         data-track-index="1"
         data-track-kind="graphics"
@@ -64,7 +71,7 @@
         class="clip"
         data-composition-id="evidence"
         data-composition-src="compositions/evidence.html"
-        data-start="28"
+        data-start="36"
         data-duration="7"
         data-track-index="1"
         data-track-kind="graphics"
@@ -74,7 +81,7 @@
         class="clip"
         data-composition-id="trust"
         data-composition-src="compositions/trust.html"
-        data-start="35"
+        data-start="43"
         data-duration="5"
         data-track-index="1"
         data-track-kind="graphics"
@@ -84,7 +91,7 @@
         class="clip"
         data-composition-id="outro"
         data-composition-src="compositions/outro.html"
-        data-start="40"
+        data-start="48"
         data-duration="4"
         data-track-index="1"
         data-track-kind="graphics"
@@ -93,7 +100,7 @@
         id="score"
         class="clip"
         data-start="0"
-        data-duration="44"
+        data-duration="52"
         data-track-index="2"
         src="assets/soundtrack.m4a"
         data-volume="0.7"
@@ -105,7 +112,7 @@
       window.__timelines = window.__timelines || {};
       window.__timelines.main = gsap
         .timeline({ paused: true })
-        .to({ clock: 0 }, { clock: 44, duration: 44, ease: "none" });
+        .to({ clock: 0 }, { clock: 52, duration: 52, ease: "none" });
     </script>
   </body>
 </html>

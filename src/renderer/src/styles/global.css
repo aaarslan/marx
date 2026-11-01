@@ -1245,3 +1245,46 @@ select {
   .group-context strong { display: block; margin: 10px 0 0; }
   .remediation-track .field-help { flex-basis: 100%; }
 }
+
+.intel-panel { margin: 18px 0; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.intel-panel h3, .intel-settings h2 { margin: 0; }
+.intel-actions, .intel-results-toolbar { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.intel-refresh { min-width: 0; }
+.intel-refresh .banner { margin-top: 10px; }
+.intel-facts { min-width: 0; overflow-wrap: anywhere; }
+.intel-headline { display: flex; align-items: center; gap: 8px; color: var(--accent); margin: 14px 0 8px; }
+.intel-source { padding: 12px 0; border-top: 1px solid var(--border); }
+.intel-source p { margin: 8px 0; }
+.intel-state { font-size: 10px; line-height: 1.5; border: 1px solid var(--border); padding: 2px 7px; border-radius: 12px; color: var(--text-dim); white-space: normal; }
+.intel-state.stale, .intel-state.needs_review, .intel-state.review_due { color: var(--warn); border-color: currentColor; }
+.intel-state.unavailable, .intel-state.disabled { color: var(--text-dim); }
+.intel-state.fresh { color: var(--ok); }
+.intel-number { font-size: 22px; font-weight: 600; }
+.intel-number span { font-size: 11px; color: var(--text-dim); font-weight: 400; }
+.intel-vector { font-size: 10px; overflow-wrap: anywhere; }
+.intel-references summary, .decision-detail summary { cursor: pointer; padding: 12px 0; font-weight: 500; }
+.intel-links { gap: 18px; font-size: 11px; margin-top: 12px; }
+.intelligence-layout { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.7fr); gap: 20px; align-items: start; margin: 22px 0; }
+.intelligence-layout > *, .intel-watch-row { min-width: 0; }
+.intel-watch-row { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 10px 0; }
+.intel-watch-row > button:first-child { display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 0; white-space: normal; }
+.intel-watch-row.selected { background: var(--accent-soft); }
+.intel-history article, .decision-revision { border-top: 1px solid var(--border); padding: 12px 0; }
+.intel-history ul { margin: 8px 0; padding-left: 20px; }
+.intel-search { display: flex; gap: 10px; flex-wrap: wrap; }
+.intel-search input { min-width: 180px; }
+.intel-settings { margin-top: 24px; }
+.decision-dialog { width: min(620px, calc(100vw - 40px)); max-height: calc(100vh - 50px); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-solid); color: var(--text); padding: 24px; }
+.decision-dialog::backdrop { background: #000a; }
+.decision-dialog .field { margin: 16px 0; }
+.decision-dialog fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin: 20px 0; }
+.decision-dialog legend { padding: 0 6px; color: var(--text-dim); font-size: 12px; }
+.decision-dialog .check { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; margin: 14px 0; }
+.decision-dialog .intel-threshold { width: 80px; }
+.decision-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.intel-close { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 20px; }
+@media (max-width: 1100px) { .intelligence-layout { grid-template-columns: 1fr; } .intel-results-toolbar { align-items: stretch; } }
+@media (forced-colors: active) { .intel-state, .intel-panel, .decision-dialog { border-color: CanvasText; } }
+
+.intel-panel > summary { cursor: pointer; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.warn-text { color: var(--warn); }

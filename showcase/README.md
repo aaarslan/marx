@@ -1,6 +1,6 @@
 # Marx product film
 
-44 seconds, 1920×1080, 30 fps. HTML scenes are rendered locally with Hyperframes 0.8.226. The final file is `website/assets/marx-showcase.mp4`. See `SPEC.md` for the editorial contract. App screens contain synthetic findings, not customer data. The score is original procedural synthesis from `soundtrack.py`.
+52 seconds, 1920×1080, 30 fps. HTML scenes are rendered locally with Hyperframes 0.8.226. The final file is `website/assets/marx-showcase.mp4`. See `SPEC.md` for the editorial contract. App screens contain synthetic findings, not customer data. The score is original procedural synthesis from `soundtrack.py`.
 
 Requirements: macOS for native capture, the application build toolchain, Python 3, ffmpeg, the WebP `cwebp` encoder and Chrome. No provider account or paid render service is used.
 
@@ -9,7 +9,7 @@ bun run build
 bun scripts/capture-showcase.ts
 ```
 
-The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures five actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,workbench}.webp` with `cwebp`. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
+The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures seven actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,workbench,intelligence,decisions}.webp` with `cwebp`. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
 
 ```sh
 bun scripts/build-showcase.ts

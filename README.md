@@ -18,6 +18,8 @@ Marx runs your installed, official Checkmarx CLI through a graphical workflow. T
 - Configure SAST and SCA scans with explicit folder-to-project mappings and per-project options.
 - Monitor durable jobs, recover known scans after restart, and retain uncertain submission outcomes without automatic resubmission.
 - Filter and investigate findings, inspect source flows, group related fixes, and compare selected baselines.
+- Enrich explicit CVE findings with opt-in CISA KEV, FIRST EPSS and CVE.org context, while preserving scanner severity.
+- Revisit scoped decisions when exploitation evidence changes, with pinned history and review dates.
 - Prepare local prompts for your coding assistant, pin original evidence, and record changes and verification results.
 - Scan workspace packages and export CSV, JSON, official SARIF, or remediation evidence bundles.
 
@@ -52,7 +54,7 @@ Marx uses Wails 3.1.0, Go, SQLite and React with the system webview. No Bun, Nod
 
 Linux, Intel macOS and Windows ARM64 are outside the supported targets. Windows packages are unsigned. Synthetic checks do not establish live tenant acceptance.
 
-Optional saved keys use Windows DPAPI or macOS Keychain-backed encryption. Local evidence and exports can contain sensitive information; the SQLite database is not encrypted. Marx has no analytics service. The Wails child-frame bridge boundary remains documented alongside application mitigations in [SECURITY.md](SECURITY.md).
+Optional saved keys use Windows DPAPI or macOS Keychain-backed encryption. Local evidence and exports can contain sensitive information; the SQLite database is not encrypted. Public intelligence lookups are optional and send only CVE IDs where required. Marx has no analytics service. The Wails child-frame bridge boundary remains documented alongside application mitigations in [SECURITY.md](SECURITY.md).
 
 ## Development
 
@@ -68,4 +70,4 @@ bun run audit
 
 ## License
 
-Marx is [MIT licensed](LICENSE). Checkmarx services and the official CLI have their own licensing. See [dependency maintenance](docs/dependencies.md) and [showcase sources](showcase/README.md) for tooling and media details.
+Marx is [MIT licensed](LICENSE). Checkmarx services and the official CLI have their own licensing. See [CVE intelligence](docs/cve-intelligence.md), [third-party notices](THIRD_PARTY_NOTICES.md), [dependency maintenance](docs/dependencies.md) and [showcase sources](showcase/README.md) for tooling and media details.

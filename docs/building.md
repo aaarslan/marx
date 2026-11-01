@@ -109,3 +109,7 @@ go test ./native -run '^TestWindowsCLIStartsInsideJobBeforeSpawningChildren$' -c
 ```
 
 This test verifies the CLI cannot execute before job assignment and that closing the job terminates a child spawned immediately after resumption. The separate native runtime acceptance results are recorded in the migration report. A host crash before assigning the newly created suspended process remains a narrow startup boundary; that process has not executed CLI code or spawned descendants.
+
+## Public CVE intelligence verification
+
+Normal tests remain offline. The acceptance build contains a separately gated synthetic intelligence adapter; production packaging rejects that adapter. To explicitly contact the three public sources for one known public CVE, run the opt-in command in [CVE intelligence](cve-intelligence.md#bounds-and-verification). This requires no Checkmarx credentials and does not upload repository contents.

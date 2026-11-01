@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Activity, Check, ChevronLeft, Copy, Download, ListChecks, Play, RefreshCw, Search, Sparkles, Trash2, Wrench, X } from 'lucide-react';
 import type { Finding, ResultsPage, ScanHistoryItem, ScanJobState } from '@shared/types';
 import type { RemediationSession } from '@shared/workbench';
+import { DecisionReview } from '../components/DecisionReview';
 import { api } from '../api';
 import { useApp } from '../store';
 import { Banner, Empty, SeverityBadge, Spinner, StatusBadge, timeAgo } from '../components/ui';
@@ -17,9 +18,15 @@ export function WorkbenchView() {
   useEffect(() => { void refreshWorkbench().catch((err) => setRefreshError(err.message)); }, [refreshWorkbench]);
   return <>
     <div className="row between workspace-heading"><div><div className="page-eyebrow">Evidence and follow-through</div><h1 className="page-title">Workbench</h1><p className="page-sub">Keep remediation work and scan activity across app restarts.</p></div><button className="btn small" disabled={refreshing} onClick={async () => { setRefreshing(true); setRefreshError(null); try { await refreshWorkbench(); } catch (err) { setRefreshError(err instanceof Error ? err.message : String(err)); } finally { setRefreshing(false); } }}><RefreshCw size={14} className={refreshing ? 'spin' : ''} />Refresh</button></div>
-    <div className="workbench-tabs" role="tablist" aria-label="Workbench sections"><button role="tab" id="sessions-tab" aria-selected={tab === 'sessions'} aria-controls="sessions-panel" className={`btn ${tab === 'sessions' ? 'selected' : 'ghost'}`} onClick={() => setTab('sessions')}><Wrench size={15} />Remediations</button><button role="tab" id="activity-tab" aria-selected={tab === 'activity'} aria-controls="activity-panel" className={`btn ${tab === 'activity' ? 'selected' : 'ghost'}`} onClick={() => setTab('activity')}><Activity size={15} />Activity & evidence</button></div>
+    <div className="workbench-tabs" role="tablist" aria-label="Workbench sections" onKeyDown={event=>{
+      const tabs=['sessions','activity','decisions'] as const;
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();const index=tabs.indexOf(tab);const next=event.key==='Home'?tabs[0]:event.key==='End'?tabs[2]:tabs[(index+(event.key==='ArrowRight'?1:2))%3];setTab(next);document.getElementById(`${next}-tab`)?.focus();
+    }}>
+      {([{id:'sessions',label:'Remediations',icon:<Wrench size={15}/>},{id:'activity',label:'Activity & evidence',icon:<Activity size={15}/>},{id:'decisions',label:'Decisions',icon:<ListChecks size={15}/>} ] as const).map(item=><button key={item.id} role="tab" id={`${item.id}-tab`} tabIndex={tab===item.id?0:-1} aria-selected={tab===item.id} aria-controls={`${item.id}-panel`} className={`btn ${tab===item.id?'selected':'ghost'}`} onClick={()=>setTab(item.id)}>{item.icon}{item.label}</button>)}
+    </div>
     {(error || refreshError) && <Banner kind="error">{refreshError ?? error}</Banner>}
-    {tab === 'sessions' ? <div role="tabpanel" id="sessions-panel" aria-labelledby="sessions-tab"><SessionsPanel /></div> : <div role="tabpanel" id="activity-panel" aria-labelledby="activity-tab"><ActivityPanel /></div>}
+    {tab === 'decisions' ? <div role="tabpanel" id="decisions-panel" aria-labelledby="decisions-tab"><DecisionReview /></div> : tab === 'sessions' ? <div role="tabpanel" id="sessions-panel" aria-labelledby="sessions-tab"><SessionsPanel /></div> : <div role="tabpanel" id="activity-panel" aria-labelledby="activity-tab"><ActivityPanel /></div>}
   </>;
 }
 

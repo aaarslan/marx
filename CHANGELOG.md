@@ -2,6 +2,10 @@
 
 ## Unreleased — 0.9.0
 
+- Add opt-in public CVE intelligence with CISA KEV, FIRST EPSS, CVE.org source context, transparent freshness, exploit-tagged references and scan filters.
+- Add a local CVE watchlist and scoped decision ledger with review dates, explicit assumptions, immutable revisions and persistent alerts when evidence changes.
+- Include cached intelligence in local handoffs and JSON exports, and pin original intelligence separately from current observations in remediation bundles.
+
 - Replace Electron with a Wails desktop host, Go engine and embedded React interface for macOS Apple Silicon and Windows x64.
 - Add durable SQLite jobs, restart recovery, pinned remediation evidence and explicit unknown outcomes without automatic resubmission.
 - Add paged finding investigation, related-fix groups, source freshness checks, local assistant handoffs and evidence-qualified comparisons.
@@ -10,7 +14,7 @@
 - Bound desktop payloads and concurrency, restrict folder grants to native selection, tighten database permissions and omit oversized log lines before redaction.
 - Reduce allocation overhead in paged results queries and correct scan-toolbar alignment.
 - Update Wails and its frontend runtime to 3.1.0; reject external-origin requests to desktop assets and runtime endpoints.
-- Add a native-interface walkthrough, an editable 44-second synthetic showcase and a static product website.
+- Add a native-interface walkthrough, an editable 52-second synthetic showcase and a static product website.
 
 Earlier entries below describe the implementation and packaging available at each historical version.
 

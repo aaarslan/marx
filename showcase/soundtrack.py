@@ -4,7 +4,7 @@ import sys
 import wave
 
 rate = 44100
-seconds = 44
+seconds = 52
 notes = [130.8128, 164.8138, 195.9977, 146.8324]
 with wave.open(sys.argv[1], 'wb') as track:
     track.setnchannels(1)

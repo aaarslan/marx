@@ -4,7 +4,7 @@ import type { RemediationSession, WorkspaceState } from '@shared/workbench';
 import type { MenuAction } from '@shared/ipc';
 import { api } from './api';
 
-export type View = 'scan' | 'batch' | 'results' | 'history' | 'workbench' | 'settings';
+export type View = 'scan' | 'batch' | 'results' | 'history' | 'workbench' | 'intelligence' | 'settings';
 
 interface AppState {
   view: View;
@@ -17,7 +17,7 @@ interface AppState {
   connectionId: string | null;
   initialized: boolean;
   workbenchError: string | null;
-  workbenchTab: 'sessions' | 'activity';
+  workbenchTab: 'sessions' | 'activity' | 'decisions';
   selectedSessionId: string | null;
   selectedScanId: string | null;
   linkedFolder: string | null;
@@ -28,7 +28,7 @@ interface AppState {
   setView: (v: View) => void;
   init: () => Promise<void>;
   refreshWorkbench: () => Promise<void>;
-  setWorkbenchTab: (tab: 'sessions' | 'activity') => void;
+  setWorkbenchTab: (tab: 'sessions' | 'activity' | 'decisions') => void;
   openSession: (sessionId: string) => void;
   applyEvent: (e: ScanEvent) => void;
   setSelectedScan: (scanId: string | null, folder?: string | null, autoBaseline?: boolean) => void;
@@ -37,7 +37,7 @@ interface AppState {
 }
 
 let subscribed = false;
-const VIEWS: View[] = ['scan', 'batch', 'results', 'history', 'workbench', 'settings'];
+const VIEWS: View[] = ['scan', 'batch', 'results', 'history', 'workbench', 'intelligence', 'settings'];
 
 function navigation(state: AppState): WorkspaceState {
   return {
@@ -117,7 +117,7 @@ export const useApp = create<AppState>((set, get) => {
           selectedScanId: saved?.selectedScanId ?? null,
           linkedFolder: saved?.linkedFolder ?? null,
           selectedSessionId: saved?.selectedSessionId ?? null,
-          workbenchTab: saved?.workbenchTab === 'activity' ? 'activity' as const : 'sessions' as const,
+          workbenchTab: saved?.workbenchTab === 'decisions' ? 'decisions' as const : saved?.workbenchTab === 'activity' ? 'activity' as const : 'sessions' as const,
           batchId: data.jobs.find((job) => job.batchId)?.batchId ?? null
         } : {})
       });

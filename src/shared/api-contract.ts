@@ -1,3 +1,4 @@
+import type { IntelligenceSettings, IntelligenceSnapshot, IntelligenceWatchlist, IntelligenceDecision, DecisionInput } from './intelligence';
 // Renderer-side API surface implemented by the Wails desktop bridge.
 
 import type {
@@ -28,6 +29,22 @@ export interface SourceSnippet {
 
 export interface MarxApi {
   platform: string;
+  intelligence: {
+    settings(): Promise<IntelligenceSettings>;
+    clearCache(): Promise<void>;
+    configure(enabledSources: IntelligenceSettings['enabledSources']): Promise<IntelligenceSettings>;
+    get(cves: string[]): Promise<Record<string, IntelligenceSnapshot>>;
+    refresh(input: {cves: string[]; requestId: string; force?: boolean; reuseCatalog?: boolean}): Promise<Record<string, IntelligenceSnapshot>>;
+    cancel(requestId: string): Promise<void>;
+    watch(cve: string): Promise<unknown>;
+    unwatch(cve: string): Promise<unknown>;
+    watchlist(): Promise<IntelligenceWatchlist>;
+    decisions(): Promise<IntelligenceDecision[]>;
+    decide(input: DecisionInput): Promise<IntelligenceDecision>;
+    closeDecision(input: {id: string; expectedRevision: number; reason: string}): Promise<IntelligenceDecision>;
+    history(id: string): Promise<IntelligenceDecision[]>;
+    exportDecisions(): Promise<string | null>;
+  };
   settings: {
     get(): Promise<Settings>;
     save(s: Partial<Settings>): Promise<Settings>;

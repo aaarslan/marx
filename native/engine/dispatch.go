@@ -67,6 +67,34 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 	m := object(a)
 	s := text(a)
 	switch ch {
+	case "intel:decisions":
+		return e.decisions()
+	case "intel:decide":
+		return e.recordDecision(m)
+	case "intel:close-decision":
+		return e.closeDecision(m)
+	case "intel:decision-history":
+		return e.decisionHistory(s)
+	case "intel:export-decisions":
+		return e.exportDecisions()
+	case "intel:clear-cache":
+		return nil, e.intel.clearCache()
+	case "intel:settings":
+		return e.intel.settings()
+	case "intel:configure":
+		return e.intel.configure(m)
+	case "intel:get":
+		return e.intel.get(a)
+	case "intel:refresh":
+		return e.intel.refresh(m)
+	case "intel:cancel":
+		e.intel.cancel(s)
+		return nil, nil
+	case "intel:watch", "intel:unwatch":
+		return e.intel.watch(m, ch == "intel:unwatch")
+	case "intel:watchlist":
+		return e.intel.watchlist()
+
 	case "settings:get":
 		return e.getSettings(), nil
 	case "settings:save":
@@ -492,7 +520,17 @@ func (e *Engine) exportResults(m Object) (any, error) {
 			k := str(f, "severity")
 			counts[k] = number(counts[k]) + 1
 		}
-		data, _ = json.MarshalIndent(Object{"exportedAt": time.Now().UTC().Format(time.RFC3339Nano), "totalCount": len(findings), "severityCounts": counts, "findings": findings}, "", "  ")
+		cves := []string{}
+		for _, finding := range findings {
+			if cve, err := normalizeCVE(str(finding, "cve")); err == nil {
+				cves = append(cves, cve)
+			}
+		}
+		intelligence, err := e.cachedIntelligence(cves)
+		if err != nil {
+			return nil, err
+		}
+		data, _ = json.MarshalIndent(Object{"exportedAt": time.Now().UTC().Format(time.RFC3339Nano), "totalCount": len(findings), "severityCounts": counts, "findings": findings, "intelligence": intelligence}, "", "  ")
 	case "csv":
 		var b strings.Builder
 		w := csv.NewWriter(&b)

@@ -38,3 +38,9 @@ See [current limitations](docs/limitations.md) and [Wails validation](docs/wails
 ## Resource limits
 
 Desktop admission accepts at most eight arguments totaling 64 MiB per operation, with a shared 128 MiB raw argument budget and 256 pending operations. These limits do not bound total process memory. Oversized streaming log lines are omitted rather than publishing potentially partial credentials. Saved settings must remain within the 1 MiB readable configuration limit. On macOS, SQLite evidence and existing WAL/SHM files are restricted to owner read/write; nonregular database and sidecar paths are rejected. This protects against accidental cross-account reads, not a malicious process running as the same user.
+
+## Optional CVE intelligence
+
+Sources are disabled by default and refreshed explicitly. Requests download CISA's official catalog mirror or send public CVE IDs to FIRST and CVE.org. They contain no repository content, package inventory, paths, tenant details or Checkmarx credentials. The source-specific Go client accepts only fixed HTTPS endpoints, rejects redirects, bounds responses and work, and preserves stale/unknown states. Exploit references are never fetched or executed by Marx.
+
+Local decisions are user assessments, not verified fixes or remote triage changes. The ledger retains pinned evidence and review triggers separately from mutable cache entries. Clearing fetched data preserves that history. Intelligence, manual notes and exported archives share the existing evidence database's permissions and lack of encryption. Acceptance-only synthetic provider adapters are excluded from production packaging. See [the intelligence guide](docs/cve-intelligence.md) for controls, data terms and limits.
