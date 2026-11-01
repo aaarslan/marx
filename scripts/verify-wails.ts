@@ -73,6 +73,10 @@ try {
  assert.equal(await evaluate('window.frameProbeRan'),false,'An embedded frame executed script');
  await evaluate("document.querySelectorAll('.marx-frame-probe').forEach(element=>element.remove())");
  for(const name of ['Scan','Results','Batch Scan','Workbench','History','Settings']){await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()===${JSON.stringify(name)}).click()`);await Bun.sleep(100);assert.ok(await evaluate('!!document.querySelector("main")?.textContent.trim()'))}
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
+ await wait(`!!document.querySelector('.settings-actions')`);
+ const shellScroll=await evaluate(`(()=>{document.querySelector('.settings-actions button').scrollIntoView();for(const element of [document.documentElement,document.body,document.querySelector('#root')])element.scrollTop=10000;const sidebar=document.querySelector('.sidebar').getBoundingClientRect();return {top:sidebar.top,bottom:sidebar.bottom,height:innerHeight,outerScroll:document.scrollingElement.scrollTop,mainScroll:document.querySelector('main').scrollTop}})()`);
+ assert.equal(shellScroll.outerScroll,0,'Settings focus scrolled the outer document');assert.ok(shellScroll.top>=-1&&shellScroll.bottom<=shellScroll.height+1,'Settings focus moved navigation outside the window');assert.ok(shellScroll.mainScroll>0,'Settings did not scroll within its content pane');
  const settings=await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");assert.equal(settings.hasStoredApiKey,true);assert.ok(!fs.readFileSync(path.join(profile,'settings.key')).includes(Buffer.from('disposable-wails-test')));
  fs.writeFileSync(path.join(root,'expectedKey'),'disposable-wails-test');
  await evaluate("window.marx.settings.save({cliAuthMode:'marx'})");assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);

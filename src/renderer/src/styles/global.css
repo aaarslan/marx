@@ -44,7 +44,7 @@ html,
 body,
 #root {
   height: 100%;
-  overflow: hidden;
+  overflow: clip;
 }
 
 body {
@@ -55,6 +55,11 @@ body {
   background: var(--bg-solid);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+#root {
+  position: fixed;
+  inset: 0;
 }
 
 ::selection {
