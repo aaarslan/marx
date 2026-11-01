@@ -11,6 +11,7 @@
 ## Build and maintain
 
 - [Build and native verification](building.md).
+- [Final acceptance checklist](final-acceptance.md).
 - [CLI contracts](api-contracts.md).
 - [Dependencies](dependencies.md).
 - [Security policy](../SECURITY.md).

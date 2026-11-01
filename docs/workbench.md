@@ -58,7 +58,7 @@ Each batch item uploads its own folder. Shared lockfiles or build context outsid
 
 ## Jobs, recovery and local storage
 
-The database is `workbench.sqlite` in Electron's user-data directory. Jobs, the latest 1,000 bounded log lines per job, scan snapshots, finding indexes, sessions and navigation state survive restarts. A schema version prevents an older Marx build from rewriting a newer database. SQLite transactions keep imports and evidence updates atomic; failed replacement leaves the previous snapshot intact.
+The database is `workbench.sqlite` in the selected native Marx profile, normally `%APPDATA%/MarxWails` on Windows or `~/Library/Application Support/MarxWails` on macOS. Jobs, the latest 1,000 bounded log lines per job, scan snapshots, sessions and navigation state survive restarts. A schema version prevents an older Marx build from rewriting a newer database. SQLite transactions keep imports and evidence updates atomic; failed replacement leaves the previous snapshot intact.
 
 Startup marks interrupted local monitoring explicitly. Known remote IDs in the current connection are reconciled, with at most eight simultaneous monitored jobs. Recovery only queries the existing scan; it never creates a replacement. Unknown submissions without a remote ID require investigation in Checkmarx One before another submission. **Activity** exposes stored jobs and logs, manual reconciliation, saved scans and cleanup.
 
@@ -72,12 +72,12 @@ Evidence is separated by CLI configuration fingerprint and project identity. The
 
 | Export | Contents |
 | --- | --- |
-| CSV / JSON | Current filtered normalized findings |
+| CSV / JSON | Current filtered normalized findings; JSON also includes cached CVE intelligence |
 | SARIF | Original CLI-generated SARIF 2.1.0 report for the whole scan, preserving its semantics |
 | Remediation Markdown | Every generated assistant prompt batch |
-| Session JSON | Session notes/reference/checks/handoff, exact selected IDs, pinned baseline, optional pinned verification, comparison and timestamps |
+| Session JSON | Session notes/reference/checks/handoff, exact selected IDs, pinned baseline, optional pinned verification, comparison, original/current intelligence and timestamps |
 
-CLI JSON and SARIF reports are limited to 64 MiB. Parsing runs in a worker with cancellation and a 60-second processing bound. There is no 5,000-finding slice; incomplete counts stay explicit. The full normalized scan is still loaded into renderer memory, so paging the DOM is not an unlimited-memory guarantee. Oversized or malformed reports fail visibly without replacing saved evidence.
+CLI JSON and SARIF reports are limited to 64 MiB. Go imports the bounded report in a shared task with reader cancellation; cancellation is checked before committing the snapshot. Parsing itself is not preemptible and has no separate processing deadline. There is no 5,000-finding slice; incomplete counts stay explicit. The full normalized scan is still loaded into renderer memory, so paging the DOM is not an unlimited-memory guarantee. Oversized or malformed reports fail visibly without replacing saved evidence.
 
 The CLI scheduler bounds ordinary execution, reserves capacity for control operations, and cancels queued work without spawning it. It does not automatically retry scan creation or triage. Exports and local evidence can contain sensitive project information. See [Security](../SECURITY.md) and [current validation boundaries](limitations.md).
 

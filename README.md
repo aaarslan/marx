@@ -50,9 +50,9 @@ Marx uses Wails 3.1.0, Go, SQLite and React with the system webview. No Bun, Nod
 | Platform | Current status |
 | --- | --- |
 | macOS Apple Silicon | Native synthetic workflow and locally built app verified; ad hoc signed, without notarization |
-| Windows 11 x64 | Wails 3.1.0 synthetic acceptance, race checks and isolated install/uninstall verified; remaining manual checks are recorded in the verification report |
+| Windows 11 x64 | Prior revision passed native synthetic acceptance, race checks and install/uninstall; new CVE controls need final native validation |
 
-Linux, Intel macOS and Windows ARM64 are outside the supported targets. Windows packages are unsigned. Synthetic checks do not establish live tenant acceptance.
+Linux, Intel macOS and Windows ARM64 are outside the supported targets. Windows packages are unsigned. Synthetic checks do not establish live tenant acceptance. See the [final acceptance checklist](docs/final-acceptance.md) before merging.
 
 Optional saved keys use Windows DPAPI or macOS Keychain-backed encryption. Local evidence and exports can contain sensitive information; the SQLite database is not encrypted. Public intelligence lookups are optional and send only CVE IDs where required. Marx has no analytics service. The Wails child-frame bridge boundary remains documented alongside application mitigations in [SECURITY.md](SECURITY.md).
 
