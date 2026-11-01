@@ -110,6 +110,9 @@ func gitInfo(ctx context.Context, folder string) Object {
 			branch = "HEAD"
 		}
 	}
+	if strings.TrimSpace(branch) == "" {
+		branch = "master"
+	}
 	return Object{"branch": strings.TrimSpace(branch), "hasGit": hasGit, "repoName": filepath.Base(folder)}
 }
 func captureProvenance(ctx context.Context, folder string, options Object, connection, version string) Object {
@@ -185,9 +188,20 @@ func captureProvenance(ctx context.Context, folder string, options Object, conne
 		captureErr = errors.New("Source fingerprint exceeded 20,000 files")
 	}
 	if captureErr == nil {
+		// Keep reads rooted even if a directory is replaced by a junction or
+		// symlink after the metadata checks below.
+		root, err := os.OpenRoot(folder)
+		if err != nil {
+			captureErr = err
+		} else {
+			defer root.Close()
+		}
 		sort.Strings(files)
 		last := ""
 		for _, rel := range files {
+			if captureErr != nil {
+				break
+			}
 			if rel == last {
 				continue
 			}
@@ -230,7 +244,13 @@ func captureProvenance(ctx context.Context, folder string, options Object, conne
 				captureErr = errors.New("Source fingerprint exceeded its 16 MiB per-file or 256 MiB total limit")
 				break
 			}
-			data, err := readBounded(target, 16<<20)
+			file, err := root.Open(rel)
+			if err != nil {
+				captureErr = errors.New("Source file is outside the selected folder or inaccessible")
+				break
+			}
+			data, err := readBoundedFile(file, 16<<20)
+			file.Close()
 			after, statErr := os.Stat(target)
 			if err != nil || statErr != nil || after.Size() != stat.Size() || !after.ModTime().Equal(stat.ModTime()) || int64(len(data)) != stat.Size() {
 				captureErr = errors.New("Source changed or could not be read during fingerprint capture")

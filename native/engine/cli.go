@@ -260,11 +260,51 @@ func parseJSON(s string) (any, error) {
 	if json.Unmarshal([]byte(s), &v) == nil {
 		return v, nil
 	}
-	lines := strings.Split(s, "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		if json.Unmarshal([]byte(strings.TrimSpace(lines[i])), &v) == nil {
-			return v, nil
+	// Find complete containers in one pass. Respect string escapes so braces
+	// in messages cannot truncate a response, and retain the last response.
+	start := -1
+	stack := []byte{}
+	quoted, escaped, found := false, false, false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if start < 0 {
+			if ch != '{' && ch != '[' {
+				continue
+			}
+			start = i
 		}
+		if quoted {
+			if escaped {
+				escaped = false
+			} else if ch == '\\' {
+				escaped = true
+			} else if ch == '"' {
+				quoted = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			quoted = true
+		case '{', '[':
+			stack = append(stack, ch)
+		case '}', ']':
+			if len(stack) == 0 || (ch == '}' && stack[len(stack)-1] != '{') || (ch == ']' && stack[len(stack)-1] != '[') {
+				start, stack = -1, stack[:0]
+				continue
+			}
+			stack = stack[:len(stack)-1]
+			if len(stack) == 0 {
+				var candidate any
+				if json.Unmarshal([]byte(s[start:i+1]), &candidate) == nil {
+					v, found = candidate, true
+				}
+				start = -1
+			}
+		}
+	}
+	if found {
+		return v, nil
 	}
 	return nil, errors.New("The CLI returned unrecognized JSON")
 }

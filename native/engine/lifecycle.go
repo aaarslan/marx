@@ -48,7 +48,7 @@ func (e *Engine) runBatch(ctx context.Context, input Object) (any, error) {
 			options = clone(object(input["options"]))
 		}
 		git := gitInfo(ctx, folder)
-		if str(git, "branch") != "" {
+		if boolean(git["hasGit"]) || strings.TrimSpace(str(options, "branch")) == "" {
 			options["branch"] = git["branch"]
 		}
 		item = clone(item)
@@ -73,13 +73,14 @@ func (e *Engine) runBatch(ctx context.Context, input Object) (any, error) {
 	for _, job := range jobs {
 		records = append(records, record{kind: "job", scope: connection, id: str(job, "id"), value: job})
 	}
-	if err := e.store.save(records...); err != nil {
-		return nil, err
-	}
 	e.mu.Lock()
 	if e.closed {
 		e.mu.Unlock()
 		return nil, errors.New("Marx is shutting down")
+	}
+	if err := e.store.save(records...); err != nil {
+		e.mu.Unlock()
+		return nil, err
 	}
 	e.wg.Add(1)
 	e.mu.Unlock()
@@ -181,7 +182,7 @@ func (e *Engine) runVerification(ctx context.Context, id string) (any, error) {
 	}
 	options := clone(object(p["options"]))
 	git := gitInfo(ctx, str(s, "folderPath"))
-	if str(git, "branch") != "" {
+	if boolean(git["hasGit"]) || strings.TrimSpace(str(options, "branch")) == "" {
 		options["branch"] = git["branch"]
 	}
 	job, c, err := e.prepareJob(ctx, Object{"folderPath": s["folderPath"], "projectName": s["projectName"], "projectId": s["projectId"], "options": options})
@@ -189,24 +190,18 @@ func (e *Engine) runVerification(ctx context.Context, id string) (any, error) {
 		return nil, err
 	}
 	e.sessionMu.Lock()
+	defer e.sessionMu.Unlock()
 	s, err = e.session(id)
 	if err != nil {
-		e.sessionMu.Unlock()
 		return nil, err
 	}
 	if c.connection != str(s, "connectionId") {
-		e.sessionMu.Unlock()
 		return nil, errors.New("Restore the session's original connection")
 	}
 	s["verificationJobId"] = job["id"]
 	s["status"] = "awaiting_verification"
 	s["updatedAt"] = now()
-	err = e.store.save(record{kind: "job", scope: c.connection, id: str(job, "id"), value: job}, record{kind: "session", scope: c.connection, id: id, value: s})
-	e.sessionMu.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	return e.startJob(job, c, false)
+	return e.startJobWithRecords(job, c, false, record{kind: "session", scope: c.connection, id: id, value: s})
 }
 func (e *Engine) deleteSession(id string) error {
 	e.sessionMu.Lock()

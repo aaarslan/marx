@@ -52,6 +52,11 @@ func (e *Engine) prepareJob(ctx context.Context, input Object) (Object, *CLI, er
 	return job, c, nil
 }
 func (e *Engine) startJob(job Object, c *CLI, resume bool) (Object, error) {
+	return e.startJobWithRecords(job, c, resume)
+}
+
+// Admission and related durable state commit under the same lock, before execution.
+func (e *Engine) startJobWithRecords(job Object, c *CLI, resume bool, records ...record) (Object, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.closed {
@@ -72,7 +77,8 @@ func (e *Engine) startJob(job Object, c *CLI, resume bool) (Object, error) {
 	working := clone(job)
 	ctx, cancel := context.WithCancel(e.ctx)
 	active := &activeJob{cancel: cancel, client: c, job: working}
-	if err := e.store.saveJob(working); err != nil {
+	records = append(records, record{kind: "job", scope: str(working, "connectionId"), id: str(working, "id"), value: working})
+	if err := e.store.save(records...); err != nil {
 		cancel()
 		return nil, err
 	}
