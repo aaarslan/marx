@@ -38,7 +38,7 @@ func (e *Engine) runBatch(ctx context.Context, input Object) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		key := strings.ToLower(folder)
+		key := pathIdentity(folder)
 		if seen[key] {
 			return nil, errors.New("The batch contains the same folder more than once")
 		}

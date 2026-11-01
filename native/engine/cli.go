@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -33,7 +34,10 @@ var defaultExcludes = []string{".git", "node_modules", "__pycache__", ".venv", "
 func newCLI(settings Object, key string, guard ProcessGuard, capacity, control, queue chan struct{}) (*CLI, error) {
 	path := str(settings, "cliPath")
 	if path == "" {
-		path = "cx.exe"
+		path = "cx"
+		if runtime.GOOS == "windows" {
+			path += ".exe"
+		}
 	}
 	if strings.ContainsAny(path, "\x00\r\n") {
 		return nil, errors.New("Choose a valid CLI executable")
@@ -49,7 +53,7 @@ func newCLI(settings Object, key string, guard ProcessGuard, capacity, control, 
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(filepath.Ext(executable), ".exe") {
+	if runtime.GOOS == "windows" && !strings.EqualFold(filepath.Ext(executable), ".exe") {
 		return nil, errors.New("Select a Windows executable for the official CLI")
 	}
 	config := str(settings, "cliConfigPath")
@@ -60,7 +64,10 @@ func newCLI(settings Object, key string, guard ProcessGuard, capacity, control, 
 	for _, entry := range os.Environ() {
 		k, v, ok := strings.Cut(entry, "=")
 		if ok {
-			envMap[strings.ToUpper(k)] = v
+			if runtime.GOOS == "windows" {
+				k = strings.ToUpper(k)
+			}
+			envMap[k] = v
 		}
 	}
 	auth := str(settings, "cliAuthMode")
@@ -82,7 +89,7 @@ func newCLI(settings Object, key string, guard ProcessGuard, capacity, control, 
 	cx := []string{}
 	for k, v := range envMap {
 		c.env = append(c.env, k+"="+v)
-		if v != "" && (strings.Contains(k, "KEY") || strings.Contains(k, "SECRET") || strings.Contains(k, "TOKEN") || strings.Contains(k, "PASSWORD")) {
+		if v != "" && (strings.Contains(strings.ToUpper(k), "KEY") || strings.Contains(strings.ToUpper(k), "SECRET") || strings.Contains(strings.ToUpper(k), "TOKEN") || strings.Contains(strings.ToUpper(k), "PASSWORD")) {
 			c.secrets = append(c.secrets, v)
 		}
 		if strings.HasPrefix(k, "CX_") {

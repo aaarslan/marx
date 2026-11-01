@@ -1,4 +1,4 @@
-import { Call, Events } from '@wailsio/runtime';
+import { Call, Events, System } from '@wailsio/runtime';
 const ipcRenderer = {
   invoke: (channel: string, ...args: unknown[]) => Call.ByName('main.DesktopService.Invoke', channel, args),
   on: (channel: string, fn: (...args: any[]) => void) => { subscriptions.set(fn, Events.On(channel, event => fn(null, event.data))); },
@@ -32,7 +32,7 @@ async function call<T>(channel: string, ...args: unknown[]): Promise<T> {
 }
 
 const api: MarxApi = {
-  platform: 'win32',
+  platform: System.IsMac() ? 'darwin' : 'win32',
   settings: {
     get: () => call<Settings>(IPC.settingsGet),
     save: (s: Partial<Settings>) => call<Settings>(IPC.settingsSave, s),

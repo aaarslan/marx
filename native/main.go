@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,11 +34,8 @@ type DesktopService struct {
 
 func jsonValue(value any) []byte { b, _ := json.Marshal(value); return b }
 func (s *DesktopService) start(profile string) error {
-	s.engine, s.startErr = engine.Open(profile, engine.Host{Native: s.native, Emit: func(event engine.Object) { s.app.Event.Emit("scan:event", event) }, Protect: protectCredential, Guard: containProcess, Downloads: downloadsDirectory()})
+	s.engine, s.startErr = engine.Open(profile, engine.Host{Native: s.native, Emit: func(event engine.Object) { s.app.Event.Emit("scan:event", event) }, Protect: credentialProtector(profile), Guard: containProcess, Downloads: downloadsDirectory()})
 	close(s.ready)
-	if s.startErr == nil {
-		s.engine.Recover()
-	}
 	return s.startErr
 }
 func (s *DesktopService) Invoke(channel string, args []json.RawMessage) (json.RawMessage, error) {
@@ -129,13 +125,14 @@ func (s *DesktopService) native(name string, values engine.Object) (any, error) 
 	return value, err
 }
 func downloadsDirectory() string {
-	if directory, err := windowsDownloadsDirectory(); err == nil {
+	if directory, err := nativeDownloadsDirectory(); err == nil {
 		return directory
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Downloads")
 }
 func secureAssets(next http.Handler) http.Handler {
+	next = acceptanceAssets(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'none'")
 		w.Header().Set("X-Frame-Options", "DENY")
@@ -148,6 +145,9 @@ func secureAssets(next http.Handler) http.Handler {
 	})
 }
 func main() {
+	if runProcessGuard() {
+		return
+	}
 	profile := os.Getenv("MARX_USER_DATA_DIR")
 	if profile == "" {
 		base, err := os.UserConfigDir()
@@ -167,17 +167,29 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	identity := sha256.Sum256([]byte(strings.ToLower(profile)))
+	identity := sha256.Sum256([]byte(engine.PathIdentity(profile)))
 	windowsOptions := browserOptions()
 	windowsOptions.WebviewUserDataPath = filepath.Join(profile, "webview2")
 	s := &DesktopService{ready: make(chan struct{})}
-	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Mac: application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true}, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 		if s.win != nil {
 			s.win.Show()
 			s.win.Focus()
 		}
 	}}})
-	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true})
+	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, Mac: application.MacWindow{TitleBar: application.MacTitleBarHiddenInset}, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true})
+	var runtimeReady sync.Once
+	s.win.OnWindowEvent(events.Common.WindowRuntimeReady, func(_ *application.WindowEvent) {
+		runtimeReady.Do(func() {
+			startAcceptance(s.win)
+			go func() {
+				<-s.ready
+				if s.startErr == nil {
+					s.engine.Recover()
+				}
+			}()
+		})
+	})
 	s.win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()
 		if len(files) == 1 {

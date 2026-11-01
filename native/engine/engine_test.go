@@ -40,7 +40,10 @@ type testFixture struct {
 
 func fixture(t *testing.T) *testFixture {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	source := filepath.Join(root, "source space (native) [1] 日本語")
 	profile := filepath.Join(root, "profile")
 	downloads := filepath.Join(root, "downloads")
@@ -91,7 +94,7 @@ func fixture(t *testing.T) *testFixture {
 	if err != nil {
 		t.Fatal("Fixture CLI resolution failed")
 	}
-	if err = e.store.save(record{kind: "binding", scope: c.connection, id: strings.ToLower(source), value: Object{"folderPath": source, "projectId": "p1", "projectName": "synthetic-fixture", "connectionId": c.connection}}); err != nil {
+	if err = e.store.save(record{kind: "binding", scope: c.connection, id: pathIdentity(source), value: Object{"folderPath": source, "projectId": "p1", "projectName": "synthetic-fixture", "connectionId": c.connection}}); err != nil {
 		t.Fatal("Fixture mapping failed")
 	}
 	return &testFixture{e, root, source, profile, downloads, events}
@@ -396,7 +399,7 @@ func TestBatchPerPackageOptionsAndQueuedCancellation(t *testing.T) {
 		_ = os.WriteFile(filepath.Join(folder, "index.js"), []byte("synthetic"), 0600)
 		_, _ = f.e.grant(folder)
 		connection, _ := f.e.connection(false)
-		_ = f.e.store.save(record{kind: "binding", scope: connection, id: strings.ToLower(folder), value: Object{"folderPath": folder, "projectId": "p1", "projectName": "synthetic-fixture", "connectionId": connection}})
+		_ = f.e.store.save(record{kind: "binding", scope: connection, id: pathIdentity(folder), value: Object{"folderPath": folder, "projectId": "p1", "projectName": "synthetic-fixture", "connectionId": connection}})
 		options := clone(object(f.input()["options"]))
 		options["sastPreset"] = name
 		options["branch"] = name

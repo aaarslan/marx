@@ -24,17 +24,20 @@ func TestFramesCannotReachNativeRuntime(t *testing.T) {
 	}
 }
 func TestProtectedCredentialRoundTrip(t *testing.T) {
+	profile := t.TempDir()
+	t.Cleanup(func() { deleteCredentialStorage(profile) })
+	protectCredential := credentialProtector(profile)
 	original := []byte("disposable-native-test")
 	protected, err := protectCredential("protect", original)
 	if err != nil {
-		t.Fatal("DPAPI encryption failed")
+		t.Fatal("Protected credential encryption failed")
 	}
 	if bytes.Contains(protected, original) {
 		t.Fatal("Plaintext credential was stored")
 	}
 	restored, err := protectCredential("unprotect", protected)
 	if err != nil || !bytes.Equal(original, restored) {
-		t.Fatal("DPAPI round-trip failed")
+		t.Fatal("Protected credential round-trip failed")
 	}
 	if _, err = protectCredential("unprotect", []byte("unprotected data")); err == nil {
 		t.Fatal("Unprotected credentials were accepted")

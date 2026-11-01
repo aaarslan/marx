@@ -13,9 +13,9 @@ Security fixes target the latest version. A clean dependency audit does not esta
 - The selected official Checkmarx CLI archives source locally and uploads it to Checkmarx One. Marx does not upload source through its own HTTP implementation. Default exclusions can be overridden; review the files you intend to send.
 - Source archive handling belongs to the selected CLI. Marx's JSON and SARIF reports use private temporary directories and are removed after reading.
 - CLI processes are launched with separate arguments and no shell. Native CLI configuration is the default; optional Marx-managed keys are passed through the child environment. Marx does not rewrite the CLI configuration. Known environment secrets, JWTs and signed upload URL parameters are redacted from captured CLI output; logs and reports can still contain source and finding information.
-- Settings use the per-user `MarxWails` application-data directory, or an explicitly selected disposable test profile. A separate credential file is encrypted using Windows DPAPI. Protected OS storage is required for Marx-managed credentials.
-- DPAPI encryption/decryption runs directly in the Go application; credentials are never passed as command-line arguments or through a helper process. Plaintext fallback is disabled. Electron credential files are not migrated.
-- The interface runs in WebView2 without Node integration. CSP disables frames, objects, remote scripts, forms, and remote resources. The asset middleware denies frame requests and sets frame-ancestor and MIME protections. Native operations invoke the Go engine directly through bounded Wails service calls. Source access requires an authorized folder and matching project mapping, with containment and size checks.
+- Settings use the per-user `MarxWails` application-data directory, or an explicitly selected disposable test profile. A separate credential file is encrypted using Windows DPAPI or AES-GCM with a profile-specific key held in macOS Keychain. Protected OS storage is required for Marx-managed credentials.
+- DPAPI and Keychain encryption/decryption run directly in the Go application; credentials are never passed as command-line arguments or through a helper process. Plaintext fallback is disabled. Electron credential files are not migrated.
+- The interface runs in system WKWebView or WebView2 without Node integration. CSP disables frames, objects, remote scripts, forms, and remote resources. The asset middleware denies frame requests and sets frame-ancestor and MIME protections. Native operations invoke the Go engine directly through bounded Wails service calls. Source access requires an authorized folder and matching project mapping, with containment and size checks.
 - Repository mappings store canonical folder paths, project IDs and names, and a SHA-256 configuration fingerprint. Configuration contents and credentials are not stored in the mapping records. CLI profile or environment changes invalidate the mapping; a project-ID lookup is checked before submission.
 - The workbench database stores normalized findings, source and configuration fingerprints, scan options, job logs, remediation notes and assistant handoffs. This evidence is not encrypted by Marx and can contain source fragments or sensitive project information. Windows relies on profile directory ACLs for the database, WAL and SHM files. No CLI configuration contents or credentials are intentionally added to the database.
 - Session evidence is pinned separately from refreshed results. Cleanup preserves evidence referenced by a session or unresolved job. Explicitly deleting a session removes its pinned copies; SQLite deletion is not guaranteed secure erasure. Protect device backups and exported bundles separately.
@@ -25,7 +25,7 @@ Never commit application-support data, environment secrets, signing keys or priv
 
 ## Distribution
 
-Windows x64 installers are unsigned and do not provide a verified publisher identity. This branch has not qualified macOS or Linux packaging.
+Windows x64 installers are unsigned and do not provide a verified publisher identity. macOS bundles are ad hoc signed for local use; Developer ID signing, notarization and distribution on other Macs are not qualified. Linux packaging is not qualified.
 
 ## Wails framework limitation
 

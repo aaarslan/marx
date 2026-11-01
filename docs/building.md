@@ -1,6 +1,37 @@
 # Building Marx with Wails
 
-Marx targets native Windows x64 with Wails 3.0.0 and Go 1.27.3. Go implements the scan engine, SQLite workbench, CLI process management, credentials and desktop integration. React runs in the installed Microsoft WebView2 runtime. Bun 1.4.4 is a frontend build/test tool only; it is not distributed.
+Marx targets native Windows x64 and macOS Apple Silicon with Wails 3.0.0 and Go 1.27.3. Go implements the scan engine, SQLite workbench, CLI process management, credentials and desktop integration. React runs in system WKWebView on macOS and the installed Microsoft WebView2 runtime on Windows. Bun 1.4.4 is a frontend build/test tool only; it is not distributed.
+
+## macOS
+
+Install Go 1.27.3, Bun 1.4.4 and Xcode Command Line Tools. Build natively on Apple Silicon:
+
+```sh
+bun install --frozen-lockfile
+bun run typecheck
+bun run test --pool=threads --maxWorkers=2
+bun run dist:mac
+go test -race -p=2 ./native/... -count=1 -timeout=5m
+go vet ./native/... ./tools/resources
+bun run verify:packaging
+bun run audit
+bun run start
+```
+
+The output is `dist/Marx.app`, built for the host architecture with a macOS 13 minimum matching Go's requirement. The build uses the existing icon, embeds frontend assets, and ad hoc signs the bundle. It is suitable for local use; Developer ID signing, notarization, Intel Macs and distribution on other Macs remain unqualified. The build does not use an Apple signing account.
+
+The default profile is `~/Library/Application Support/MarxWails`. Set `MARX_USER_DATA_DIR` to a disposable directory for testing. API-key files use authenticated AES-GCM encryption with a separate random key per canonical profile held in macOS Keychain. Locked or denied Keychain access fails closed. Unsigned/ad hoc rebuilds can require granting Keychain access again; using the CLI's existing authentication avoids application-managed credential storage. No existing Keychain access controls are changed.
+
+CLI commands run in separate process groups. Cancellation kills the group; a copy of the same executable watches a parent-owned pipe and kills remaining descendants when the app exits or crashes. No extra executable is bundled. The macOS menu bar and Command+O/Command+R use native modifier conventions.
+
+To run the synthetic workflow in real WKWebView:
+
+```sh
+go build -race -trimpath -buildvcs=false -tags production,acceptance -ldflags '-extldflags=-mmacosx-version-min=13.0' -o /tmp/Marx-acceptance ./native
+MARX_TEST_EXECUTABLE=/tmp/Marx-acceptance bun run verify:runtime
+```
+
+The macOS harness uses a token-authenticated loopback evaluation transport compiled only with the acceptance tag. CSP remains enabled. Never distribute acceptance binaries. The regular packaging verifier rejects binaries containing the acceptance endpoint. The Windows harness continues to use WebView2 debugging. Set `MARX_VERIFY_MINIMUM_SIZE=1` when running the macOS harness to exercise the 960×640 minimum window and toolbar alignment.
 
 ## Prerequisites
 

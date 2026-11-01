@@ -114,7 +114,7 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 		if err != nil {
 			return nil, err
 		}
-		b, err := e.store.get("binding", connection, strings.ToLower(folder))
+		b, err := e.store.get("binding", connection, pathIdentity(folder))
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +203,7 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 			return nil, err
 		}
 		if ch == "bindings:get" {
-			return e.store.get("binding", c.connection, strings.ToLower(folder))
+			return e.store.get("binding", c.connection, pathIdentity(folder))
 		}
 		id, err := identifier(arg(args, 1))
 		if err != nil {
@@ -217,7 +217,7 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 			return nil, err
 		}
 		binding := Object{"folderPath": folder, "projectId": id, "projectName": project["name"], "connectionId": c.connection}
-		err = e.store.save(record{kind: "binding", scope: c.connection, id: strings.ToLower(folder), value: binding})
+		err = e.store.save(record{kind: "binding", scope: c.connection, id: pathIdentity(folder), value: binding})
 		return binding, err
 	case "projects:list":
 		c, err := e.client()

@@ -42,7 +42,7 @@ export function App() {
     };
     const off = api.onMenuAction(dispatch);
     const onKey = (event: KeyboardEvent) => {
-      const action = desktopShortcut(event);
+      const action = desktopShortcut(event, api.platform);
       if (!action) return;
       event.preventDefault();
       event.stopPropagation();

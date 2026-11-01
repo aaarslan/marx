@@ -223,7 +223,7 @@ func (e *Engine) createSession(ctx context.Context, input Object) (Object, error
 		if err != nil {
 			return nil, err
 		}
-		b, err := e.store.get("binding", pageConnection(page), strings.ToLower(folder))
+		b, err := e.store.get("binding", pageConnection(page), pathIdentity(folder))
 		if err != nil {
 			return nil, err
 		}

@@ -18,7 +18,7 @@ func (e *Engine) prepareJob(ctx context.Context, input Object) (Object, *CLI, er
 		return nil, nil, err
 	}
 	if project := str(input, "projectId"); project != "" {
-		b, err := e.store.get("binding", c.connection, strings.ToLower(folder))
+		b, err := e.store.get("binding", c.connection, pathIdentity(folder))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -42,7 +42,7 @@ func (e *Engine) prepareJob(ctx context.Context, input Object) (Object, *CLI, er
 	settings := e.getSettings()
 	recent := []string{folder}
 	for _, s := range stringsOf(settings["recentFolders"]) {
-		if !strings.EqualFold(s, folder) && len(recent) < 8 {
+		if pathIdentity(s) != pathIdentity(folder) && len(recent) < 8 {
 			recent = append(recent, s)
 		}
 	}
@@ -75,6 +75,12 @@ func (e *Engine) startJobWithRecords(job Object, c *CLI, resume bool, records ..
 		return nil, errors.New("Restore the job's original CLI connection before reconciling")
 	}
 	working := clone(job)
+	if resume {
+		delete(working, "finishedAt")
+		delete(working, "error")
+		working["status"] = "Running"
+		working["monitoringStatus"] = "active"
+	}
 	ctx, cancel := context.WithCancel(e.ctx)
 	active := &activeJob{cancel: cancel, client: c, job: working}
 	records = append(records, record{kind: "job", scope: str(working, "connectionId"), id: str(working, "id"), value: working})
@@ -197,7 +203,7 @@ func (e *Engine) executeJob(ctx context.Context, a *activeJob, resume bool) {
 							} else {
 								submitting = false
 								update(Object{"status": scan["status"], "progress": Object{"phase": "queued"}})
-								_ = e.store.save(record{kind: "binding", scope: c.connection, id: strings.ToLower(str(job, "folderPath")), value: Object{"folderPath": job["folderPath"], "projectId": job["projectId"], "projectName": job["projectName"], "connectionId": c.connection}})
+								_ = e.store.save(record{kind: "binding", scope: c.connection, id: pathIdentity(str(job, "folderPath")), value: Object{"folderPath": job["folderPath"], "projectId": job["projectId"], "projectName": job["projectName"], "connectionId": c.connection}})
 							}
 						}
 					}

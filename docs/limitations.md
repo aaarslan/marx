@@ -1,6 +1,6 @@
 # Current limitations
 
-The current target is native Windows 11 x64 using Wails 3.0.0, Go 1.27.3 and WebView2. The Go engine and single-executable NSIS package have native synthetic workflow coverage. Earlier Electron verification records are historical. See [the current verification report](wails-migration.md).
+The current targets are native Windows 11 x64 with WebView2 and macOS Apple Silicon with WKWebView, using Wails 3.0.0 and Go 1.27.3. The Go engine and single-executable NSIS package have native synthetic workflow coverage. Earlier Electron verification records are historical. See [the current verification report](wails-migration.md).
 
 ## Integration boundaries
 
@@ -8,7 +8,7 @@ All scan acceptance used a synthetic Go CLI and disposable data. No live Checkma
 
 A user-assisted physical Explorer folder drop and an installed VS Code link launch were verified with disposable source. Cursor and full screen-reader behavior remain unqualified. Local paths with spaces, Unicode, parentheses, brackets and mixed separators have coverage. A real loopback SMB/UNC source read and scan passed; remote NAS authentication, network failures and latency remain outside that check.
 
-The Wails child-frame/native-bridge limitation remains disclosed in [SECURITY.md](../SECURITY.md). Frames and remote resources are blocked. The installer is unsigned, requires WebView2, and targets x64 only. Other operating systems/architectures are outside this verification.
+The Wails child-frame/native-bridge limitation remains disclosed in [SECURITY.md](../SECURITY.md). Frames and remote resources are blocked. The installer is unsigned, requires WebView2, and targets x64 only. macOS has a locally verified ad hoc signed app bundle, without notarization or distribution qualification. Linux and Intel macOS are outside this verification.
 
 ## Evidence and workflow bounds
 

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func (e *Engine) grant(folder string) (string, error) {
 		return "", err
 	}
 	e.mu.Lock()
-	e.folders[strings.ToLower(real)] = true
+	e.folders[pathIdentity(real)] = true
 	e.mu.Unlock()
 	return real, nil
 }
@@ -48,7 +49,7 @@ func (e *Engine) requireFolder(folder string) (string, error) {
 		return "", err
 	}
 	e.mu.Lock()
-	allowed := e.folders[strings.ToLower(real)]
+	allowed := e.folders[pathIdentity(real)]
 	e.mu.Unlock()
 	if !allowed {
 		return "", errors.New("Select this source folder through the folder picker first")
@@ -56,7 +57,10 @@ func (e *Engine) requireFolder(folder string) (string, error) {
 	return real, nil
 }
 func readSnippet(folder, relative string, line int) (Object, error) {
-	relative = strings.ReplaceAll(relative, "/", string(filepath.Separator))
+	relative = strings.ReplaceAll(strings.ReplaceAll(relative, "\\", "/"), "/", string(filepath.Separator))
+	if len(relative) >= 2 && relative[1] == ':' {
+		return nil, errors.New("Invalid source path")
+	}
 	if relative == "" || filepath.IsAbs(relative) || filepath.VolumeName(relative) != "" || strings.HasPrefix(relative, "\\") {
 		return nil, errors.New("Invalid source path")
 	}
@@ -279,4 +283,12 @@ func captureProvenance(ctx context.Context, folder string, options Object, conne
 	o := clone(options)
 	o["scanners"] = sortedStrings(options["scanners"])
 	return Object{"version": 1, "connectionId": connection, "capturedAt": now(), "cliVersion": version, "source": source, "options": o, "optionsFingerprint": hash([]byte(requestedConfig(o))), "requestedScanners": o["scanners"]}
+}
+
+func PathIdentity(path string) string { return pathIdentity(path) }
+func pathIdentity(path string) string {
+	if runtime.GOOS == "windows" {
+		return strings.ToLower(path)
+	}
+	return path
 }

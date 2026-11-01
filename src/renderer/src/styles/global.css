@@ -1106,6 +1106,7 @@ select {
 .result-scan-toolbar { align-items: end; margin-bottom: 14px; }
 .scan-picker { flex: 1; max-width: 560px; }
 .scan-picker select { width: 100%; }
+.result-scan-toolbar > .btn, .result-scan-toolbar > .export-menu > summary { min-height: 38px; }
 .export-menu { position: relative; }
 .export-menu summary { list-style: none; }
 .export-menu summary::-webkit-details-marker { display: none; }

@@ -194,10 +194,10 @@ func planWorkspace(ctx context.Context, root string) (Object, error) {
 			return nil, ctx.Err()
 		}
 		canonical, err := canonicalFolder(current.path)
-		if err != nil || canonical != current.path || !within(root, canonical) || visited[strings.ToLower(canonical)] {
+		if err != nil || canonical != current.path || !within(root, canonical) || visited[pathIdentity(canonical)] {
 			continue
 		}
-		visited[strings.ToLower(canonical)] = true
+		visited[pathIdentity(canonical)] = true
 		dir, err := os.Open(canonical)
 		if err != nil {
 			warn("Some workspace directories could not be read.")

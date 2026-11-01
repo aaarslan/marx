@@ -11,7 +11,7 @@ import (
 
 type processJob windows.Handle
 
-func windowsDownloadsDirectory() (string, error) {
+func nativeDownloadsDirectory() (string, error) {
 	return windows.KnownFolderPath(windows.FOLDERID_Downloads, 0)
 }
 
@@ -61,3 +61,10 @@ func protectCredential(mode string, value []byte) ([]byte, error) {
 	defer windows.LocalFree(windows.Handle(uintptr(unsafe.Pointer(out.Data))))
 	return append([]byte(nil), unsafe.Slice(out.Data, int(out.Size))...), nil
 }
+
+func credentialProtector(profile string) func(string, []byte) ([]byte, error) {
+	return protectCredential
+}
+func runProcessGuard() bool { return false }
+
+func deleteCredentialStorage(profile string) {}
