@@ -21,6 +21,40 @@ func OpenStore(file string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
 		return nil, errors.New("The workbench directory could not be created")
 	}
+	info, err := os.Lstat(file)
+	if err == nil && (!info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0) {
+		return nil, errors.New("The workbench database must be a regular file")
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return nil, errors.New("The workbench database could not be inspected")
+	}
+	private, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return nil, errors.New("The workbench database could not be opened privately")
+	}
+	chmodErr := private.Chmod(0600)
+	closeErr := private.Close()
+	if chmodErr != nil || closeErr != nil {
+		return nil, errors.New("The workbench database permissions could not be secured")
+	}
+	for _, sidecar := range []string{file + "-wal", file + "-shm"} {
+		info, err := os.Lstat(sidecar)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil || !info.Mode().IsRegular() {
+			return nil, errors.New("Workbench sidecars must be regular files")
+		}
+		handle, err := os.OpenFile(sidecar, os.O_RDWR, 0600)
+		if err != nil {
+			return nil, errors.New("Workbench sidecars could not be secured")
+		}
+		chmodErr := handle.Chmod(0600)
+		closeErr := handle.Close()
+		if chmodErr != nil || closeErr != nil {
+			return nil, errors.New("Workbench sidecar permissions could not be secured")
+		}
+	}
 	db, err := sql.Open("sqlite", file)
 	if err != nil {
 		return nil, errors.New("The workbench database could not be opened")
@@ -181,33 +215,40 @@ func (s *Store) query(connection, id string, q Object) (Object, error) {
 	if page == nil {
 		return nil, errors.New("Import this scan before querying findings")
 	}
-	filtered := []Object{}
-	search := strings.ToLower(strings.TrimSpace(str(q, "search")))
-	for _, f := range objects(page["findings"]) {
-		if v := str(q, "scanner"); v != "" && v != "ALL" && v != str(f, "type") {
-			continue
-		}
-		if v := str(q, "state"); v != "" && v != "ALL" && v != str(f, "state") {
-			continue
-		}
-		if values := stringsOf(q["severities"]); len(values) > 0 && !contains(values, str(f, "severity")) {
-			continue
-		}
-		parts := []string{}
-		for _, k := range []string{"title", "where", "description", "cve", "cwe", "packageName", "packageVersion", "group", "similarityId"} {
-			parts = append(parts, str(f, k))
-		}
-		for _, n := range objects(f["flow"]) {
-			parts = append(parts, str(n, "fileName"))
-		}
-		if search != "" && !strings.Contains(strings.ToLower(strings.Join(parts, "\n")), search) {
-			continue
-		}
-		filtered = append(filtered, f)
-	}
-	count := len(filtered)
-	offset := integer(q["offset"], 0, 0, count)
+	offset := integer(q["offset"], 0, 0, 1<<30)
 	limit := integer(q["limit"], 200, 1, 1000)
-	end := min(count, offset+limit)
-	return Object{"findings": filtered[offset:end], "filteredCount": count, "totalCount": page["totalCount"]}, nil
+	selected := make([]Object, 0, limit)
+	count := 0
+	scanner, state := str(q, "scanner"), str(q, "state")
+	severities := stringsOf(q["severities"])
+	search := strings.ToLower(strings.TrimSpace(str(q, "search")))
+	for _, item := range array(page["findings"]) {
+		f := object(item)
+		if scanner != "" && scanner != "ALL" && scanner != str(f, "type") {
+			continue
+		}
+		if state != "" && state != "ALL" && state != str(f, "state") {
+			continue
+		}
+		if len(severities) > 0 && !contains(severities, str(f, "severity")) {
+			continue
+		}
+		if search != "" {
+			parts := make([]string, 0, 10)
+			for _, key := range []string{"title", "where", "description", "cve", "cwe", "packageName", "packageVersion", "group", "similarityId"} {
+				parts = append(parts, str(f, key))
+			}
+			for _, node := range array(f["flow"]) {
+				parts = append(parts, str(object(node), "fileName"))
+			}
+			if !strings.Contains(strings.ToLower(strings.Join(parts, "\n")), search) {
+				continue
+			}
+		}
+		if count >= offset && len(selected) < limit {
+			selected = append(selected, f)
+		}
+		count++
+	}
+	return Object{"findings": selected, "filteredCount": count, "totalCount": page["totalCount"]}, nil
 }

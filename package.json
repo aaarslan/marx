@@ -19,7 +19,11 @@
     "audit:go": "govulncheck ./native/... ./tools/resources",
     "verify:privacy": "bun scripts/verify-privacy.ts",
     "test:go": "go test -p=2 ./native/... -count=1",
-    "verify:packaging": "bun scripts/verify-native-packaging.ts"
+    "verify:packaging": "bun scripts/verify-native-packaging.ts",
+    "verify:site": "bun scripts/verify-site.ts",
+    "showcase:capture": "bun scripts/capture-showcase.ts",
+    "showcase:prepare": "bun scripts/build-showcase.ts",
+    "showcase:render": "bun scripts/build-showcase.ts --render"
   },
   "dependencies": {},
   "devDependencies": {

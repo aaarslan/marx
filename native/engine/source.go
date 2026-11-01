@@ -43,6 +43,17 @@ func (e *Engine) grant(folder string) (string, error) {
 	e.mu.Unlock()
 	return real, nil
 }
+func (e *Engine) AuthorizeFolder(folder string) (string, error) {
+	e.mu.Lock()
+	if e.closed {
+		e.mu.Unlock()
+		return "", errors.New("Marx is shutting down")
+	}
+	e.wg.Add(1)
+	e.mu.Unlock()
+	defer e.wg.Done()
+	return e.grant(folder)
+}
 func (e *Engine) requireFolder(folder string) (string, error) {
 	real, err := canonicalFolder(folder)
 	if err != nil {

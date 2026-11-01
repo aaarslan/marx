@@ -24,6 +24,7 @@ var assets embed.FS
 
 type DesktopService struct {
 	dialogMu sync.Mutex
+	dropMu   sync.Mutex
 	app      *application.App
 	win      *application.WebviewWindow
 	engine   *engine.Engine
@@ -192,20 +193,21 @@ func main() {
 	})
 	s.win.OnWindowEvent(events.Common.WindowFilesDropped, func(e *application.WindowEvent) {
 		files := e.Context().DroppedFiles()
-		if len(files) == 1 {
-			payload, _ := json.Marshal(files[0])
-			go func() {
-				result, err := s.Invoke("fs:authorize-folder", []json.RawMessage{payload})
-				if err == nil {
-					var value struct {
-						OK   bool   `json:"ok"`
-						Data string `json:"data"`
-					}
-					if json.Unmarshal(result, &value) == nil && value.OK {
-						s.app.Event.Emit("source:dropped", value.Data)
-					}
+		if len(files) == 1 && s.dropMu.TryLock() {
+			go func(folder string) {
+				defer s.dropMu.Unlock()
+				select {
+				case <-s.ready:
+				case <-time.After(20 * time.Second):
+					return
 				}
-			}()
+				if s.startErr != nil {
+					return
+				}
+				if canonical, err := s.engine.AuthorizeFolder(folder); err == nil {
+					s.app.Event.Emit("source:dropped", canonical)
+				}
+			}(files[0])
 		}
 	})
 	go func() {

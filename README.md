@@ -67,3 +67,9 @@ Wails 3.0.0 has a documented child-frame/native-bridge limitation. Marx blocks e
 Synthetic checks do not establish live tenant acceptance. Installers are unsigned. Linux, Intel macOS and other architectures are not qualified on this branch.
 
 Built with [Wails](https://wails.io/), [Go](https://go.dev/), [Bun](https://bun.com/), [React](https://react.dev/), [Vite](https://vite.dev/), [Zustand](https://zustand.docs.pmnd.rs/), SQLite, and [Lucide](https://lucide.dev/).
+
+## Walkthrough and showcase
+
+Start with [the walkthrough](docs/walkthrough.md). The [static landing page](docs/index.html) includes a 44-second synthetic product film. [Hosting instructions](docs/hosting.md) explain branch-based GitHub Pages; [showcase sources](showcase/README.md) describe local rendering.
+
+See [the hardening report](docs/hardening.md) for the latest bounded review and validation.

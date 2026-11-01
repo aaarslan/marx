@@ -50,6 +50,7 @@ type Engine struct {
 	wg                sync.WaitGroup
 	closed            bool
 	pending           int
+	pendingBytes      int
 	batch             bool
 	preparing         map[string]bool
 	canceled          map[string]bool
@@ -214,7 +215,12 @@ func (e *Engine) saveSettings(next Object) (Object, error) {
 			return nil, err
 		}
 	}
-	if err := writePrivate(filepath.Join(e.profile, "settings.json"), jsonValue(updated)); err != nil {
+	encoded := jsonValue(updated)
+	if len(encoded) > 1<<20 {
+		e.settingsMu.Unlock()
+		return nil, errors.New("Settings exceed their 1 MiB size limit")
+	}
+	if err := writePrivate(filepath.Join(e.profile, "settings.json"), encoded); err != nil {
 		e.settingsMu.Unlock()
 		return nil, err
 	}

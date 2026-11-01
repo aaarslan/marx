@@ -15,22 +15,30 @@ import (
 )
 
 func (e *Engine) Invoke(channel string, raw []json.RawMessage) (any, error) {
+	if len(raw) > 8 {
+		return nil, errors.New("Too many operation arguments")
+	}
+	total := 0
+	for _, value := range raw {
+		if len(value) > 64<<20-total {
+			return nil, errors.New("Operation exceeds its combined size limit")
+		}
+		total += len(value)
+	}
 	e.mu.Lock()
 	if e.closed {
 		e.mu.Unlock()
 		return nil, errors.New("Marx is shutting down")
 	}
-	if e.pending >= 256 {
+	if e.pending >= 256 || e.pendingBytes > 128<<20-total {
 		e.mu.Unlock()
 		return nil, errors.New("Too many pending desktop operations")
 	}
 	e.pending++
+	e.pendingBytes += total
 	e.wg.Add(1)
 	e.mu.Unlock()
-	defer func() { e.mu.Lock(); e.pending--; e.mu.Unlock(); e.wg.Done() }()
-	if len(raw) > 8 {
-		return nil, errors.New("Too many operation arguments")
-	}
+	defer func() { e.mu.Lock(); e.pending--; e.pendingBytes -= total; e.mu.Unlock(); e.wg.Done() }()
 	args := make([]any, len(raw))
 	for i, b := range raw {
 		if len(b) > 64<<20 {
@@ -62,7 +70,9 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 	case "settings:get":
 		return e.getSettings(), nil
 	case "settings:save":
-		return e.saveSettings(m)
+		next := clone(m)
+		delete(next, "recentFolders")
+		return e.saveSettings(next)
 	case "settings:set-api-key":
 		key, err := bounded(a, "API key", 1<<20)
 		if err != nil {
@@ -103,8 +113,6 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 			return e.grant(paths[0])
 		}
 		return paths[0], nil
-	case "fs:authorize-folder":
-		return e.grant(s)
 	case "fs:read-source-file", "fs:open-in-editor":
 		folder, err := e.requireFolder(s)
 		if err != nil {

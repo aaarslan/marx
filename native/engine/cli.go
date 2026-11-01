@@ -96,6 +96,7 @@ func newCLI(settings Object, key string, guard ProcessGuard, capacity, control, 
 			cx = append(cx, k+"="+v)
 		}
 	}
+	sort.Slice(c.secrets, func(i, j int) bool { return len(c.secrets[i]) > len(c.secrets[j]) })
 	sort.Strings(cx)
 	configFile := config
 	if configFile == "" {
@@ -135,14 +136,15 @@ var signedURLPattern = regexp.MustCompile(`(?i)([?&](?:X-Amz-[\w-]+|X-Goog-[\w-]
 var credentialPattern = regexp.MustCompile(`(?i)((?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token|authorization|bearer)[\s"':=]+)[^\s",}]+`)
 
 type boundedOutput struct {
-	mu       sync.Mutex
-	data     bytes.Buffer
-	limit    int
-	cancel   context.CancelFunc
-	line     func(string)
-	partial  string
-	redact   func(string) string
-	exceeded bool
+	mu           sync.Mutex
+	data         bytes.Buffer
+	limit        int
+	cancel       context.CancelFunc
+	line         func(string)
+	partial      string
+	suppressLine bool
+	redact       func(string) string
+	exceeded     bool
 }
 
 func (b *boundedOutput) Write(p []byte) (int, error) {
@@ -155,18 +157,28 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 	}
 	b.data.Write(p)
 	if b.line != nil {
-		b.partial += string(p)
+		remaining := string(p)
 		for {
-			line, rest, ok := strings.Cut(b.partial, "\n")
-			if !ok {
+			fragment, rest, complete := strings.Cut(remaining, "\n")
+			if b.suppressLine {
+				if complete {
+					b.suppressLine = false
+				}
+			} else if len(b.partial)+len(fragment) > 16384 {
+				b.partial = ""
+				b.suppressLine = !complete
+				b.line("[Oversized CLI log line omitted]")
+			} else {
+				b.partial += fragment
+				if complete {
+					b.line(b.redact(strings.TrimSuffix(b.partial, "\r")))
+					b.partial = ""
+				}
+			}
+			if !complete {
 				break
 			}
-			b.partial = rest
-			b.line(b.redact(strings.TrimSuffix(line, "\r")))
-		}
-		if len(b.partial) > 16384 {
-			b.line(b.redact(b.partial[:16384]))
-			b.partial = ""
+			remaining = rest
 		}
 	}
 	return len(p), nil
