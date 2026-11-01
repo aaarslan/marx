@@ -4,6 +4,14 @@ Validate the exact PR head and record its commit, Windows/WebView2 versions, too
 
 ## Current evidence
 
+### macOS native-dialog follow-up of `128963b`, November 1, 2026
+
+The two Windows commits were fast-forwarded from the verified remote head `128963b93cdce4c1cd4f43fd9f2e03e56add88d0`. Review confirmed that cancellation normalization applies only to an empty selection with the pinned Wails cancellation error; unrelated failures and nonempty selections accompanied by errors remain errors. The focused native test passed with the race detector on macOS. The production bundle was rebuilt with Go 1.27.3 and passed packaging and tracked-content/history privacy checks. Packaging initially encountered an unset Go shim; rerunning under the pinned toolchain passed without changing global configuration.
+
+The actual production bundle was launched through Launch Services with a new disposable profile. Canceling the native folder picker with Escape returned to Scan without a failure banner. In local demo Results, Fix with AI opened the synthetic prompt. Its real Save As sheet was canceled first with Escape and then, after reopening, with the native Cancel button. Both returned to the usable prompt without a cancellation error banner. Escape subsequently dismissed the prompt. No real source, tenant credentials or customer profile was used. The isolated app was closed after inspection.
+
+This closes the focused macOS cancellation follow-up. It does not qualify complete keyboard traversal, restoration to the originating control for every dialog, screen-reader operation or an extended soak. Those checks remain open along with live tenant verification (**BLOCKED: needs API key**) and distribution signing. No application code or visible showcase scene changed in this follow-up; existing media remains applicable without a new render.
+
 ### Native Windows rebuild from `9032dcc`, November 1, 2026
 
 Started from clean HEAD `9032dcc77ff6a3940fc1b978d85d92e0a1d0f881`, tree `bc31ae3e3599d83b3dc39ffee8c536fd0789c710`, after removing old build output. Native Windows 11 x64, Go 1.27.3, Bun 1.4.4, WebView2 156.0.4314.58 and NSIS 3.12 were used with session-local toolchain overrides. Frozen installation, both TypeScript projects and 46 frontend tests passed. Native compilation initially stopped because the removed frontend assets were absent; building them first resolved the prerequisite. Native tests, vet, immediate-child containment and the LLVM-MinGW race suite passed. Complete race-instrumented acceptance passed at normal size and 960×640, including intelligence decisions, immutable pins, restart/watch persistence, validation/return focus, honest CLI setup status, isolated demo warnings, 5,051 findings, DPAPI, clipboard, SQLite and crash cleanup. The race suite and both full acceptance runs passed again after the dialog repair below.
