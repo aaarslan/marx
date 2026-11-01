@@ -1,75 +1,71 @@
 # Marx
 
-A desktop remediation workbench for Checkmarx One.
+A desktop workbench for investigating and remediating Checkmarx One findings.
 
 ![Version](https://img.shields.io/badge/version-0.9.0-ff864d)
 ![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-17181c)
 ![Windows x64](https://img.shields.io/badge/Windows-x64-17181c)
 [![License: MIT](https://img.shields.io/badge/license-MIT-ff864d)](LICENSE)
 
-This branch uses Wails 3.0.0 with the system WKWebView on macOS and the installed WebView2 runtime on Windows and Go for the complete scan/workbench engine, SQLite, credentials and native desktop integration. One application executable is shipped. Bun is a frontend build/test tool only. Windows 11 x64 and macOS Apple Silicon have native synthetic workflow coverage.
+[Walkthrough](docs/walkthrough.md) · [Product website](https://aaarslan.github.io/marx/) · [Showcase video](website/assets/marx-showcase.mp4) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md)
 
-<img src="docs/workbench-results.png" width="960" alt="Marx findings and remediation workbench" />
+<img src="website/assets/detail.webp" width="960" alt="Marx native findings explorer with synthetic findings and a source-flow detail panel" />
 
-This screenshot contains synthetic findings from the earlier Electron version; it is not new Wails verification evidence.
+Marx runs your installed, official Checkmarx CLI through a graphical workflow. The CLI uploads selected source to Checkmarx One for remote analysis. Marx is an independent project and requires your organization's Checkmarx access and approved CLI.
 
-## Features
+## What you can do
 
-| Workflow | What Marx provides |
-| --- | --- |
-| Scan a project | Browse or drop a folder, detect its Git branch, choose SAST/SCA options and exclusions |
-| Follow progress | Durable jobs and logs, recovery of known scans after restart, confirmed cancellation and explicit unknown outcomes |
-| Explore findings | Saved filters and investigation context, paged split list/detail, related-fix groups, source freshness and editor links |
-| Compare changes | New, persistent, escalated, reduced and absent findings with explicit coverage and provenance checks |
-| Track remediation | Pinned baseline evidence, exact finding selections, assistant handoffs, change references, checks and verification records |
-| Triage and export | Update states with a comment; export filtered CSV/JSON, official SARIF or a complete remediation evidence bundle |
-| Scan multiple projects | Nested workspace discovery, dependency impact hints, exact per-folder project mappings and custom scan options |
-| Work comfortably | Keyboard navigation, recent folders, reduced-motion and display accessibility support |
+- Configure SAST and SCA scans with explicit folder-to-project mappings and per-project options.
+- Monitor durable jobs, recover known scans after restart, and retain uncertain submission outcomes without automatic resubmission.
+- Filter and investigate findings, inspect source flows, group related fixes, and compare selected baselines.
+- Prepare local prompts for your coding assistant, pin original evidence, and record changes and verification results.
+- Scan workspace packages and export CSV, JSON, official SARIF, or remediation evidence bundles.
 
-Marx is a standalone GUI for the official Checkmarx One `cx` CLI. It runs your installed CLI for authentication, project discovery, scan submission, monitoring, results and triage. The CLI uploads selected source and analysis runs in Checkmarx One. Marx has no custom upload fallback.
+The screenshots and film use synthetic data from the native application. Prompt generation stays local; Marx does not call a model or modify your repository.
 
-## Quick start
+## Get started
 
-Open the macOS app bundle or install the Windows x64 package built from this branch. Windows end users need WebView2 and their organization's approved Checkmarx CLI (`cx`); Go, Bun and Node do not need to be installed.
+Published installer downloads are not available yet. Build locally using Go 1.27.3 and Bun 1.4.4. macOS builds require Xcode Command Line Tools; Windows requires WebView2, and installer creation requires NSIS 3.12.
 
-1. Open Settings, select the official CLI executable and optional configuration file, and test the connection. Existing CLI authentication is the default.
-2. Select a source folder and confirm its Checkmarx project mapping. Review scanner options before submitting.
-3. Monitor the job and investigate Results. Baselines are explicitly selected; uncertain submissions are never automatically retried.
-4. Select findings to generate AI handoffs or track remediation. Export CSV, JSON, official SARIF, and pinned evidence bundles.
-
-Command+O on macOS or Ctrl+O on Windows selects a folder; Command+R or Ctrl+R starts the configured scan. Native folder drop is enabled. External links open in the system browser.
-
-## Build and verify
-
-Use Go 1.27.3, Bun 1.4.4, the pinned Wails 3.0.0 module, and Xcode Command Line Tools on macOS or NSIS 3.12 for the Windows installer. See [building](docs/building.md) for prerequisite setup and runtime verification.
-
-```powershell
+```sh
 bun install --frozen-lockfile
-bun run typecheck
-bun run test --pool=threads --maxWorkers=2
 bun run build
-go test ./native ./tools/resources
-bun run audit
-govulncheck ./native ./tools/resources
-bun run dist:win
+bun run start
 ```
 
-On macOS, run `bun run dist:mac` to create `dist/Marx.app`. The bundle is ad hoc signed for local use, without notarization or a verified publisher identity.
+The build selects the host platform. Outputs are `dist/Marx.app` on macOS and `dist/Marx.exe` on Windows. Use `bun run dist:win` on Windows to create the per-user installer. See [building and verification](docs/building.md) for exact platform commands and toolchain setup.
 
-Windows output: `dist/Marx.exe` and `dist/Marx-0.9.0-win-x64-setup.exe`. No workflow sidecar or Bun runtime is shipped. The per-user installer uses a separate `MarxWails` destination and retains data on uninstall. Electron credentials and settings are not imported.
+1. Open **Settings**, select the official CLI and optional configuration file, and test the connection. Existing CLI authentication is the default.
+2. Choose a source folder, confirm its Checkmarx project, and review the scan options before upload.
+3. Open **Results** to investigate findings, prepare a handoff, or track remediation in **Workbench**.
 
-## Security and validation
+Command+O / Ctrl+O selects a folder. Command+R / Ctrl+R starts the configured scan. Follow [the walkthrough](docs/walkthrough.md) for the complete workflow.
 
-The official CLI uploads selected source for Checkmarx One analysis. Marx stores evidence locally; the SQLite database is not encrypted. Optional saved credentials use Windows DPAPI or AES-GCM with a profile-specific key in macOS Keychain. Protect exports and backups. There is no analytics service.
+## Platform and security status
 
-Wails 3.0.0 has a documented child-frame/native-bridge limitation. Marx blocks embedded frames and remote content; these protections do not fix the upstream framework. Read [SECURITY.md](SECURITY.md), [dependencies](docs/dependencies.md), [migration coverage](docs/wails-migration.md), and [limitations](docs/limitations.md).
+Marx uses Wails 3.1.0, Go, SQLite and React with the system webview. No Bun, Node or Electron runtime is distributed.
 
-Synthetic checks do not establish live tenant acceptance. Installers are unsigned. Linux, Intel macOS and other architectures are not qualified on this branch.
+| Platform | Current status |
+| --- | --- |
+| macOS Apple Silicon | Native synthetic workflow and locally built app verified; ad hoc signed, without notarization |
+| Windows 11 x64 | Native verification exists for the preceding Wails build; the current update requires a fresh Windows pass |
 
-Built with [Wails](https://wails.io/), [Go](https://go.dev/), [Bun](https://bun.com/), [React](https://react.dev/), [Vite](https://vite.dev/), [Zustand](https://zustand.docs.pmnd.rs/), SQLite, and [Lucide](https://lucide.dev/).
+Linux, Intel macOS and Windows ARM64 are outside the supported targets. Windows packages are unsigned. Synthetic checks do not establish live tenant acceptance.
 
-## Walkthrough and showcase
+Optional saved keys use Windows DPAPI or macOS Keychain-backed encryption. Local evidence and exports can contain sensitive information; the SQLite database is not encrypted. Marx has no analytics service. The Wails child-frame bridge boundary remains documented alongside application mitigations in [SECURITY.md](SECURITY.md).
 
-Start with [the walkthrough](docs/walkthrough.md). The [static landing page](docs/index.html) includes a 44-second synthetic product film. [Hosting instructions](docs/hosting.md) explain branch-based GitHub Pages; [showcase sources](showcase/README.md) describe local rendering.
+## Development
 
-See [the hardening report](docs/hardening.md) for the latest bounded review and validation.
+```sh
+bun run typecheck
+bun run test --pool=threads --maxWorkers=2
+bun run test:go
+bun run verify:site
+bun run audit
+```
+
+[Contributing](CONTRIBUTING.md) covers native acceptance, packaging, privacy checks and project conventions. Keep real scan data and credentials out of issues and pull requests; use [private security reporting](SECURITY.md) for vulnerabilities.
+
+## License
+
+Marx is [MIT licensed](LICENSE). Checkmarx services and the official CLI have their own licensing. See [dependency maintenance](docs/dependencies.md) and [showcase sources](showcase/README.md) for tooling and media details.

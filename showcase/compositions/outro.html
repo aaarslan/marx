@@ -1,3 +1,84 @@
-<template><style>#root{position:absolute;inset:0}.outro-lockup{position:absolute;left:730px;top:285px}.outro-tagline{position:absolute;left:180px;right:180px;top:500px;text-align:center;font-size:45px;letter-spacing:-.025em}.outro-link{position:absolute;left:180px;right:180px;top:660px;text-align:center;font-size:31px;color:#ffae7e}.outro-foot{position:absolute;left:180px;right:180px;top:735px;text-align:center;font-size:28px;color:#bdb6b0}</style>
-<div id="root" data-composition-id="outro" data-width="1920" data-height="1080" class="scene dark"><div class="wordmark outro-lockup"><img id="outro-image-1" src="assets/icon.png" alt="Marx" class="clip" data-start="0" data-duration="4"><span>Marx</span></div><div class="outro-tagline">A clearer path from findings to fixes.</div><div class="outro-link">github.com/aaarslan/marx</div><div class="outro-foot">Open source · MIT · macOS + Windows</div></div>
-<script>const tl=gsap.timeline({paused:true});tl.fromTo('.outro-lockup',{y:30,opacity:0,scale:.96},{y:0,opacity:1,scale:1,duration:.6,ease:'power3.out'},.1).fromTo('.outro-tagline',{opacity:0,y:18},{opacity:1,y:0,duration:.45},.65).fromTo('.outro-link',{opacity:0},{opacity:1,duration:.4},1.1).fromTo('.outro-foot',{opacity:0},{opacity:1,duration:.4},1.45);window.__timelines.outro=tl;</script></template>
+<template
+  ><style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .outro-lockup {
+      position: absolute;
+      left: 730px;
+      top: 285px;
+    }
+    .outro-tagline {
+      position: absolute;
+      left: 180px;
+      right: 180px;
+      top: 500px;
+      text-align: center;
+      font-size: 45px;
+      letter-spacing: -0.025em;
+    }
+    .outro-link {
+      position: absolute;
+      left: 180px;
+      right: 180px;
+      top: 660px;
+      text-align: center;
+      font-size: 31px;
+      color: #ffae7e;
+    }
+    .outro-foot {
+      position: absolute;
+      left: 180px;
+      right: 180px;
+      top: 735px;
+      text-align: center;
+      font-size: 28px;
+      color: #bdb6b0;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="outro"
+    data-width="1920"
+    data-height="1080"
+    class="scene dark"
+  >
+    <div class="wordmark outro-lockup">
+      <img
+        id="outro-image-1"
+        src="assets/icon.png"
+        alt="Marx"
+        class="clip"
+        data-start="0"
+        data-duration="4"
+      /><span>Marx</span>
+    </div>
+    <div class="outro-tagline">A clearer path from findings to fixes.</div>
+    <div class="outro-link">github.com/aaarslan/marx</div>
+    <div class="outro-foot">Open source · MIT · macOS + Windows</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      ".outro-lockup",
+      { y: 30, opacity: 0, scale: 0.96 },
+      { y: 0, opacity: 1, scale: 1, duration: 0.6, ease: "power3.out" },
+      0.1,
+    )
+      .fromTo(
+        ".outro-tagline",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.45 },
+        0.65,
+      )
+      .fromTo(".outro-link", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 1.1)
+      .fromTo(
+        ".outro-foot",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4 },
+        1.45,
+      );
+    window.__timelines.outro = tl;
+  </script></template
+>

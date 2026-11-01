@@ -1,45 +1,67 @@
 # Contributing to Marx
 
-Small, focused pull requests are welcome. Describe the user-visible problem, the change and the checks you ran. For a larger feature, open an issue first so the scope can be discussed.
+Focused pull requests are welcome. Describe the user-visible problem, resulting behavior and relevant local checks. Discuss substantial features in an issue before implementing them. Report vulnerabilities through [SECURITY.md](SECURITY.md).
 
 ## Set up
 
-Use macOS on Apple Silicon or Windows and the Bun version in `.bun-version`. macOS packaging requires a Mac; Windows runtime checks require Windows.
+Use Go 1.27.3 and Bun 1.4.4, pinned in `.go-version`, `go.mod` and `.bun-version`. The Wails Go module and frontend runtime are pinned together. macOS packaging requires Apple Silicon and Xcode Command Line Tools; Windows runtime acceptance requires Windows 11 x64 with WebView2. NSIS 3.12 is needed for the Windows installer.
 
 ```sh
 bun install --frozen-lockfile
 bun run dev
 ```
 
-A Checkmarx One API key is only needed for live integration checks. The unit tests and built-in demo work without credentials.
+Unit tests and synthetic acceptance do not need a tenant or API key. Follow [building and native verification](docs/building.md) for platform commands, isolated profiles and toolchain overrides.
 
-## Check your changes
-
-Run locally before opening a pull request:
+## Validate your change
 
 ```sh
 bun run typecheck
-bun run test
+bun run test --pool=threads --maxWorkers=2
+bun run test:go
+go vet ./native/... ./tools/resources
 bun run build
+bun run verify:packaging
 bun run audit
 ```
 
-For UI changes, inspect the actual Electron app at its minimum 960×640 window size, with keyboard navigation and reduced motion. For dependency or packaging changes, run `bun run verify:packaging`, review [the dependency patches](docs/dependencies.md), and follow [building and packaging](docs/building.md): verify the copied macOS app launches from the DMG, and validate Windows installer changes on Windows. No CI or GitHub Actions configuration is required or included.
+Run the native Go race suite when changing concurrency or process handling. For UI changes, exercise the actual WKWebView or WebView2 application at its 960×640 minimum window size, keyboard navigation and reduced motion. Native synthetic acceptance uses a separately compiled acceptance-tagged host; never distribute that binary. A cross-build does not establish runtime acceptance on another operating system.
 
-Use a disposable directory through `MARX_USER_DATA_DIR` for runtime tests. Keep real credentials and existing app data out of fixtures.
+For dependency changes, also run `bun run audit:go` with govulncheck installed and inspect the compiled dependency graph. A passing dependency audit does not replace the [documented framework security assessment](SECURITY.md).
+
+For website changes, run `bun run verify:site`, preview `website/`, and inspect narrow and desktop layouts, keyboard tabs and video playback. See [website hosting](docs/hosting.md) and [showcase production](showcase/README.md). No GitHub Actions workflow or remote paid validation is required.
+
+Before committing:
+
+```sh
+git diff --check
+bun run verify:privacy
+```
+
+The privacy verifier inspects staged files and available release executables. Review screenshots and media separately. Use a GitHub noreply identity for commits when keeping your personal email private.
 
 ## Project conventions
 
-- Keep changes proportional and reuse the existing components and typed preload API.
-- Preserve Checkmarx request contracts. Confirm uncertain changes against the official client and update focused tests and [API documentation](docs/api-contracts.md).
-- Handle cancellation, timeouts and bounded work when changing asynchronous flows. Do not retry mutations whose remote outcome is unknown.
-- Use synthetic data and reserved example domains in new fixtures. Never include API keys, customer source, real scan results or personal filesystem paths.
-- Keep `bun.lock` in sync when dependencies change. Do not introduce a second package-manager lockfile.
-- Keep generated app bundles, archives, logs, compiler caches and local tool state out of Git.
-- Run checks appropriate to the change and describe any integration behavior you could not verify.
+- Reuse the existing typed desktop API and repository components. Keep changes proportional to the problem.
+- Keep the official CLI as the scan boundary. Preserve its request contracts and explicit folder-to-project mapping.
+- Handle relevant timeouts, cancellation and bounded work. Never retry a mutation with an unknown remote outcome.
+- Add focused behavioral coverage for changed contracts and failure paths. Report native, synthetic, cross-built and live checks separately.
+- Use synthetic fixtures and reserved example domains. Keep profiles, keys, logs, raw evidence and personal paths outside tracked files.
+- Keep `bun.lock` and `go.sum` synchronized with dependency changes. Use the existing package managers and exact pins.
+- Keep generated application bundles, temporary render state and tool installations ignored. Public website media is intentionally tracked so hosting needs no render job.
+- Keep documentation consistent with the current Wails application. Historical Electron evidence belongs in `docs/archive/`.
+- Do not add code comments or docstrings. Preserve required compiler directives and third-party license notices.
+- Do not add CI workflows or trigger metered validation without explicit authorization.
 
-## Pull requests
+## Repository layout
 
-Include a short explanation and local validation results. UI changes should include screenshots made with sample data. Distinguish fixture-backed checks from real tenant validation; do not claim live acceptance based only on mocks.
-
-For security issues, follow [SECURITY.md](SECURITY.md) instead of posting sensitive details in a public issue.
+| Path | Purpose |
+| --- | --- |
+| `native/` | Wails desktop host, Go engine and native tests |
+| `src/` | React interface and shared contracts |
+| `tests/` | Frontend and shared regression tests |
+| `scripts/`, `tools/` | Local build, verification and resource tooling |
+| `docs/` | User/developer guides and historical verification |
+| `website/` | Public static site and synthetic media |
+| `showcase/` | Editable film scenes and original score |
+| `build/` | Application icons and packaging inputs |

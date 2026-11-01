@@ -39,7 +39,7 @@ Installer: `dist/Marx-0.8.1-win-x64-setup.exe`.
 Unpacked: `dist/win-unpacked/Marx.exe`.
 Installed (removed by uninstall): `%LOCALAPPDATA%/Programs/Marx/Marx.exe`.
 Final installer SHA256: `E93F0518E784D5036D00F709DF9491F0A8B029ABD35FC049D585EE7EFF803D26`.
-Machine-readable final harness and archive evidence are recorded beside this document. Acceptance screenshots and disposable profiles are kept locally in generated temporary directories; machine-specific paths are not published. These contain synthetic data only.
+Machine-readable final harness and archive evidence are retained in the `evidence/` directory. Acceptance screenshots and disposable profiles are kept locally in generated temporary directories; machine-specific paths are not published. These contain synthetic data only.
 
 ## Remaining coverage gaps
 

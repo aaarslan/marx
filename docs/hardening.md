@@ -28,3 +28,9 @@ The existing 5,051-finding synthetic workload, ten benchmark iterations, changed
 Live tenant verification is **BLOCKED: needs API key**. No real source upload or metered provider call was performed. macOS notarization, distribution qualification and full screen-reader acceptance remain outside this pass. See [current limitations](limitations.md).
 
 The public walkthrough/site/video use synthetic fixtures and portable summaries. Temporary profiles, raw validation logs, local tool paths and hardware inventories remain ignored or outside the repository.
+
+## Wails 3.1.0 follow-up
+
+The Go host and frontend runtime now pin Wails 3.1.0 together. Desktop asset/runtime middleware additionally rejects cross-site fetch metadata and external or opaque Origin headers; normal native transports without Origin remain supported. A table-driven regression covers same-origin, native-scheme, cross-site, opaque and malformed-origin cases. The fresh macOS native workflow, race suite, vet, packaging inspection, 42 frontend tests and both dependency audits pass. The Windows production cross-build and target-specific vet also pass; native Windows acceptance of this revision remains pending.
+
+The walkthrough shortcut now correctly describes Command+R / Ctrl+R as starting the configured scan. The website has a separate public source directory and an explicit publisher that uses only approved public files, pins documentation to the source commit, rejects dirty checkouts and uses a GitHub noreply identity. Historical Electron material is archived outside the current contributor path. Private vulnerability reporting is enabled for the repository.

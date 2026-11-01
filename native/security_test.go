@@ -23,6 +23,35 @@ func TestFramesCannotReachNativeRuntime(t *testing.T) {
 		}
 	}
 }
+func TestExternalOriginsCannotReachNativeRuntime(t *testing.T) {
+	for _, test := range []struct {
+		name, origin, site string
+		allowed            bool
+	}{
+		{"native transport", "", "", true},
+		{"same origin", "http://wails.localhost", "same-origin", true},
+		{"native scheme", "wails://wails.localhost", "", true},
+		{"external origin", "https://example.invalid", "", false},
+		{"cross site metadata", "", "cross-site", false},
+		{"opaque frame", "null", "", false},
+		{"same site different origin", "https://other.wails.localhost", "same-site", false},
+		{"userinfo", "http://external@wails.localhost", "", false},
+		{"origin path", "http://wails.localhost/path", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			called := false
+			handler := secureAssets(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true }))
+			request := httptest.NewRequest("POST", "http://wails.localhost/wails/runtime", nil)
+			request.Header.Set("Origin", test.origin)
+			request.Header.Set("Sec-Fetch-Site", test.site)
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if called != test.allowed || (!test.allowed && response.Code != http.StatusForbidden) {
+				t.Fatal("Native endpoint origin policy was not enforced")
+			}
+		})
+	}
+}
 func TestProtectedCredentialRoundTrip(t *testing.T) {
 	profile := t.TempDir()
 	protectCredential := credentialProtector(profile)

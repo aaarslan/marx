@@ -18,14 +18,14 @@ The current source checkout can be checked against the fingerprint recorded befo
 
 1. Select findings or inspect a fix group, then choose **Fix with AI**.
 2. Review the severity scope and generated batches. Choose **Track remediation** to create a named session with those exact findings.
-3. In **Workbench → Sessions**, record notes, the commit or PR reference, and checks performed. These are your records; Marx does not execute the checks or independently validate the reference.
+3. In **Workbench → Remediations**, record notes, the commit or PR reference, and checks performed. These are your records; Marx does not execute the checks or independently validate the reference.
 4. Copy or save the assistant handoff and apply the reviewed change in your normal development workflow.
 5. Run a verification scan using recorded options, or select a later completed scan from the same project. Choose **Compare evidence** when its results are available.
 6. Export the session's JSON evidence bundle when you need a portable record.
 
 Creating a session atomically saves its metadata and a separate original scan snapshot. Later refreshes and triage changes update the normal result cache, not that baseline. Verification saves the later snapshot and the comparison record together. Editing a session cannot manually set it to Verified.
 
-![A remediation session with notes, handoff and an explicitly inconclusive verification](workbench-session.png)
+![A native remediation session with investigation notes and pinned evidence](../website/assets/workbench.webp)
 
 This screenshot uses synthetic fixture findings and no customer source or tenant.
 

@@ -1,17 +1,18 @@
 # Changelog
 
-## Unreleased
+## Unreleased — 0.9.0
 
-- Add a persistent SQLite workbench for jobs, logs, scan evidence, remediation sessions and investigation state, with atomic writes and protected retention.
-- Reconcile known remote scan IDs after restart without resubmitting; preserve unknown submission/cancellation outcomes and distinguish partial completion.
-- Pin original findings when tracking a remediation, record handoffs, change references and checks, and compare later verification evidence without overwriting the baseline.
-- Qualify comparisons using scope, completeness, identities, severity escalation, source evidence and scan coverage. Count informational findings and retain unknown severities honestly.
-- Group dependency fixes and SAST findings sharing concrete sink evidence, while preserving all original occurrences and vendor identities.
-- Add a paged split investigation view, persistent filters and baseline, keyboard finding navigation, source freshness and VS Code/Cursor links.
-- Discover nested npm/Yarn/pnpm workspaces, suggest affected packages, configure exact project mappings and per-item options in Batch, and page project-scoped history.
-- Import complete CLI reports within the existing size bound, parse report JSON in a worker, schedule CLI work centrally, and cancel superseded imports safely.
-- Export official SARIF and complete remediation bundles. Remove unused HTTP, JWT and ZIP implementations and their obsolete dependencies/tests.
-- Replace npm minimatch implementations with Picomatch in workspace discovery and packaging, migrate ASAR crawling to fdir, preserve literal mapped/unpacked filenames, enforce archive link containment, and add reproducible packaging contract checks.
+- Replace Electron with a Wails desktop host, Go engine and embedded React interface for macOS Apple Silicon and Windows x64.
+- Add durable SQLite jobs, restart recovery, pinned remediation evidence and explicit unknown outcomes without automatic resubmission.
+- Add paged finding investigation, related-fix groups, source freshness checks, local assistant handoffs and evidence-qualified comparisons.
+- Add nested workspace discovery, explicit project mappings, per-package options, official SARIF and complete evidence exports.
+- Protect optional saved credentials with Windows DPAPI or macOS Keychain-backed encryption; support explicit replacement when old keys become inaccessible.
+- Bound desktop payloads and concurrency, restrict folder grants to native selection, tighten database permissions and omit oversized log lines before redaction.
+- Reduce allocation overhead in paged results queries and correct scan-toolbar alignment.
+- Update Wails and its frontend runtime to 3.1.0; reject external-origin requests to desktop assets and runtime endpoints.
+- Add a native-interface walkthrough, an editable 44-second synthetic showcase and a static product website.
+
+Earlier entries below describe the implementation and packaging available at each historical version.
 
 ## 0.8.1
 

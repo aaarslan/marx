@@ -1,6 +1,6 @@
 # Building Marx with Wails
 
-Marx targets native Windows x64 and macOS Apple Silicon with Wails 3.0.0 and Go 1.27.3. Go implements the scan engine, SQLite workbench, CLI process management, credentials and desktop integration. React runs in system WKWebView on macOS and the installed Microsoft WebView2 runtime on Windows. Bun 1.4.4 is a frontend build/test tool only; it is not distributed.
+Marx targets native Windows x64 and macOS Apple Silicon with Wails 3.1.0 and Go 1.27.3. Go implements the scan engine, SQLite workbench, CLI process management, credentials and desktop integration. React runs in system WKWebView on macOS and the installed Microsoft WebView2 runtime on Windows. Bun 1.4.4 is a frontend build/test tool only; it is not distributed.
 
 ## macOS
 

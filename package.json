@@ -23,7 +23,9 @@
     "verify:site": "bun scripts/verify-site.ts",
     "showcase:capture": "bun scripts/capture-showcase.ts",
     "showcase:prepare": "bun scripts/build-showcase.ts",
-    "showcase:render": "bun scripts/build-showcase.ts --render"
+    "showcase:render": "bun scripts/build-showcase.ts --render",
+    "site:build": "bun scripts/build-site.ts",
+    "site:publish": "bun scripts/publish-site.ts"
   },
   "dependencies": {},
   "devDependencies": {
@@ -32,7 +34,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
-    "@wailsio/runtime": "3.0.0",
+    "@wailsio/runtime": "3.1.0",
     "lucide-react": "1.66.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",

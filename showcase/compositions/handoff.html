@@ -1,3 +1,98 @@
-<template><style>#root{position:absolute;inset:0}.handoff-copy{position:absolute;left:115px;top:240px;width:620px}.handoff-copy .headline{font-size:93px}.handoff-pane{left:820px;top:120px;width:1000px;height:840px}.handoff-pane img{width:1280px;max-width:none;transform:translateX(-140px)}.handoff-label{position:absolute;top:120px;left:115px}.handoff-caption{left:115px;bottom:150px;width:610px}</style>
-<div id="root" data-composition-id="handoff" data-width="1920" data-height="1080" class="scene"><div class="kicker handoff-label">03 / PREPARE THE CHANGE</div><div class="handoff-copy"><h2 class="headline">Give your AI<br>useful context.</h2><p class="subcopy">A focused handoff.<br>Real finding details.<br>Your choice of assistant.</p></div><div class="pane handoff-pane"><img data-layout-allow-overflow id="handoff-image-1" src="assets/prompt.webp" alt="Actual locally generated remediation prompt" class="clip" data-start="0" data-duration="8"></div><div class="caption handoff-caption">Generate locally. Copy when ready.<br>Stay in control of the change.</div><div class="demo">SYNTHETIC DEMO DATA</div></div>
-<script>const tl=gsap.timeline({paused:true});tl.fromTo('.handoff-copy',{y:35,opacity:0},{y:0,opacity:1,duration:.55,ease:'power3.out'},.15).fromTo('.handoff-pane',{x:150,opacity:0},{x:0,opacity:1,duration:.6,ease:'power3.out'},.3).fromTo('.handoff-label',{opacity:0},{opacity:1,duration:.35},.1).fromTo('.handoff-caption',{y:18,opacity:0},{y:0,opacity:1,duration:.5},2.6).to('.handoff-pane',{y:-25,duration:3.6,ease:'sine.inOut'},3.4);window.__timelines.handoff=tl;</script></template>
+<template
+  ><style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .handoff-copy {
+      position: absolute;
+      left: 115px;
+      top: 240px;
+      width: 620px;
+    }
+    .handoff-copy .headline {
+      font-size: 93px;
+    }
+    .handoff-pane {
+      left: 820px;
+      top: 120px;
+      width: 1000px;
+      height: 840px;
+    }
+    .handoff-pane img {
+      width: 1280px;
+      max-width: none;
+      transform: translateX(-140px);
+    }
+    .handoff-label {
+      position: absolute;
+      top: 120px;
+      left: 115px;
+    }
+    .handoff-caption {
+      left: 115px;
+      bottom: 150px;
+      width: 610px;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="handoff"
+    data-width="1920"
+    data-height="1080"
+    class="scene"
+  >
+    <div class="kicker handoff-label">03 / PREPARE THE CHANGE</div>
+    <div class="handoff-copy">
+      <h2 class="headline">Give your AI<br />useful context.</h2>
+      <p class="subcopy">
+        A focused handoff.<br />Real finding details.<br />Your choice of
+        assistant.
+      </p>
+    </div>
+    <div class="pane handoff-pane">
+      <img
+        data-layout-allow-overflow
+        id="handoff-image-1"
+        src="assets/prompt.webp"
+        alt="Actual locally generated remediation prompt"
+        class="clip"
+        data-start="0"
+        data-duration="8"
+      />
+    </div>
+    <div class="caption handoff-caption">
+      Generate locally. Copy when ready.<br />Stay in control of the change.
+    </div>
+    <div class="demo">SYNTHETIC DEMO DATA</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      ".handoff-copy",
+      { y: 35, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+      0.15,
+    )
+      .fromTo(
+        ".handoff-pane",
+        { x: 150, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.6, ease: "power3.out" },
+        0.3,
+      )
+      .fromTo(
+        ".handoff-label",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.35 },
+        0.1,
+      )
+      .fromTo(
+        ".handoff-caption",
+        { y: 18, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5 },
+        2.6,
+      )
+      .to(".handoff-pane", { y: -25, duration: 3.6, ease: "sine.inOut" }, 3.4);
+    window.__timelines.handoff = tl;
+  </script></template
+>

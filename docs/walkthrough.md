@@ -24,7 +24,7 @@ Never paste credentials into notes, prompts, screenshots or issue reports. API k
 
 Open **Scan**, use the native folder picker (Command+O on macOS, Control+O on Windows), or drop a folder. Map it to the intended Checkmarx project. Check the branch, scanners and effective settings, then start the scan. Review the source before upload: the selected CLI uploads it to your tenant.
 
-Progress and logs stay in the application. Cancel stops the local process tree; cancellation cannot promise a remote scan has stopped. If submission status is uncertain, inspect tenant/history state before starting another scan. Do not assume a timeout means nothing was submitted. Command+R / Control+R refreshes the current view.
+Progress and logs stay in the application. Cancel stops the local process tree; cancellation cannot promise a remote scan has stopped. If submission status is uncertain, inspect tenant/history state before starting another scan. Do not assume a timeout means nothing was submitted. Command+R / Control+R starts the configured scan. Review the Scan view before using it.
 
 For **Batch Scan**, inspect the discovered roots and mappings before starting. Shared workspace files can affect multiple packages. Review dependency changes at the workspace root rather than treating every package as independent.
 
@@ -34,19 +34,19 @@ In **Results**, choose a scan. Filter by scanner, severity and state; search fin
 
 Choose a baseline to compare available evidence. Enable other branches only when the comparison is intentional. Missing source revision or effective configuration stays visibly unavailable. A disappearing finding alone does not prove a code change fixed it when scan scope or evidence differs.
 
-![Results with synthetic findings](assets/results.webp)
+![Results with synthetic findings](../website/assets/results.webp)
 
 ## 5. Prepare a change
 
 Select the relevant findings and choose **Fix with AI**. Inspect the generated prompt, then copy it to the assistant of your choice. Prompt generation happens locally. Marx does not call a model or modify the repository for you. Review what you copy: finding details and paths can contain proprietary information. Apply and test the proposed change in your usual development workflow.
 
-![Local remediation prompt](assets/prompt.webp)
+![Local remediation prompt](../website/assets/prompt.webp)
 
 ## 6. Keep a workbench session
 
 Use **Workbench** to retain a named session, pinned findings and notes. Keep the original evidence while changing the code. Link the relevant repository intentionally. After testing, run a verification scan and compare compatible evidence. Inconclusive verification remains inconclusive; absence of evidence is not a successful fix.
 
-![Workbench with synthetic notes](assets/workbench.webp)
+![Workbench with synthetic notes](../website/assets/workbench.webp)
 
 ## 7. Export and troubleshoot
 

@@ -1,3 +1,91 @@
-<template><style>#root{position:absolute;inset:0}.evidence-pane{left:155px;top:255px;width:1610px;height:685px}.evidence-pane img{transform:translateY(-220px)}.evidence-caption{bottom:92px}.evidence-badge{position:absolute;right:155px;top:102px;color:#ffae7e;font-size:28px;border:1px solid #ffae7e55;padding:14px 22px;border-radius:40px}</style>
-<div id="root" data-composition-id="evidence" data-width="1920" data-height="1080" class="scene dark"><div class="screen-label accent">04 / TRACK AND VERIFY</div><h2 id="evidence-heading" class="screen-heading">Keep evidence. Check the outcome.</h2><div class="evidence-badge">Original evidence stays pinned</div><div class="pane evidence-pane"><img data-layout-allow-overflow id="evidence-image-1" src="assets/workbench.webp" alt="Actual Marx pinned remediation workbench" class="clip" data-start="0" data-duration="7"></div><div class="caption evidence-caption">Notes, selected findings and verification in one place.</div><div class="demo">SYNTHETIC DEMO DATA</div></div>
-<script>const tl=gsap.timeline({paused:true});tl.fromTo('.evidence-pane',{y:55,opacity:0},{y:0,opacity:1,duration:.6,ease:'power3.out'},.2).fromTo('#evidence-heading',{opacity:0,y:20},{opacity:1,y:0,duration:.5},.1).fromTo('.evidence-badge',{opacity:0,scale:.9},{opacity:1,scale:1,duration:.45,ease:'power3.out'},2.1).fromTo('.evidence-caption',{opacity:0},{opacity:1,duration:.5},3).to('.evidence-pane',{scale:1.025,duration:2.8,ease:'sine.inOut'},3.5);window.__timelines.evidence=tl;</script></template>
+<template
+  ><style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .evidence-pane {
+      left: 155px;
+      top: 255px;
+      width: 1610px;
+      height: 685px;
+    }
+    .evidence-pane img {
+      transform: translateY(-220px);
+    }
+    .evidence-caption {
+      bottom: 92px;
+    }
+    .evidence-badge {
+      position: absolute;
+      right: 155px;
+      top: 102px;
+      color: #ffae7e;
+      font-size: 28px;
+      border: 1px solid #ffae7e55;
+      padding: 14px 22px;
+      border-radius: 40px;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="evidence"
+    data-width="1920"
+    data-height="1080"
+    class="scene dark"
+  >
+    <div class="screen-label accent">04 / TRACK AND VERIFY</div>
+    <h2 id="evidence-heading" class="screen-heading">
+      Keep evidence. Check the outcome.
+    </h2>
+    <div class="evidence-badge">Original evidence stays pinned</div>
+    <div class="pane evidence-pane">
+      <img
+        data-layout-allow-overflow
+        id="evidence-image-1"
+        src="assets/workbench.webp"
+        alt="Actual Marx pinned remediation workbench"
+        class="clip"
+        data-start="0"
+        data-duration="7"
+      />
+    </div>
+    <div class="caption evidence-caption">
+      Notes, selected findings and verification in one place.
+    </div>
+    <div class="demo">SYNTHETIC DEMO DATA</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      ".evidence-pane",
+      { y: 55, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.6, ease: "power3.out" },
+      0.2,
+    )
+      .fromTo(
+        "#evidence-heading",
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5 },
+        0.1,
+      )
+      .fromTo(
+        ".evidence-badge",
+        { opacity: 0, scale: 0.9 },
+        { opacity: 1, scale: 1, duration: 0.45, ease: "power3.out" },
+        2.1,
+      )
+      .fromTo(
+        ".evidence-caption",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5 },
+        3,
+      )
+      .to(
+        ".evidence-pane",
+        { scale: 1.025, duration: 2.8, ease: "sine.inOut" },
+        3.5,
+      );
+    window.__timelines.evidence = tl;
+  </script></template
+>
