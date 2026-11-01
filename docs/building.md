@@ -20,7 +20,7 @@ bun run start
 
 The output is `dist/Marx.app`, built for the host architecture with a macOS 13 minimum matching Go's requirement. The build uses the existing icon, embeds frontend assets, and ad hoc signs the bundle. It is suitable for local use; Developer ID signing, notarization, Intel Macs and distribution on other Macs remain unqualified. The build does not use an Apple signing account.
 
-The default profile is `~/Library/Application Support/MarxWails`. Set `MARX_USER_DATA_DIR` to a disposable directory for testing. API-key files use authenticated AES-GCM encryption with a separate random key per canonical profile held in macOS Keychain. Locked or denied Keychain access fails closed. Unsigned/ad hoc rebuilds can require granting Keychain access again; using the CLI's existing authentication avoids application-managed credential storage. No existing Keychain access controls are changed.
+The default profile is `~/Library/Application Support/MarxWails`. Set `MARX_USER_DATA_DIR` to a disposable directory for testing. API-key files use authenticated AES-GCM encryption with a random Keychain entry per saved credential, bound to the canonical profile. Valid credentials from the previous format remain readable. Availability checks do not create encryption keys. Locked or denied Keychain access fails closed. Ad hoc executable replacement or relocation can make a previous entry inaccessible. Native tests verified prompt-free failure and explicit recovery: replace the saved API key in Settings, or remove it and save it again. Replacement allocates a new Keychain entry before atomically committing the file; failed commits retain the old credential. Using the CLI's existing authentication avoids application-managed credential storage. No existing Keychain access controls are changed. Marx disables legacy Keychain authorization dialogs within its own process so denied access returns an error instead of blocking a service call. This uses the deprecated legacy interaction API because `LAContext.interactionNotAllowed` does not suppress file-based Keychain authorization.
 
 CLI commands run in separate process groups. Cancellation kills the group; a copy of the same executable watches a parent-owned pipe and kills remaining descendants when the app exits or crashes. No extra executable is bundled. The macOS menu bar and Command+O/Command+R use native modifier conventions.
 
@@ -97,3 +97,15 @@ Keep race/acceptance builds private. Restore session environment overrides befor
 Native Windows 11 x64 verification on October 31, 2026 includes the Go workflow suite, 5,051-finding WebView acceptance, actual release GUI interaction, native folder/save dialogs, DPAPI, installed scanning, persistence and uninstall. Exact results and boundaries are recorded in [the migration report](wails-migration.md).
 
 Keep profiles, detailed logs, screenshots, customer evidence, local account paths and hardware inventories outside tracked files and PR descriptions. Publish only portable summaries. Go builds use `-trimpath -buildvcs=false`; run `bun run verify:privacy` after staging and before committing.
+
+## Credential replacement verification
+
+The macOS runtime harness can replace its private copy of the executable while keeping the same disposable profile. Build two acceptance binaries with different bytes (for example, one with `-s -w` and one without), then set `MARX_UPGRADE_TEST_EXECUTABLE` alongside `MARX_TEST_EXECUTABLE`. The harness checks saved credential access after replacement and tests explicit recovery if macOS denies access. `MARX_UPGRADE_RELOCATE=1` exercises moving the app to another path. The input binaries and real profiles are never overwritten.
+
+Windows guarded CLI commands now start suspended, enter their kill-on-close job object, and resume only after the primary thread's owner has been verified. This prevents CLI user code from spawning a descendant before assignment. Cross-compilation of both application and regression test binaries passed on macOS. The new native regression test remains to be executed on Windows:
+
+```powershell
+go test ./native -run '^TestWindowsCLIStartsInsideJobBeforeSpawningChildren$' -count=1
+```
+
+This test verifies the CLI cannot execute before job assignment and that closing the job terminates a child spawned immediately after resumption. It is not a claim of native Windows runtime acceptance. A host crash before assigning the newly created suspended process remains a narrow startup boundary; that process has not executed CLI code or spawned descendants.

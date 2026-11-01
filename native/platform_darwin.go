@@ -8,6 +8,7 @@ package main
 import "C"
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -19,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -29,24 +31,127 @@ func nativeDownloadsDirectory() (string, error) {
 	return filepath.Join(home, "Downloads"), err
 }
 
-func credentialProtector(profile string) func(string, []byte) ([]byte, error) {
+var credentialAccessOnce sync.Once
+var credentialAccessErr error
+
+func configureCredentialAccess() error {
+	credentialAccessOnce.Do(func() {
+		if C.marxDisableCredentialInteraction() != 0 {
+			credentialAccessErr = errors.New("macOS Keychain noninteractive access could not be configured")
+		}
+	})
+	return credentialAccessErr
+}
+
+var credentialEnvelope = []byte("MARXKEY2")
+
+func nativeCredentialAccount(profile string, blob []byte) (string, []byte, error) {
 	identity := sha256.Sum256([]byte(profile))
+	account := hex.EncodeToString(identity[:])
+	if !bytes.HasPrefix(blob, credentialEnvelope) {
+		return account, identity[:], nil
+	}
+	if len(blob) < len(credentialEnvelope)+16+12+16 {
+		return "", nil, errors.New("Invalid protected credential")
+	}
+	header := blob[:len(credentialEnvelope)+16]
+	return account + "." + hex.EncodeToString(header[len(credentialEnvelope):]), append(identity[:], header...), nil
+}
+func readCredentialKey(account string) ([]byte, error) {
+	if err := configureCredentialAccess(); err != nil {
+		return nil, err
+	}
+	name := C.CString(account)
+	defer C.free(unsafe.Pointer(name))
+	key := make([]byte, 32)
+	if C.marxReadCredentialKey(name, (*C.uchar)(unsafe.Pointer(&key[0]))) != 0 {
+		return nil, errors.New("The saved key is unavailable in macOS Keychain; replace it in Settings or use CLI configuration")
+	}
+	return key, nil
+}
+func storeCredentialKey(account string, key []byte) error {
+	if err := configureCredentialAccess(); err != nil {
+		return err
+	}
+	if len(key) == 0 {
+		return errors.New("Empty Keychain value")
+	}
+	name := C.CString(account)
+	defer C.free(unsafe.Pointer(name))
+	if C.marxStoreCredentialKey(name, (*C.uchar)(unsafe.Pointer(&key[0])), C.int(len(key))) != 0 {
+		return errors.New("macOS Keychain could not save a new encryption key")
+	}
+	return nil
+}
+func removeCredentialKey(account string) error {
+	if err := configureCredentialAccess(); err != nil {
+		return err
+	}
+	name := C.CString(account)
+	defer C.free(unsafe.Pointer(name))
+	status := C.marxDeleteCredentialKey(name)
+	if status != 0 && status != -25300 {
+		return errors.New("The previous macOS Keychain entry could not be removed")
+	}
+	return nil
+}
+func credentialStorageAvailable() bool {
+	return configureCredentialAccess() == nil && C.marxCredentialStorageStatus() == 0
+}
+func credentialDeleter(profile string) func([]byte) error {
+	return func(blob []byte) error {
+		if len(blob) == 0 {
+			return nil
+		}
+		account, _, err := nativeCredentialAccount(profile, blob)
+		if err != nil {
+			return err
+		}
+		return removeCredentialKey(account)
+	}
+}
+func credentialProtector(profile string) func(string, []byte) ([]byte, error) {
 	return func(mode string, value []byte) ([]byte, error) {
+		if mode != "protect" && mode != "unprotect" {
+			return nil, errors.New("Unsupported credential operation")
+		}
 		if len(value) == 0 || len(value) > 2<<20 || mode == "protect" && len(value) > 1<<20 {
 			return nil, errors.New("Credential input rejected")
 		}
-		account := C.CString(hex.EncodeToString(identity[:]))
-		defer C.free(unsafe.Pointer(account))
-		key := make([]byte, 32)
+		var key, header, aad []byte
+		var account string
+		var err error
+		if mode == "protect" {
+			reference := make([]byte, 16)
+			key = make([]byte, 32)
+			if _, err = rand.Read(reference); err != nil {
+				return nil, err
+			}
+			if _, err = rand.Read(key); err != nil {
+				return nil, err
+			}
+			header = append(append([]byte{}, credentialEnvelope...), reference...)
+			identity := sha256.Sum256([]byte(profile))
+			account = hex.EncodeToString(identity[:]) + "." + hex.EncodeToString(reference)
+			aad = append(identity[:], header...)
+		} else {
+			account, aad, err = nativeCredentialAccount(profile, value)
+			if err != nil {
+				return nil, err
+			}
+			key, err = readCredentialKey(account)
+			if err != nil {
+				return nil, err
+			}
+			if bytes.HasPrefix(value, credentialEnvelope) {
+				value = value[len(credentialEnvelope)+16:]
+			}
+		}
 		defer func() {
 			for i := range key {
 				key[i] = 0
 			}
 		}()
-		status := C.marxCredentialKey(account, (*C.uchar)(unsafe.Pointer(&key[0])))
-		if status != 0 {
-			return nil, errors.New("macOS Keychain is unavailable")
-		}
 		block, err := aes.NewCipher(key)
 		if err != nil {
 			return nil, err
@@ -55,21 +160,21 @@ func credentialProtector(profile string) func(string, []byte) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		switch mode {
-		case "protect":
+		if mode == "protect" {
 			nonce := make([]byte, aead.NonceSize())
-			if _, err := rand.Read(nonce); err != nil {
+			if _, err = rand.Read(nonce); err != nil {
 				return nil, err
 			}
-			return aead.Seal(nonce, nonce, value, identity[:]), nil
-		case "unprotect":
-			if len(value) < aead.NonceSize() {
-				return nil, errors.New("Invalid protected credential")
+			protected := append(header, aead.Seal(nonce, nonce, value, aad)...)
+			if err = storeCredentialKey(account, key); err != nil {
+				return nil, err
 			}
-			return aead.Open(nil, value[:aead.NonceSize()], value[aead.NonceSize():], identity[:])
-		default:
-			return nil, errors.New("Unsupported credential operation")
+			return protected, nil
 		}
+		if len(value) < aead.NonceSize() {
+			return nil, errors.New("Invalid protected credential")
+		}
+		return aead.Open(nil, value[:aead.NonceSize()], value[aead.NonceSize():], aad)
 	}
 }
 
@@ -136,11 +241,4 @@ func runProcessGuard() bool {
 	io.Copy(io.Discard, os.Stdin)
 	syscall.Kill(-pid, syscall.SIGKILL)
 	return true
-}
-
-func deleteCredentialStorage(profile string) {
-	identity := sha256.Sum256([]byte(profile))
-	account := C.CString(hex.EncodeToString(identity[:]))
-	defer C.free(unsafe.Pointer(account))
-	C.marxDeleteCredentialKey(account)
 }

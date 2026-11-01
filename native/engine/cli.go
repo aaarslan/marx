@@ -222,6 +222,9 @@ func (c *CLI) command(ctx context.Context, args []string, timeout time.Duration,
 	cmd.Stdout = output
 	cmd.Stderr = errout
 	cmd.WaitDelay = 2 * time.Second
+	if c.guard != nil {
+		prepareGuardedProcess(cmd)
+	}
 	if err := cmd.Start(); err != nil {
 		return "", errors.New("The Checkmarx CLI could not start")
 	}

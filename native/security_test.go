@@ -25,12 +25,14 @@ func TestFramesCannotReachNativeRuntime(t *testing.T) {
 }
 func TestProtectedCredentialRoundTrip(t *testing.T) {
 	profile := t.TempDir()
-	t.Cleanup(func() { deleteCredentialStorage(profile) })
 	protectCredential := credentialProtector(profile)
 	original := []byte("disposable-native-test")
 	protected, err := protectCredential("protect", original)
 	if err != nil {
 		t.Fatal("Protected credential encryption failed")
+	}
+	if forget := credentialDeleter(profile); forget != nil {
+		t.Cleanup(func() { _ = forget(protected) })
 	}
 	if bytes.Contains(protected, original) {
 		t.Fatal("Plaintext credential was stored")
@@ -50,5 +52,22 @@ func TestConcurrentNativeDialogIsRejected(t *testing.T) {
 	defer s.dialogMu.Unlock()
 	if _, err := s.native("open", nil); err == nil {
 		t.Fatal("Repeated native dialog was not rejected")
+	}
+}
+
+func TestMaximumCredentialRoundTrip(t *testing.T) {
+	profile := t.TempDir()
+	protect := credentialProtector(profile)
+	original := bytes.Repeat([]byte("x"), 1<<20)
+	blob, err := protect("protect", original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if forget := credentialDeleter(profile); forget != nil {
+		t.Cleanup(func() { _ = forget(blob) })
+	}
+	restored, err := protect("unprotect", blob)
+	if err != nil || !bytes.Equal(original, restored) {
+		t.Fatal("The maximum supported credential could not be restored")
 	}
 }

@@ -60,7 +60,7 @@ func fixture(t *testing.T) *testFixture {
 		t.Setenv(key, "")
 	}
 	events := make(chan Object, 1000)
-	host := Host{Downloads: downloads, Emit: func(event Object) {
+	host := Host{Downloads: downloads, CredentialAvailable: func() bool { return true }, Emit: func(event Object) {
 		select {
 		case events <- event:
 		default:

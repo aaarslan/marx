@@ -15,6 +15,12 @@ const cli=path.join(root,mac?'cx':'cx.exe');
 let proc: ReturnType<typeof spawn>|undefined;
 let socket:WebSocket|undefined;
 let runtimeStderr='';
+function keychainAccount(){
+ const blob=fs.readFileSync(path.join(profile,'settings.key'));
+ const identity=createHash('sha256').update(fs.realpathSync(profile)).digest('hex');
+ return blob.subarray(0,8).toString('ascii')==='MARXKEY2'?identity+'.'+blob.subarray(8,24).toString('hex'):identity;
+}
+function removeKeychainEntry(){execFileSync('/usr/bin/security',['delete-generic-password','-s','com.marx.scanner.credentials','-a',keychainAccount()],{stdio:'ignore',timeout:5000});}
 function launch(executable:string){
  const child=spawn(executable,[],{cwd:os.tmpdir(),stdio:['ignore','ignore','pipe'],env:{...process.env,MARX_USER_DATA_DIR:profile,MARX_FIXTURE_ROOT:root,MARX_ACCEPTANCE_PORT:'19332',MARX_ACCEPTANCE_TOKEN:token,MARX_ACCEPTANCE_MINIMUM_SIZE:process.env.MARX_VERIFY_MINIMUM_SIZE||'',GORACE:'halt_on_error=1'}});
  child.stderr.on('data',chunk=>{runtimeStderr=(runtimeStderr+String(chunk)).slice(-1024*1024)});
@@ -34,8 +40,10 @@ try {
  if(!go)throw new Error('Install the pinned Go toolchain.');
  await run([go,'build','-trimpath','-buildvcs=false','-o',cli,'./scripts/fixtures/cli']);
  fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify({cliPath:cli,cliAuthMode:'cli',recentFolders:[source,...(uncSource?[uncSource]:[])]}));
- const executable=process.env.MARX_TEST_EXECUTABLE;
- if(!executable)throw new Error('Set MARX_TEST_EXECUTABLE to an acceptance-tagged Wails build.');
+ const selectedExecutable=process.env.MARX_TEST_EXECUTABLE;
+ if(!selectedExecutable)throw new Error('Set MARX_TEST_EXECUTABLE to an acceptance-tagged Wails build.');
+ const executable=mac&&process.env.MARX_UPGRADE_TEST_EXECUTABLE?path.join(root,'Marx-upgrade-test'):selectedExecutable;
+ if(executable!==selectedExecutable){fs.copyFileSync(selectedExecutable,executable);fs.chmodSync(executable,0o700);}
  proc=launch(executable);
  const macEvaluate=async(expression:string)=>{const response=await fetch('http://127.0.0.1:19332/evaluate',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({expression}),signal:AbortSignal.timeout(65000)});if(!response.ok)throw new Error('Native evaluation failed: '+response.status);const result=await response.json() as any;if(result.error)throw new Error(result.error);return result.value;};
  const ready=async()=>{const end=Date.now()+30000;while(Date.now()<end){try{if((await fetch('http://127.0.0.1:19332/ready',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(1000)})).ok)return}catch{}await Bun.sleep(100)}throw new Error('Native WebView did not start')};
@@ -67,6 +75,15 @@ try {
  const settings=await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");assert.equal(settings.hasStoredApiKey,true);assert.ok(!fs.readFileSync(path.join(profile,'settings.key')).includes(Buffer.from('disposable-wails-test')));
  fs.writeFileSync(path.join(root,'expectedKey'),'disposable-wails-test');
  await evaluate("window.marx.settings.save({cliAuthMode:'marx'})");assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
+ if(mac){
+  const previous=fs.readFileSync(path.join(profile,'settings.key'));
+  removeKeychainEntry();
+  assert.equal(await evaluate("window.marx.settings.testConnection().then(()=>false,()=>true)"),true,'Missing Keychain entry was not rejected');
+  assert.equal((await evaluate('window.marx.settings.get()')).credentialStorageAvailable,true,'A missing entry disabled credential replacement');
+  await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");
+  assert.notDeepEqual(fs.readFileSync(path.join(profile,'settings.key')),previous);
+  assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
+ }
  await evaluate("window.marx.settings.save({cliAuthMode:'cli'})");fs.rmSync(path.join(root,'expectedKey'));
  await evaluate('window.marx.workbench.saveWorkspace("native-test",{search:"persisted"})');assert.equal((await evaluate('window.marx.workbench.workspace("native-test")')).search,'persisted');
  await evaluate('window.marx.remediation.copy("Synthetic Wails clipboard")');
@@ -124,11 +141,39 @@ try {
  assert.ok((await evaluate('window.marx.scan.jobs()')).some((j:any)=>j.status==='Unknown'));
  await wait(`window.marx.scan.jobs().then(jobs=>jobs.some(j=>j.id===${JSON.stringify(recovering.id)}&&j.status==='Completed'))`);
  assert.ok((await evaluate('window.marx.scan.jobs()')).some((j:any)=>j.id===uncertain.id&&j.status==='Unknown'&&!j.scanId));assert.equal(fs.readFileSync(path.join(root,'counter'),'utf8'),submissions);
+
+ if(mac&&process.env.MARX_UPGRADE_TEST_EXECUTABLE){
+  fs.writeFileSync(path.join(root,'expectedKey'),'disposable-upgrade-key');
+  await evaluate("window.marx.settings.setApiKey('disposable-upgrade-key')");
+  await evaluate("window.marx.settings.save({cliAuthMode:'marx'})");
+  assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
+  await stopProcess(proc);
+  const replacement=fs.readFileSync(process.env.MARX_UPGRADE_TEST_EXECUTABLE);
+  assert.notEqual(createHash('sha256').update(fs.readFileSync(executable)).digest('hex'),createHash('sha256').update(replacement).digest('hex'),'App replacement must change the executable bytes');
+  const replacedExecutable=process.env.MARX_UPGRADE_RELOCATE==='1'?path.join(root,'Marx-relocated-test'):executable;
+  fs.copyFileSync(process.env.MARX_UPGRADE_TEST_EXECUTABLE,replacedExecutable);
+  fs.chmodSync(replacedExecutable,0o700);
+  proc=launch(replacedExecutable);
+  await ready();await wait('!!window.marx');
+  console.log('Checking saved credential after executable replacement.');
+  const readable=await evaluate("window.marx.settings.testConnection().then(()=>true,()=>false)");
+  console.log('Replacement credential read completed:',readable);
+  if(!readable){
+   assert.equal((await evaluate('window.marx.settings.get()')).credentialStorageAvailable,true);
+   console.log('Saving a replacement credential.');
+   await evaluate("window.marx.settings.setApiKey('disposable-upgrade-key')");
+   assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
+  }
+  console.log(JSON.stringify({appReplacement:readable?'saved key remained readable':'OS access denied; explicit key replacement recovered',plaintextFallback:false}));
+  console.log('Removing the disposable upgrade credential.');
+  await evaluate("window.marx.settings.setApiKey('')");
+  assert.equal((await evaluate('window.marx.settings.get()')).hasStoredApiKey,false);
+ }
  assert.equal(runtimeStderr.includes('DATA RACE'),false,'The native runtime reported a data race');
- console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain-backed encryption and decryption':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
+ console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
  if(!mac)await command('Browser.close').catch(()=>{});
 } catch(error) {fs.writeFileSync(path.join(root,'runtime-stderr.log'),runtimeStderr);console.error('Wails acceptance failed:',String(error).replaceAll(root,'<fixture>').replaceAll(os.homedir(),'%USERPROFILE%').replaceAll(os.homedir().replaceAll('\\','/'),'%USERPROFILE%'));process.exitCode=1;} finally {
  socket?.close();
  if(proc)await stopProcess(proc);
- if(mac){try{execFileSync('/usr/bin/security',['delete-generic-password','-s','com.marx.scanner.credentials','-a',createHash('sha256').update(fs.realpathSync(profile)).digest('hex')],{stdio:'ignore',timeout:5000});}catch{}}
+ if(mac){try{removeKeychainEntry();}catch{}}
 }

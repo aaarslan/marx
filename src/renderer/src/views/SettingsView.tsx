@@ -162,7 +162,7 @@ export function SettingsView() {
               </button>
             </div>
             <span className="faint">
-              Generate a key in Checkmarx One → Settings → API keys. Keys saved in Marx require your operating system’s protected storage.
+              Generate a key in Checkmarx One → Settings → API keys. Keys saved in Marx require your operating system’s protected storage. If a saved key stops working after an app update, replace it here or remove it and save it again.
             </span>
           </label>
 

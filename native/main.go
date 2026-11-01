@@ -34,7 +34,7 @@ type DesktopService struct {
 
 func jsonValue(value any) []byte { b, _ := json.Marshal(value); return b }
 func (s *DesktopService) start(profile string) error {
-	s.engine, s.startErr = engine.Open(profile, engine.Host{Native: s.native, Emit: func(event engine.Object) { s.app.Event.Emit("scan:event", event) }, Protect: credentialProtector(profile), Guard: containProcess, Downloads: downloadsDirectory()})
+	s.engine, s.startErr = engine.Open(profile, engine.Host{Native: s.native, Emit: func(event engine.Object) { s.app.Event.Emit("scan:event", event) }, Protect: credentialProtector(profile), CredentialAvailable: credentialStorageAvailable, ForgetCredential: credentialDeleter(profile), Guard: containProcess, Downloads: downloadsDirectory()})
 	close(s.ready)
 	return s.startErr
 }

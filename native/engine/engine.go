@@ -10,11 +10,13 @@ import (
 )
 
 type Host struct {
-	Native    func(string, Object) (any, error)
-	Emit      func(Object)
-	Protect   func(string, []byte) ([]byte, error)
-	Guard     ProcessGuard
-	Downloads string
+	Native              func(string, Object) (any, error)
+	Emit                func(Object)
+	Protect             func(string, []byte) ([]byte, error)
+	CredentialAvailable func() bool
+	ForgetCredential    func([]byte) error
+	Guard               ProcessGuard
+	Downloads           string
 }
 type activeJob struct {
 	cancel context.CancelFunc
@@ -163,9 +165,8 @@ func (e *Engine) getSettings() Object {
 	defer e.settingsMu.Unlock()
 	s := clone(e.settings)
 	available := false
-	if e.host.Protect != nil {
-		_, err := e.host.Protect("protect", []byte("storage-check"))
-		available = err == nil
+	if e.host.Protect != nil && e.host.CredentialAvailable != nil {
+		available = e.host.CredentialAvailable()
 	}
 	stat, err := os.Stat(filepath.Join(e.profile, "settings.key"))
 	stored := err == nil && stat.Size() > 0
@@ -225,19 +226,35 @@ func (e *Engine) setKey(key string) (Object, error) {
 	if len(key) > 1<<20 {
 		return nil, errors.New("Credential exceeds its size limit")
 	}
+	e.settingsMu.Lock()
+	previous, _ := readBounded(filepath.Join(e.profile, "settings.key"), 2<<20)
+	defer func() {
+		for i := range previous {
+			previous[i] = 0
+		}
+	}()
 	data := []byte{}
 	if key != "" {
 		if e.host.Protect == nil {
+			e.settingsMu.Unlock()
 			return nil, errors.New("Protected credential storage is unavailable")
 		}
 		var err error
 		data, err = e.host.Protect("protect", []byte(key))
 		if err != nil || len(data) == 0 {
+			e.settingsMu.Unlock()
 			return nil, errors.New("Credential encryption failed; existing key was left unchanged")
 		}
 	}
-	e.settingsMu.Lock()
 	err := writePrivate(filepath.Join(e.profile, "settings.key"), data)
+	if e.host.ForgetCredential != nil {
+		if err != nil && len(data) > 0 {
+			_ = e.host.ForgetCredential(data)
+		}
+		if err == nil && len(previous) > 0 {
+			_ = e.host.ForgetCredential(previous)
+		}
+	}
 	e.settingsMu.Unlock()
 	if err != nil {
 		return nil, err
