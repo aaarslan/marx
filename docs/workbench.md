@@ -18,14 +18,14 @@ The current source checkout can be checked against the fingerprint recorded befo
 
 1. Select findings or inspect a fix group, then choose **Fix with AI**.
 2. Review the severity scope and generated batches. Choose **Track remediation** to create a named session with those exact findings.
-3. In **Workbench → Sessions**, record notes, the commit or PR reference, and checks performed. These are your records; Marx does not execute the checks or independently validate the reference.
+3. In **Workbench → Remediations**, record notes, the commit or PR reference, and checks performed. These are your records; Marx does not execute the checks or independently validate the reference.
 4. Copy or save the assistant handoff and apply the reviewed change in your normal development workflow.
 5. Run a verification scan using recorded options, or select a later completed scan from the same project. Choose **Compare evidence** when its results are available.
 6. Export the session's JSON evidence bundle when you need a portable record.
 
 Creating a session atomically saves its metadata and a separate original scan snapshot. Later refreshes and triage changes update the normal result cache, not that baseline. Verification saves the later snapshot and the comparison record together. Editing a session cannot manually set it to Verified.
 
-![A remediation session with notes, handoff and an explicitly inconclusive verification](workbench-session.png)
+![A native remediation session with investigation notes and pinned evidence](../website/assets/workbench.webp)
 
 This screenshot uses synthetic fixture findings and no customer source or tenant.
 
@@ -58,7 +58,7 @@ Each batch item uploads its own folder. Shared lockfiles or build context outsid
 
 ## Jobs, recovery and local storage
 
-The database is `workbench.sqlite` in Electron's user-data directory. Jobs, the latest 1,000 bounded log lines per job, scan snapshots, finding indexes, sessions and navigation state survive restarts. A schema version prevents an older Marx build from rewriting a newer database. SQLite transactions keep imports and evidence updates atomic; failed replacement leaves the previous snapshot intact.
+The database is `workbench.sqlite` in the selected native Marx profile, normally `%APPDATA%/MarxWails` on Windows or `~/Library/Application Support/MarxWails` on macOS. Jobs, the latest 1,000 bounded log lines per job, scan snapshots, sessions and navigation state survive restarts. A schema version prevents an older Marx build from rewriting a newer database. SQLite transactions keep imports and evidence updates atomic; failed replacement leaves the previous snapshot intact.
 
 Startup marks interrupted local monitoring explicitly. Known remote IDs in the current connection are reconciled, with at most eight simultaneous monitored jobs. Recovery only queries the existing scan; it never creates a replacement. Unknown submissions without a remote ID require investigation in Checkmarx One before another submission. **Activity** exposes stored jobs and logs, manual reconciliation, saved scans and cleanup.
 
@@ -72,11 +72,15 @@ Evidence is separated by CLI configuration fingerprint and project identity. The
 
 | Export | Contents |
 | --- | --- |
-| CSV / JSON | Current filtered normalized findings |
+| CSV / JSON | Current filtered normalized findings; JSON also includes cached CVE intelligence |
 | SARIF | Original CLI-generated SARIF 2.1.0 report for the whole scan, preserving its semantics |
 | Remediation Markdown | Every generated assistant prompt batch |
-| Session JSON | Session notes/reference/checks/handoff, exact selected IDs, pinned baseline, optional pinned verification, comparison and timestamps |
+| Session JSON | Session notes/reference/checks/handoff, exact selected IDs, pinned baseline, optional pinned verification, comparison, original/current intelligence and timestamps |
 
-CLI JSON and SARIF reports are limited to 64 MiB. Parsing runs in a worker with cancellation and a 60-second processing bound. There is no 5,000-finding slice; incomplete counts stay explicit. The full normalized scan is still loaded into renderer memory, so paging the DOM is not an unlimited-memory guarantee. Oversized or malformed reports fail visibly without replacing saved evidence.
+CLI JSON and SARIF reports are limited to 64 MiB. Go imports the bounded report in a shared task with reader cancellation; cancellation is checked before committing the snapshot. Parsing itself is not preemptible and has no separate processing deadline. There is no 5,000-finding slice; incomplete counts stay explicit. The full normalized scan is still loaded into renderer memory, so paging the DOM is not an unlimited-memory guarantee. Oversized or malformed reports fail visibly without replacing saved evidence.
 
 The CLI scheduler bounds ordinary execution, reserves capacity for control operations, and cancels queued work without spawning it. It does not automatically retry scan creation or triage. Exports and local evidence can contain sensitive project information. See [Security](../SECURITY.md) and [current validation boundaries](limitations.md).
+
+## Local CVE decisions
+
+The **Decisions** tab records scoped verdicts with rationale, review dates, assumptions and immutable revisions. Changes to KEV, EPSS or publication state can retain an evidence-backed review flag; they never change remote finding state. Remediation evidence bundles keep original and current intelligence separately. See [CVE intelligence and decision reviews](cve-intelligence.md) for the complete workflow and export semantics.

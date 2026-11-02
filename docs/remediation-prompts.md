@@ -16,7 +16,7 @@ Each numbered finding includes its original normalized title and description, sc
 
 Prompts sort by severity and retain stable ordering within a severity. Batches contain at most the selected 10, 20 or 40 findings and target approximately 32,000 characters including instructions. Every batch is independently usable and includes its batch number and scope. If a single finding exceeds that target, its full evidence remains included and the dialog identifies the oversized batch. No finding or evidence field is silently truncated to meet a model limit.
 
-Copy writes the current batch as plain text through Electron's main-process clipboard API. Save writes every batch into one UTF-8 Markdown file at a user-selected destination. Canceled saves do not write. Clipboard and file exports are limited to 8 MiB of UTF-8 text, with an explicit error for larger payloads; new prompt files request mode 0600 on POSIX systems.
+Copy writes the current batch as plain text through the native Wails clipboard bridge. Save writes every batch into one UTF-8 Markdown file at a user-selected destination. Canceled saves do not write. Clipboard and file exports are limited to 8 MiB of UTF-8 text, with an explicit error for larger payloads; new prompt files request mode 0600 on POSIX systems.
 
 ## Assistant templates
 
@@ -28,4 +28,6 @@ The shared prompt contract asks the assistant to verify repository/branch contex
 
 ## Validation
 
-`tests/remediation.test.ts` covers severity scope, evidence preservation, stable ordering, count/size batching, oversized evidence, partial/demo labeling and templates. `bun run verify:cli` exercises the built Electron app with synthetic CLI results, clipboard and save-dialog stubs, and isolated temporary files. It checks prompt selection, copy payloads, real Markdown file bytes, multi-batch navigation/export, dropdown padding, dialog layouts, Escape and focus return. It does not call an LLM or validate a remediation performed by Copilot.
+`tests/remediation.test.ts` covers severity scope, evidence preservation, stable ordering, count/size batching, oversized evidence, partial/demo labeling and templates. Native engine tests cover prompt persistence and export boundaries; the acceptance-tagged Wails harness exercises clipboard and evidence exports with disposable synthetic data. The removed Electron harness is historical evidence only. Full production keyboard, prompt-dialog and save-dialog checks remain part of [final acceptance](final-acceptance.md). No LLM is called and no assistant-produced remediation is validated by these checks.
+
+Cached intelligence for selected CVEs is attached with source and freshness qualifiers. Preparing a prompt makes no public-provider request. Missing or stale intelligence is disclosed rather than interpreted as safety. See [CVE intelligence](cve-intelligence.md#handoffs-and-exports).

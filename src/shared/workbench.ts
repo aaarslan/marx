@@ -86,11 +86,12 @@ export interface WorkspaceState {
   connectionId?: string;
   view?: string;
   selectedSessionId?: string;
-  workbenchTab?: 'sessions' | 'activity';
+  workbenchTab?: 'sessions' | 'activity' | 'decisions';
   selectedScanId?: string | null;
   linkedFolder?: string | null;
   selectedFindingId?: string | null;
   baselineId?: string | null;
+  intelligenceFilter?: string;
   search?: string;
   severities?: Severity[];
   scanner?: string;
@@ -132,5 +133,7 @@ export interface EvidenceBundle {
   exportedAt: string;
   session: RemediationSession;
   baseline: ResultsPage;
+  intelligence?: Record<string, import('./intelligence').IntelligenceSnapshot>;
+  currentIntelligence?: Record<string, import('./intelligence').IntelligenceSnapshot>;
   verification?: ResultsPage;
 }

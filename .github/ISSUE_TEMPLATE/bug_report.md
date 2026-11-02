@@ -16,8 +16,9 @@ Describe the problem and the behavior you expected.
 ## Environment
 
 - Marx version:
-- Operating system version and architecture (macOS ARM64 / Windows x64 / Windows ARM64):
+- Operating system version and architecture (macOS Apple Silicon / Windows 11 x64):
 - Packaged app or development build:
+- Official CLI version (if relevant):
 - Relevant scanner/options:
 
 ## Evidence
