@@ -4,7 +4,8 @@ import { CheckCircle2, KeyRound, Plug } from 'lucide-react';
 import type { ScanDefaults, Settings, TestConnectionResult } from '@shared/types';
 import { api } from '../api';
 import { useApp } from '../store';
-import { Banner, Spinner, Toggle } from '../components/ui';
+import { IntelligenceSettings } from '../components/IntelligenceSettings';
+import { Banner, Spinner, Toggle, restoreControlFocus } from '../components/ui';
 
 export function SettingsView() {
   const { settings, init } = useApp(useShallow((state) => ({
@@ -106,9 +107,11 @@ export function SettingsView() {
             CLI executable
             <div className="row">
               <input type="text" aria-label="CLI executable" value={cliPath} onChange={(event) => setCliPath(event.target.value)} placeholder="Auto-detect cx from PATH" style={{ flex: 1 }} />
-              <button className="btn" disabled={testing || saving} onClick={async () => {
+              <button className="btn" aria-label="Browse for Checkmarx CLI" disabled={testing || saving} onClick={async (event) => {
+                const origin = event.currentTarget;
                 try { const selected = await api.dialog.selectCli(); if (selected) { setCliPath(selected); setTestResult(null); } }
                 catch (error) { setSaveError(error instanceof Error ? error.message : String(error)); }
+                finally { restoreControlFocus(origin); }
               }}>Browse…</button>
             </div>
             <span className="faint">Select the same cx executable that works in your terminal. Marx does not download or replace your CLI.</span>
@@ -126,12 +129,7 @@ export function SettingsView() {
             </select>
             <span className="faint">Existing CLI configuration is recommended when scans already work in your terminal. Marx does not modify it. Shell-only environment variables must also be available to the app, or configured in your CLI configuration file.</span>
           </label>
-          <button className="btn primary" disabled={testing || savingKey || saving} onClick={() => void test()}>
-            {testing ? <Spinner size={13} /> : <Plug size={13} />}
-            {testing ? 'Testing CLI…' : 'Test CLI connection'}
-          </button>
-          {testResult && <Banner kind="ok">{testResult.message}<div className="mono">{testResult.cliPath}</div></Banner>}
-          {testError && <Banner kind="error">{testError}</Banner>}
+
         </div>
       </div>
 
@@ -157,12 +155,12 @@ export function SettingsView() {
                 placeholder={settings.hasApiKey ? '••••••••••••  (enter a new key to replace)' : 'Paste your Checkmarx One API key'}
                 style={{ flex: 1 }}
               />
-              <button className="btn" disabled={!apiKey.trim() || !settings.credentialStorageAvailable || savingKey || saving || testing} onClick={() => void saveKey()}>
+              <button className="btn" aria-label="Save API key" disabled={!apiKey.trim() || !settings.credentialStorageAvailable || savingKey || saving || testing} onClick={() => void saveKey()}>
                 {savingKey ? <Spinner size={12} /> : null}{savingKey ? 'Saving…' : 'Save key'}
               </button>
             </div>
             <span className="faint">
-              Generate a key in Checkmarx One → Settings → API keys. Keys saved in Marx require your operating system’s protected storage.
+              Generate a key in Checkmarx One → Settings → API keys. Keys saved in Marx require your operating system’s protected storage. If a saved key stops working after an app update, replace it here or remove it and save it again.
             </span>
           </label>
 
@@ -199,11 +197,21 @@ export function SettingsView() {
           </div>
           </details>
 
-          {keySaved && <Banner kind="ok">API key saved. Test the CLI connection to verify access.</Banner>}
+          {keySaved && <Banner kind="ok">API key saved. Choose Save connection and test below to verify access.</Banner>}
         </div>
       </div>
 
       </>}
+
+      <section className="settings-connection-check" aria-label="Connection check">
+          <button className="btn primary" disabled={testing || savingKey || saving} onClick={() => void test()}>
+            {testing ? <Spinner size={13} /> : <Plug size={13} />}
+            {testing ? 'Testing CLI…' : 'Save connection and test'}
+          </button>
+          {testResult && <Banner kind="ok">{testResult.message}<div className="mono">{testResult.cliPath}</div></Banner>}
+          {testError && <Banner kind="error">{testError}</Banner>}
+        <p className="field-help">Saves the connection fields above, then checks CLI authentication and project access. This does not upload source or start a scan.</p>
+      </section>
 
       <div className="card">
         <div className="section-title" style={{ marginTop: 0 }}>Scan defaults</div>
@@ -258,13 +266,14 @@ export function SettingsView() {
         </div>
       </div>
 
+      <IntelligenceSettings />
       {saveError && <Banner kind="error">{saveError}</Banner>}
       <div className="settings-actions">
         <button className="btn primary" disabled={saving || savingKey || testing} onClick={() => void save()}>
           {saving ? <Spinner size={13} /> : savedFlash ? <CheckCircle2 size={14} /> : null}
           {saving ? 'Saving…' : savedFlash ? 'Settings saved' : 'Save settings'}
         </button>
-        <span className="field-help" role="status">{savedFlash ? 'Your preferences are up to date.' : 'Applies to new scans.'}</span>
+        <span className="field-help" role="status">{savedFlash ? 'Your preferences are up to date.' : 'Connection and scan defaults. Public CVE sources are saved separately.'}</span>
       </div>
     </>
   );

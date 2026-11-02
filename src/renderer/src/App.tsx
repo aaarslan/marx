@@ -1,11 +1,13 @@
 import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon, ShieldCheck, Wrench } from 'lucide-react';
 import { useApp, type View } from './store';
 import { api, isMac } from './api';
 import { ScanView } from './views/ScanView';
+import { desktopShortcut } from '@shared/desktopShortcuts';
 
+const IntelligenceView = lazy(() => import('./views/IntelligenceView').then(m => ({default:m.IntelligenceView})));
 const BatchView = lazy(() => import('./views/BatchView').then((m) => ({ default: m.BatchView })));
 const ResultsView = lazy(() => import('./views/ResultsView').then((m) => ({ default: m.ResultsView })));
 const HistoryView = lazy(() => import('./views/HistoryView').then((m) => ({ default: m.HistoryView })));
@@ -17,30 +19,44 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
   { id: 'batch', label: 'Batch Scan', icon: <Layers size={16} /> },
   { id: 'results', label: 'Results', icon: <ListChecks size={16} /> },
   { id: 'workbench', label: 'Workbench', icon: <Wrench size={16} /> },
+  { id: 'intelligence', label: 'CVE intelligence', icon: <ShieldCheck size={16} /> },
   { id: 'history', label: 'History', icon: <FolderSearch size={16} /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon size={16} /> }
 ];
 
 export function App() {
-  const { view, setView, init, triggerMenuAction, settings } = useApp(useShallow((state) => ({
+  const { view, setView, init, triggerMenuAction, settings, connectionId } = useApp(useShallow((state) => ({
     view: state.view,
     setView: state.setView,
     init: state.init,
     triggerMenuAction: state.triggerMenuAction,
-    settings: state.settings
+    settings: state.settings,
+    connectionId: state.connectionId
   })));
+  const [batchVisited, setBatchVisited] = useState(view === 'batch');
+  const main = useRef<HTMLElement>(null);
+  useLayoutEffect(() => { if (main.current) main.current.scrollTop = 0; }, [view]);
+  useEffect(() => { if (view === 'batch') setBatchVisited(true); }, [view]);
 
   useEffect(() => {
     void init();
   }, [init]);
 
   useEffect(() => {
-    // ⌘R / ⌘O always land on the Scan view
-    const off = api.onMenuAction((action) => {
+    const dispatch = (action: import('@shared/ipc').MenuAction) => {
       triggerMenuAction(action);
       setView('scan');
-    });
-    return off;
+    };
+    const off = api.onMenuAction(dispatch);
+    const onKey = (event: KeyboardEvent) => {
+      const action = desktopShortcut(event, api.platform);
+      if (!action) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dispatch(action);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => { off(); window.removeEventListener('keydown', onKey, true); };
   }, [setView, triggerMenuAction]);
 
   return (
@@ -71,16 +87,17 @@ export function App() {
           ))}
           <div className="nav-spacer" />
           <button className="connection-status" aria-label={hasScanCredentials(settings) ? 'Manage connection' : 'Set up connection'} title="Connection settings" onClick={() => setView('settings')}>
-            <span className={`connection-dot ${hasScanCredentials(settings) ? 'configured' : ''}`} />
-            <span>{hasScanCredentials(settings) ? 'Checkmarx CLI' : 'Set up connection'}<small>{hasScanCredentials(settings) ? 'Manage CLI and defaults' : 'Connect to start scanning'}</small></span>
+            <span className="connection-dot" />
+            <span>{hasScanCredentials(settings) ? 'CLI settings' : 'Set up connection'}<small>{hasScanCredentials(settings) ? 'Configure and test access' : 'Connect to start scanning'}</small></span>
             <SettingsIcon size={14} aria-hidden="true" />
           </button>
         </aside>
-        <main className={`main ${view === 'scan' || view === 'settings' ? 'narrow' : ''}`}>
+        <main ref={main} className={`main ${view === 'scan' || view === 'settings' ? 'narrow' : ''}`}>
           <div className="page-content">
           <div hidden={view !== 'scan'}><ScanView /></div>
           <Suspense fallback={<div className="field-help" role="status">Loading view…</div>}>
-          {view === 'batch' && <BatchView />}
+          {view === 'intelligence' && <IntelligenceView />}
+          {(view === 'batch' || batchVisited) && <div hidden={view !== 'batch'}><BatchView key={connectionId} /></div>}
           {view === 'results' && <ResultsView />}
           {view === 'history' && <HistoryView />}
           {view === 'workbench' && <WorkbenchView />}

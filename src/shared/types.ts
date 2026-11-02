@@ -260,8 +260,7 @@ export interface TestConnectionResult {
 export type ScanEvent =
   | { kind: 'job-updated'; job: ScanJobState }
   | { kind: 'job-list'; jobs: ScanJobState[] }
-  | { kind: 'log'; jobId: string; line: string }
-  | { kind: 'open-results'; scanId: string; folderPath?: string };
+  | { kind: 'log'; jobId: string; line: string };
 
 export interface GitInfo {
   branch: string;

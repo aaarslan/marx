@@ -1,10 +1,10 @@
 import { folderName } from '@shared/path';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FolderOpen, UploadCloud, Check, ArrowUpRight } from 'lucide-react';
 import type { ScanJobState, ScanOptions, ScannerType } from '@shared/types';
 import { SEVERITY_COLOR } from '@shared/severity';
 import { api, commandKey } from '../api';
-import { Toggle, formatCount } from './ui';
+import { Toggle, formatCount, restoreControlFocus } from './ui';
 
 export function Dropzone({
   folder,
@@ -15,17 +15,23 @@ export function Dropzone({
   onPick: (path: string) => void;
   hint: string;
 }) {
+  const target = useRef<HTMLButtonElement>(null);
+  useEffect(() => api.onFolderDrop(folder => { if (target.current?.getClientRects().length) {setDropError(null);onPick(folder);} }), [onPick]);
   const [over, setOver] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
   return (
     <button
+      ref={target}
+      data-file-drop-target
       type="button"
       className={`dropzone ${over ? 'over' : ''} ${folder ? 'has-folder' : ''}`}
       aria-label={folder ? `Change project folder: ${folder}` : 'Choose a project folder'}
-      onClick={async () => {
+      onClick={async (event) => {
+        const origin = event.currentTarget;
         setDropError(null);
         try { const folder = await api.dialog.selectFolder(); if (folder) onPick(folder); }
         catch (e) { setDropError(e instanceof Error ? e.message : String(e)); }
+        finally { restoreControlFocus(origin); }
       }}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setOver(false); }}
@@ -33,10 +39,7 @@ export function Dropzone({
         e.preventDefault();
         setOver(false);
         setDropError(null);
-        const file = e.dataTransfer.files[0];
-        try {
-          if (file) { const path = await api.fs.pathForFile(file); if (path) onPick(path); }
-        } catch (error) { setDropError(error instanceof Error ? error.message : String(error)); }
+
       }}
     >
       <span className="dropzone-topline"><span>{folder ? 'Source folder' : 'Local source'}</span><kbd>{commandKey}O</kbd></span>
@@ -76,6 +79,7 @@ export function ScannerToggles({
         </div>
         <Toggle
           checked={scanners.includes('sast')}
+          accessibleLabel="SAST scanning"
           onChange={() => flip('sast')}
           label={scanners.includes('sast') ? 'Enabled' : 'Disabled'}
         />
@@ -95,6 +99,7 @@ export function ScannerToggles({
         </div>
         <Toggle
           checked={scanners.includes('sca')}
+          accessibleLabel="SCA scanning"
           onChange={() => flip('sca')}
           label={scanners.includes('sca') ? 'Enabled' : 'Disabled'}
         />
@@ -165,7 +170,7 @@ export function ScanOptionsEditor({
 
       <div className="section-title">Excludes</div>
       <label className="field">
-        Folders / files to skip (one per line). Add <span className="mono">!name</span> to re-include a default.
+        <span>Folders / files to skip (one per line). Add <span className="mono">!name</span> to re-include a default.</span>
         <textarea
           rows={3}
           value={options.excludes.join('\n')}
@@ -182,7 +187,7 @@ export function ScanOptionsEditor({
 
       <div className="section-title">Tags</div>
       <label className="field">
-        Tags applied to the scan (<span className="mono">key:value</span>, comma-separated)
+        <span>Tags applied to the scan (<span className="mono">key:value</span>, comma-separated)</span>
         <input
           type="text"
           placeholder="team:frontend, tier:critical"

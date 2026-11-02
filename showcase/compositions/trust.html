@@ -1,0 +1,74 @@
+<template
+  ><style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .trust-copy {
+      position: absolute;
+      left: 180px;
+      top: 195px;
+    }
+    .trust-copy .headline {
+      font-size: 111px;
+    }
+    .trust-notes {
+      position: absolute;
+      left: 180px;
+      right: 180px;
+      bottom: 185px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 120px;
+    }
+    .trust-note {
+      font-size: 33px;
+      line-height: 1.45;
+      border-top: 2px solid #c9c3b9;
+      padding-top: 25px;
+    }
+    .trust-note strong {
+      display: block;
+      font-size: 28px;
+      margin-bottom: 16px;
+      color: #a34924;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="trust"
+    data-width="1920"
+    data-height="1080"
+    class="scene"
+    data-hold
+  >
+    <div class="trust-copy">
+      <div class="kicker">YOUR CLI. CLEAR BOUNDARIES.</div>
+      <h2 class="headline">Scans through your CLI.<br />Intelligence by choice.</h2>
+    </div>
+    <div class="trust-notes">
+      <div class="trust-note">
+        <strong>OFFICIAL SCAN WORKFLOW</strong>The official CLI uploads to<br />Checkmarx
+        One for analysis.
+      </div>
+      <div class="trust-note">
+        <strong>OPT-IN PUBLIC CONTEXT</strong>Public CVE IDs only.<br />No source code or credentials.
+      </div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      ".trust-copy",
+      { opacity: 0, y: 28 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" },
+      0.1,
+    ).fromTo(
+      ".trust-note",
+      { opacity: 0, y: 20 },
+      { opacity: 1, y: 0, duration: 0.45, stagger: 0.2 },
+      0.6,
+    );
+    window.__timelines.trust = tl;
+  </script></template
+>

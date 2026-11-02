@@ -4,7 +4,7 @@ import type { RemediationSession, WorkspaceState } from '@shared/workbench';
 import type { MenuAction } from '@shared/ipc';
 import { api } from './api';
 
-export type View = 'scan' | 'batch' | 'results' | 'history' | 'workbench' | 'settings';
+export type View = 'scan' | 'batch' | 'results' | 'history' | 'workbench' | 'intelligence' | 'settings';
 
 interface AppState {
   view: View;
@@ -17,7 +17,7 @@ interface AppState {
   connectionId: string | null;
   initialized: boolean;
   workbenchError: string | null;
-  workbenchTab: 'sessions' | 'activity';
+  workbenchTab: 'sessions' | 'activity' | 'decisions';
   selectedSessionId: string | null;
   selectedScanId: string | null;
   linkedFolder: string | null;
@@ -28,7 +28,7 @@ interface AppState {
   setView: (v: View) => void;
   init: () => Promise<void>;
   refreshWorkbench: () => Promise<void>;
-  setWorkbenchTab: (tab: 'sessions' | 'activity') => void;
+  setWorkbenchTab: (tab: 'sessions' | 'activity' | 'decisions') => void;
   openSession: (sessionId: string) => void;
   applyEvent: (e: ScanEvent) => void;
   setSelectedScan: (scanId: string | null, folder?: string | null, autoBaseline?: boolean) => void;
@@ -37,7 +37,7 @@ interface AppState {
 }
 
 let subscribed = false;
-const VIEWS: View[] = ['scan', 'batch', 'results', 'history', 'workbench', 'settings'];
+const VIEWS: View[] = ['scan', 'batch', 'results', 'history', 'workbench', 'intelligence', 'settings'];
 
 function navigation(state: AppState): WorkspaceState {
   return {
@@ -50,11 +50,24 @@ function navigation(state: AppState): WorkspaceState {
 }
 
 export const useApp = create<AppState>((set, get) => {
+  let pendingNavigation: { connectionId: string | null; state: WorkspaceState } | null = null;
+  let savingNavigation = false;
   const persist = () => {
     if (!get().initialized) return;
-    void api.workbench.saveWorkspace('navigation', navigation(get())).catch((error) => {
-      set({ workbenchError: `Could not save workspace: ${error instanceof Error ? error.message : String(error)}` });
-    });
+    pendingNavigation = { connectionId: get().connectionId, state: navigation(get()) };
+    if (savingNavigation) return;
+    savingNavigation = true;
+    void (async () => {
+      try {
+        while (pendingNavigation) {
+          const next = pendingNavigation;
+          pendingNavigation = null;
+          if (next.connectionId !== get().connectionId) continue;
+          try { await api.workbench.saveWorkspace('navigation', next.state); }
+          catch (error) { set({ workbenchError: `Could not save workspace: ${error instanceof Error ? error.message : String(error)}` }); }
+        }
+      } finally { savingNavigation = false; }
+    })();
   };
   return {
     view: 'scan',
@@ -113,11 +126,11 @@ export const useApp = create<AppState>((set, get) => {
         initialized: true,
         workbenchError: null,
         ...(restore ? {
-          view: saved?.view && VIEWS.includes(saved.view as View) ? saved.view as View : saved?.selectedScanId ? 'results' as const : 'scan' as const,
+          view: get().initialized && get().view === 'settings' ? 'settings' as const : saved?.view && VIEWS.includes(saved.view as View) ? saved.view as View : saved?.selectedScanId ? 'results' as const : 'scan' as const,
           selectedScanId: saved?.selectedScanId ?? null,
           linkedFolder: saved?.linkedFolder ?? null,
           selectedSessionId: saved?.selectedSessionId ?? null,
-          workbenchTab: saved?.workbenchTab === 'activity' ? 'activity' as const : 'sessions' as const,
+          workbenchTab: saved?.workbenchTab === 'decisions' ? 'decisions' as const : saved?.workbenchTab === 'activity' ? 'activity' as const : 'sessions' as const,
           batchId: data.jobs.find((job) => job.batchId)?.batchId ?? null
         } : {})
       });
@@ -137,9 +150,6 @@ export const useApp = create<AppState>((set, get) => {
         set({ batchId: event.jobs[0]?.batchId ?? null, jobs: [...event.jobs, ...get().jobs.filter((job) => !incoming.has(job.id))] });
       } else if (event.kind === 'log') {
         set((state) => ({ logs: { ...state.logs, [event.jobId]: [...(state.logs[event.jobId] ?? []), event.line].slice(-400) } }));
-      } else if (event.kind === 'open-results') {
-        set({ selectedScanId: event.scanId, linkedFolder: event.folderPath ?? null, view: 'results' });
-        persist();
       }
     },
 

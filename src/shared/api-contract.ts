@@ -1,5 +1,5 @@
-// Renderer-side API surface implemented by the preload bridge.
-// Kept electron-free so both node and web tsconfigs can consume it.
+import type { IntelligenceSettings, IntelligenceSnapshot, IntelligenceWatchlist, IntelligenceDecision, DecisionInput } from './intelligence';
+// Renderer-side API surface implemented by the Wails desktop bridge.
 
 import type {
   Finding,
@@ -29,6 +29,22 @@ export interface SourceSnippet {
 
 export interface MarxApi {
   platform: string;
+  intelligence: {
+    settings(): Promise<IntelligenceSettings>;
+    clearCache(): Promise<void>;
+    configure(enabledSources: IntelligenceSettings['enabledSources']): Promise<IntelligenceSettings>;
+    get(cves: string[]): Promise<Record<string, IntelligenceSnapshot>>;
+    refresh(input: {cves: string[]; requestId: string; force?: boolean; reuseCatalog?: boolean}): Promise<Record<string, IntelligenceSnapshot>>;
+    cancel(requestId: string): Promise<void>;
+    watch(cve: string): Promise<unknown>;
+    unwatch(cve: string): Promise<unknown>;
+    watchlist(): Promise<IntelligenceWatchlist>;
+    decisions(): Promise<IntelligenceDecision[]>;
+    decide(input: DecisionInput): Promise<IntelligenceDecision>;
+    closeDecision(input: {id: string; expectedRevision: number; reason: string}): Promise<IntelligenceDecision>;
+    history(id: string): Promise<IntelligenceDecision[]>;
+    exportDecisions(): Promise<string | null>;
+  };
   settings: {
     get(): Promise<Settings>;
     save(s: Partial<Settings>): Promise<Settings>;
@@ -40,7 +56,6 @@ export interface MarxApi {
     selectCli(): Promise<string | null>;
   };
   fs: {
-    pathForFile(file: File): Promise<string>;
     readSourceFile(folder: string, relPath: string, line?: number, projectId?: string): Promise<SourceSnippet>;
     openInEditor(folder: string, relPath: string, line: number, projectId: string, editor: 'code' | 'cursor'): Promise<void>;
     sourceStatus(folder: string, scanId: string): Promise<{ matches: boolean | null; message: string }>;
@@ -81,7 +96,7 @@ export interface MarxApi {
     query(scanId: string, query: FindingQuery): Promise<FindingQueryPage>;
     sarif(scanId: string): Promise<string | null>;
     triage(req: TriageRequest): Promise<boolean>;
-    /** Write findings to ~/Downloads and reveal in Finder; returns the file path */
+    /** Write findings to Downloads and reveal in the system file manager; returns the file path */
     export(format: 'csv' | 'json', label: string, findings: Finding[]): Promise<string>;
   };
   remediation: {
@@ -107,6 +122,7 @@ export interface MarxApi {
   shell: {
     openExternal(url: string): Promise<void>;
   };
+  onFolderDrop(listener: (folder: string) => void): () => void;
   onScanEvent(listener: (event: ScanEvent) => void): () => void;
   onMenuAction(listener: (action: MenuAction) => void): () => void;
 }

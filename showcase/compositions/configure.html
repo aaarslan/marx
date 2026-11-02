@@ -1,0 +1,101 @@
+<template
+  ><style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .configure-copy {
+      position: absolute;
+      left: 125px;
+      top: 245px;
+      width: 600px;
+    }
+    .configure-copy .headline {
+      font-size: 96px;
+    }
+    .configure-pane {
+      left: 780px;
+      top: 140px;
+      width: 1540px;
+      height: 850px;
+    }
+    .configure-pane img {
+      width: 1540px;
+    }
+    .configure-step {
+      position: absolute;
+      left: 125px;
+      top: 135px;
+      color: #a34924;
+    }
+    .configure-caption {
+      left: 125px;
+      bottom: 145px;
+      width: 540px;
+      font-size: 31px;
+    }
+  </style>
+  <div
+    id="root"
+    data-composition-id="configure"
+    data-width="1920"
+    data-height="1080"
+    class="scene"
+  >
+    <div class="configure-step number">01 / SCOPE</div>
+    <div class="configure-copy">
+      <h2 class="headline">Your scan.<br />Your settings.</h2>
+      <p class="subcopy">
+        Choose a folder.<br />Confirm the project.<br />Review SAST and SCA.
+      </p>
+    </div>
+    <div class="pane configure-pane" data-layout-allow-overflow>
+      <img
+        id="configure-image-1"
+        src="assets/scan.webp"
+        alt="Actual Marx scan configuration"
+        class="clip"
+        data-start="0"
+        data-duration="7"
+      />
+    </div>
+    <div class="caption configure-caption">
+      Confirm the mapping and options.<br />The official CLI handles the upload.
+    </div>
+    <div class="demo">SYNTHETIC DEMO DATA</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      ".configure-copy",
+      { x: -45, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+      0.15,
+    )
+      .fromTo(
+        ".configure-pane",
+        { x: 160, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.65, ease: "power3.out" },
+        0.25,
+      )
+      .fromTo(
+        ".configure-step",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.3 },
+        0.1,
+      )
+      .fromTo(
+        ".configure-caption",
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5 },
+        2.5,
+      )
+      .fromTo(
+        ".configure-pane img",
+        { y: 0 },
+        { y: -110, duration: 3.6, ease: "sine.inOut" },
+        2.8,
+      );
+    window.__timelines.configure = tl;
+  </script></template
+>

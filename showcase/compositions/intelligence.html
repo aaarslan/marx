@@ -1,0 +1,102 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    .intelligence-copy {
+      position: absolute;
+      left: 115px;
+      top: 240px;
+      width: 610px;
+    }
+    .intelligence-copy .headline {
+      font-size: 91px;
+    }
+    .intelligence-pane {
+      left: 800px;
+      top: 120px;
+      width: 1010px;
+      height: 820px;
+    }
+    .intelligence-pane img {
+      width: 1600px;
+      max-width: none;
+      transform: translate(-570px, -190px);
+    }
+    .intelligence-label {
+      position: absolute;
+      left: 115px;
+      top: 120px;
+    }
+    .intelligence-caption {
+      left: 115px;
+      bottom: 150px;
+      width: 610px;
+    }
+  </style>
+  <div
+    id="root"
+    class="scene"
+    data-composition-id="intelligence"
+    data-width="1920"
+    data-height="1080"
+  >
+    <div class="kicker intelligence-label">03 / ADD THE CONTEXT</div>
+    <div class="intelligence-copy">
+      <h2 class="headline">Severity is<br />one signal.</h2>
+      <p class="subcopy">
+        Known exploitation.<br />Published probability.<br />Sources you can
+        inspect.
+      </p>
+    </div>
+    <div class="pane intelligence-pane">
+      <img
+        id="intelligence-screen"
+        class="clip"
+        data-start="0"
+        data-duration="8"
+        data-layout-allow-overflow
+        src="assets/intelligence.webp"
+        alt="Actual Marx CVE intelligence view with synthetic CISA and EPSS observations"
+      />
+    </div>
+    <div class="caption intelligence-caption">
+      See what is known.<br />Keep the unknowns visible.
+    </div>
+    <div class="demo">SYNTHETIC DEMO DATA</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo(
+      ".intelligence-copy",
+      { y: 30, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
+      0.15,
+    )
+      .fromTo(
+        ".intelligence-pane",
+        { x: 120, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.6, ease: "power3.out" },
+        0.3,
+      )
+      .fromTo(
+        ".intelligence-label",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.35 },
+        0.1,
+      )
+      .fromTo(
+        ".intelligence-caption",
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.5 },
+        2.5,
+      )
+      .to(
+        ".intelligence-pane",
+        { y: -20, duration: 3.5, ease: "sine.inOut" },
+        3.5,
+      );
+    window.__timelines.intelligence = tl;
+  </script>
+</template>
