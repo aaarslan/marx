@@ -2,6 +2,7 @@
 
 ## Use Marx
 
+- [Start from source](../README.md#get-started): choose your platform, build and open Marx, then connect your approved CLI.
 - [Walkthrough](walkthrough.md): setup, scanning, investigation, handoffs and verification.
 - [CVE intelligence and decision reviews](cve-intelligence.md): public context, watch changes and evidence-backed review.
 - [Remediation workbench](workbench.md): pinned evidence and comparison rules.
@@ -15,7 +16,7 @@
 
 ## Build and maintain
 
-- [Build and native verification](building.md).
+- [Build and native verification](building.md): pinned tools, macOS/Windows quickstarts, local installation, updating, troubleshooting and checks.
 - [Final acceptance checklist](final-acceptance.md).
 - [CLI contracts](api-contracts.md).
 - [Dependencies](dependencies.md).

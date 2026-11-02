@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -79,5 +81,41 @@ func TestJobAdmissionRollsBackRelatedRecordsOnWriteFailure(t *testing.T) {
 	s, err := f.e.store.get("session", c.connection, "unchanged")
 	if err != nil || s != nil || len(f.e.active) != 0 {
 		t.Fatal("partial admission survived rollback")
+	}
+}
+
+func TestQueuedCancellationWinsAtJobAdmission(t *testing.T) {
+	for _, activeCount := range []int{0, 8} {
+		t.Run(fmt.Sprintf("active-%d", activeCount), func(t *testing.T) {
+			f := fixture(t)
+			job, c, err := f.e.prepareJob(context.Background(), f.input())
+			if err != nil {
+				t.Fatal(err)
+			}
+			job["batchId"] = "synthetic-batch"
+			invoke(t, f.e, "scan:cancel-job", job)
+			f.e.mu.Lock()
+			for index := range activeCount {
+				f.e.active[fmt.Sprint(index)] = &activeJob{cancel: func() {}}
+			}
+			f.e.mu.Unlock()
+			result, err := f.e.startJob(job, c, false)
+			if err != nil || str(result, "status") != "Canceled" || str(object(result["progress"]), "phase") != "canceled" {
+				t.Fatalf("Queued cancellation was lost at admission: %v %v", result, err)
+			}
+			stored, err := f.e.store.get("job", c.connection, str(job, "id"))
+			if err != nil || str(stored, "status") != "Canceled" || number(stored["finishedAt"]) == 0 {
+				t.Fatalf("Canceled job was not durably settled: %v %v", stored, err)
+			}
+			f.e.mu.Lock()
+			admitted := f.e.active[str(job, "id")] != nil
+			f.e.mu.Unlock()
+			if admitted {
+				t.Fatal("Canceled job started execution")
+			}
+			if _, err := os.Stat(filepath.Join(f.root, "counter")); !os.IsNotExist(err) {
+				t.Fatal("Canceled queued job reached source submission")
+			}
+		})
 	}
 }

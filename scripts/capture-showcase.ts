@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { writeAnimationRuntime, encodeWebP } from "./showcase-assets";
 if (process.platform !== "darwin")
   throw new Error("Native showcase capture requires macOS");
+execFileSync("bun", ["--bun", "vite", "build"], { stdio: "inherit" });
 const environment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith("CX_")),
 );
@@ -144,13 +145,20 @@ try {
   );
   await wait(`!!document.querySelector('select[aria-label="Checkmarx One project"] option[value="p1"]') && !document.querySelector('select[aria-label="Checkmarx One project"]').disabled`);
   await capture("scan");
+  await view("CVE intelligence");
+  await wait(`document.querySelector('.intel-count')?.textContent==='0 / 200' && !!document.querySelector('.intel-watch > .empty')`);
+  await capture("intelligence-empty");
   await view("Results");
   await wait(
     `!!document.querySelector('select[aria-label="Scan"] option[value="showcase"]')`,
   );
+  await evaluate(`(()=>{window.showcaseResults={get:window.marx.results.get};window.marx.results.get=(...args)=>new Promise((resolve,reject)=>window.showcaseResults.get(...args).then(data=>{window.showcaseResults.complete=()=>resolve(data)},reject))})()`);
   await evaluate(
     `(()=>{const e=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'showcase');e.dispatchEvent(new Event('change',{bubbles:true}))})()`,
   );
+  await wait(`!!window.showcaseResults.complete && !!document.querySelector('.results-workspace .loading-state')`);
+  await capture("loading");
+  await evaluate(`(()=>{window.marx.results.get=window.showcaseResults.get;window.showcaseResults.complete();delete window.showcaseResults})()`);
   await wait('document.querySelectorAll(".finding-link").length===8');
   await capture("results");
   await evaluate('document.querySelector(".finding-link").click()');
@@ -243,6 +251,8 @@ try {
 const binary = process.env.HYPERFRAMES_EXECUTABLE;
 for (const name of [
   "scan",
+  "intelligence-empty",
+  "loading",
   "results",
   "detail",
   "prompt",
@@ -282,4 +292,4 @@ for (const name of [
     `website/assets/${name}.webp`,
   );
 }
-console.log("Captured and encoded nine synthetic native application states.");
+console.log("Captured and encoded eleven synthetic application states from the native host.");

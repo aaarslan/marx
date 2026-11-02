@@ -401,6 +401,53 @@ h2 {
   max-width: 650px;
   padding-top: 15px;
 }
+.interface-states {
+  margin-top: 44px;
+}
+.interface-states-heading {
+  max-width: 700px;
+  margin-bottom: 24px;
+}
+.interface-states-heading h3 {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  margin-bottom: 10px;
+}
+.interface-states-heading p {
+  color: #62685c;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-bottom: 0;
+}
+.interface-states-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+.interface-states figure {
+  margin: 0;
+  min-width: 0;
+}
+.interface-states a {
+  display: block;
+}
+.interface-states img {
+  display: block;
+  width: 100%;
+  border: 1px solid #38383c;
+  border-radius: 8px;
+  background: #17181c;
+}
+.interface-states figcaption {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #62685c;
+  margin-top: 14px;
+}
+.interface-states figcaption strong {
+  color: var(--ink);
+}
 .film-section {
   margin-top: 110px;
   padding: 65px 0 58px;
@@ -845,6 +892,13 @@ pre code {
   }
   .demo-panel figcaption {
     font-size: 10px;
+  }
+  .interface-states {
+    margin-top: 32px;
+  }
+  .interface-states-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
   }
   .film-section {
     margin-top: 65px;

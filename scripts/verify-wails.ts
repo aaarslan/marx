@@ -4,10 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
 import {spawn,execFileSync} from 'node:child_process';
+import {verifyConnectionTestIdentity, verifySessionSaveIdentity, verifySessionWriteOrdering, verifySourcePreviewIdentity, verifyBatchMappingFailure} from './verify-interactions';
+import {verifyIntelligenceLayout, verifyBaselineRecovery, verifyIntelligenceFilterReset, verifyResultsLoading, verifyWatchRemovalFocus} from './verify-ui-polish';
 const mac=process.platform==='darwin';
 const token=randomBytes(32).toString('hex');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'marx-wails-test-'));
 const source=path.join(root,'source (native) [1] 日本語');fs.mkdirSync(source);fs.writeFileSync(path.join(source,'index.js'),'const synthetic = true;');
+const offlineSource=path.join(root,'source-before-cli-setup');fs.mkdirSync(offlineSource);fs.writeFileSync(path.join(offlineSource,'index.js'),'const offline = true;');
 const uncSource=process.env.MARX_VERIFY_UNC==='1'?`\\\\localhost\\${source[0]}$${source.slice(2)}`:null;
 if(uncSource)assert.ok(fs.statSync(uncSource).isDirectory(),'Disposable loopback SMB source is unavailable');
 fs.writeFileSync(path.join(root,'.synthetic-marx-fixture'),'Isolated synthetic acceptance');
@@ -40,7 +43,7 @@ try {
  const go=process.env.GO_EXECUTABLE||Bun.which('go')||(!mac&&process.env.LOCALAPPDATA?path.join(process.env.LOCALAPPDATA,'MarxBuildTools/go/bin/go.exe'):undefined);
  if(!go)throw new Error('Install the pinned Go toolchain.');
  await run([go,'build','-trimpath','-buildvcs=false','-o',cli,'./scripts/fixtures/cli']);
- fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify({cliPath:cli,cliAuthMode:'cli',recentFolders:[source,...(uncSource?[uncSource]:[])]}));
+ fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify({cliPath:cli,cliAuthMode:'cli',recentFolders:[source,offlineSource,...(uncSource?[uncSource]:[])]}));
  const selectedExecutable=process.env.MARX_TEST_EXECUTABLE;
  if(!selectedExecutable)throw new Error('Set MARX_TEST_EXECUTABLE to an acceptance-tagged Wails build.');
  const executable=mac&&process.env.MARX_UPGRADE_TEST_EXECUTABLE?path.join(root,'Marx-upgrade-test'):selectedExecutable;
@@ -59,6 +62,12 @@ try {
  const evaluate=async(expression:string)=>{if(mac)return macEvaluate(expression);const r=await command('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.result?.exceptionDetails)throw new Error(r.result.exceptionDetails.exception?.description||r.result.exceptionDetails.text);return r.result?.result?.value};
  const wait=async(expression:string)=>{const end=Date.now()+30000;while(Date.now()<end){if(await evaluate(expression))return;await Bun.sleep(100)}throw new Error('Workflow did not settle: '+expression)};
  const dialogFocus=async()=>{
+  const before=await evaluate(`({view:document.querySelector('.nav-item[aria-current="page"]').textContent,dialog:document.querySelector('dialog[open]').getAttribute('aria-labelledby')})`);
+  for(const key of ['r','o']){
+   await evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(key)},${mac?'metaKey':'ctrlKey'}:true,bubbles:true,cancelable:true}))`);
+   await Bun.sleep(100);
+   assert.deepEqual(await evaluate(`({view:document.querySelector('.nav-item[aria-current="page"]').textContent,dialog:document.querySelector('dialog[open]')?.getAttribute('aria-labelledby')})`),before,'A global shortcut escaped the modal dialog');
+  }
   assert.equal(await evaluate(`(()=>{const dialog=document.querySelector('dialog[open]');const close=dialog.querySelector('button');close.focus();close.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));return dialog.contains(document.activeElement)&&document.activeElement!==close})()`),true,'Reverse Tab did not wrap inside the dialog');
   assert.equal(await evaluate(`(()=>{const last=document.activeElement;last.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));return document.activeElement===document.querySelector('dialog[open] button')})()`),true,'Forward Tab did not return to the dialog close control');
  };
@@ -77,6 +86,7 @@ try {
  assert.equal(await evaluate('window.frameProbeRan'),false,'An embedded frame executed script');
  await evaluate("document.querySelectorAll('.marx-frame-probe').forEach(element=>element.remove())");
  for(const name of ['Scan','Results','Batch Scan','Workbench','History','Settings']){await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()===${JSON.stringify(name)}).click()`);await Bun.sleep(100);assert.ok(await evaluate('!!document.querySelector("main")?.textContent.trim()'))}
+ await verifyIntelligenceLayout(evaluate,wait);
  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
  await wait(`!!document.querySelector('.settings-actions')`);
  const shellScroll=await evaluate(`(()=>{document.querySelector('.settings-actions button').scrollIntoView();for(const element of [document.documentElement,document.body,document.querySelector('#root')])element.scrollTop=10000;const sidebar=document.querySelector('.sidebar').getBoundingClientRect();return {top:sidebar.top,bottom:sidebar.bottom,height:innerHeight,outerScroll:document.scrollingElement.scrollTop,mainScroll:document.querySelector('main').scrollTop}})()`);
@@ -84,6 +94,33 @@ try {
  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Scan').click()`);
  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===${JSON.stringify(path.basename(source))}).click()`);
  await wait(`!!document.querySelector('.scanner-grid')`);
+ await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='New project').click()`);
+ await wait(`!document.querySelector('.scan-actions button').disabled`);
+ await evaluate(`(()=>{
+  window.folderProbe={info:window.marx.git.info,binding:window.marx.bindings.get,picker:window.marx.dialog.selectFolder,run:window.marx.scan.run,calls:0};
+  window.marx.dialog.selectFolder=async()=>'/synthetic/replacement-project';
+  window.marx.git.info=()=>new Promise(resolve=>window.folderProbe.resolveInfo=resolve);
+  window.marx.bindings.get=()=>new Promise(resolve=>window.folderProbe.resolveBinding=resolve);
+  window.marx.scan.run=async()=>{window.folderProbe.calls++;throw new Error('Unexpected submission during folder selection')};
+  document.querySelector('[data-file-drop-target]').click();
+ })()`);
+ await wait(`!!window.folderProbe.resolveInfo`);
+ assert.equal(await evaluate(`document.querySelector('.scan-actions button').disabled`),true,'Scan remained enabled while replacement source metadata was loading');
+ await evaluate(`document.querySelector('[data-file-drop-target]').dispatchEvent(new KeyboardEvent('keydown',{key:'r',${mac?'metaKey':'ctrlKey'}:true,bubbles:true,cancelable:true}))`);
+ assert.equal(await evaluate(`window.folderProbe.calls`),0,'A shortcut submitted the previous repository during folder selection');
+ await evaluate(`window.folderProbe.resolveInfo({hasGit:true,repoName:'replacement-project',branch:'replacement-branch'})`);
+ await wait(`!!window.folderProbe.resolveBinding`);
+ assert.equal(await evaluate(`document.querySelector('.scan-actions button').disabled`),true,'Scan remained enabled while the replacement repository mapping was loading');
+ await evaluate(`window.folderProbe.resolveBinding(null)`);
+ await wait(`!document.querySelector('.scan-actions button').disabled`);
+ assert.equal(await evaluate(`Array.from(document.querySelectorAll('label.field')).find(e=>e.textContent.trim()==='Project name').querySelector('input').value`),'replacement-project','Replacement source retained the previous project name');
+ await evaluate(`(()=>{
+  window.marx.git.info=window.folderProbe.info;window.marx.bindings.get=window.folderProbe.binding;window.marx.scan.run=window.folderProbe.run;
+  window.marx.dialog.selectFolder=async()=>${JSON.stringify(source)};
+  document.querySelector('[data-file-drop-target]').click();
+ })()`);
+ await wait(`document.querySelector('.dropzone-hint').textContent===${JSON.stringify(source)}&&!document.querySelector('.scan-actions button').disabled`);
+ await evaluate(`(()=>{window.marx.dialog.selectFolder=window.folderProbe.picker;delete window.folderProbe})()`);
  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
  await wait(`!!document.querySelector('.settings-actions button')`);
  await evaluate(`document.querySelector('.settings-actions button').scrollIntoView()`);
@@ -93,6 +130,10 @@ try {
  assert.equal(await evaluate(`document.querySelector('.connection-dot').classList.contains('configured')`),false,'CLI configuration used an unconditional success indicator');
  fs.renameSync(cli,cli+'.offline');
  try {
+  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Scan').click()`);
+  await evaluate(`(()=>{window.offlinePicker=window.marx.dialog.selectFolder;window.marx.dialog.selectFolder=async()=>${JSON.stringify(offlineSource)};document.querySelector('[data-file-drop-target]').click()})()`);
+  await wait(`document.querySelector('.dropzone-hint').textContent===${JSON.stringify(offlineSource)}&&!!document.querySelector('.scanner-grid')`);
+  await evaluate(`(()=>{window.marx.dialog.selectFolder=window.offlinePicker;delete window.offlinePicker})()`);
   await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='History').click()`);
   await wait(`document.querySelector('main').textContent.includes('No saved history available')`);
   assert.equal(await evaluate(`document.querySelector('main').textContent.includes('No scans in this workspace yet')`),false,'Unavailable remote history was presented as an empty remote workspace');
@@ -111,6 +152,7 @@ try {
  } finally { fs.renameSync(cli+'.offline',cli); }
  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
  const settings=await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");assert.equal(settings.hasStoredApiKey,true);assert.ok(!fs.readFileSync(path.join(profile,'settings.key')).includes(Buffer.from('disposable-wails-test')));
+ await verifyConnectionTestIdentity(evaluate,wait);
  const alternateCli=path.join(root,mac?'cx-alternate':'cx-alternate.exe');fs.copyFileSync(cli,alternateCli);if(mac)fs.chmodSync(alternateCli,0o700);
  await evaluate(`(()=>{const e=document.querySelector('input[aria-label="CLI executable"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(alternateCli)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
  await evaluate(`document.querySelector('.settings-connection-check button').click()`);
@@ -146,6 +188,12 @@ try {
  const session=await evaluate(`window.marx.workbench.createSession({title:'Synthetic Wails remediation',scanId:'s1',findingIds:['finding-1']})`);
  assert.ok(session.id);await evaluate(`window.marx.workbench.updateSession({id:${JSON.stringify(session.id)},notes:'Synthetic notes'})`);
  assert.equal((await evaluate('window.marx.workbench.bootstrap()')).sessions[0].notes,'Synthetic notes');
+ await verifySessionSaveIdentity(evaluate,wait,session.id);
+ await verifySessionWriteOrdering(evaluate,wait,session.id);
+ await verifyBaselineRecovery(evaluate,wait);
+ await verifyResultsLoading(evaluate,wait);
+ await verifySourcePreviewIdentity(evaluate,wait,source,offlineSource);
+ await verifyBatchMappingFailure(evaluate,wait,source);
  const exported=await evaluate(`window.marx.results.export('json','synthetic-wails',${JSON.stringify(large.findings.slice(0,2))})`);assert.equal(JSON.parse(fs.readFileSync(exported,'utf8')).findings.length,2);fs.rmSync(exported);
 
  const verify = await evaluate(`window.marx.workbench.verifySession({id:${JSON.stringify(session.id)},scanId:'s2'})`);
@@ -186,6 +234,7 @@ try {
  await wait(`!!document.querySelector('select[aria-label="Scan"] option[value="intel-demo"]')`);
  await evaluate(`(()=>{const e=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(e,'intel-demo');e.dispatchEvent(new Event('change',{bubbles:true}))})()`);
  await wait(`document.querySelectorAll('.finding-link').length===2`);
+ await verifyIntelligenceFilterReset(evaluate,wait);
  await evaluate(`document.querySelector('.finding-link').click()`);
  await wait(`!!document.querySelector('.intel-panel > summary')`);
  await evaluate(`document.querySelector('.intel-panel > summary').click()`);
@@ -224,8 +273,8 @@ try {
  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.page-content *')).some(e=>e.getBoundingClientRect().right>innerWidth+2)`),false,'CVE intelligence layout exceeds the native window');
  await evaluate(`window.marx.intelligence.watch('CVE-2024-5678').then(()=>window.dispatchEvent(new Event('marx-intelligence-changed')))`);
  await wait(`document.querySelectorAll('.intel-watch-row').length===2`);
- await evaluate(`(()=>{const button=document.querySelector('button[aria-label="Stop watching CVE-2024-1234"]');button.focus();button.click()})()`);
- await wait(`document.querySelectorAll('.intel-watch-row').length===1&&document.activeElement===document.querySelector('.intel-watch-row > button:first-child')`);
+ await verifyWatchRemovalFocus(evaluate,wait);
+ await wait(`document.querySelectorAll('.intel-watch-row').length===1&&document.activeElement===document.querySelector('.intel-watch-row > button:first-child')`).catch(async error=>{const focus=await evaluate(`({count:document.querySelectorAll('.intel-watch-row').length,active:document.activeElement?.outerHTML?.slice(0,400),pending:document.querySelectorAll('.intel-watch-row button:disabled').length})`);throw new Error(`${error}; watch focus: ${JSON.stringify(focus)}`)});
  assert.ok(await evaluate(`document.activeElement.textContent.includes('CVE-2024-5678')`),'Removing a watch did not focus the next watched CVE');
  await evaluate(`(()=>{const button=document.querySelector('button[aria-label="Stop watching CVE-2024-5678"]');button.scrollIntoView({block:'start'});button.focus();button.click()})()`);
  await wait(`!document.querySelector('.intel-watch-row')&&document.activeElement===document.querySelector('#cve-lookup')`);
@@ -294,7 +343,7 @@ try {
  }
  assert.equal((await evaluate('window.marx.intelligence.decisions()'))[0].reviewState,'needs_review');
  assert.equal(runtimeStderr.includes('DATA RACE'),false,'The native runtime reported a data race');
- console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','opt-in intelligence with synthetic providers','native decision dialog and assumptions','changed evidence review and immutable pins','watch events and decision persistence','CVE validation focus, watch toggle and decision return focus','honest CLI setup state and isolated demo warning recovery','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
+ console.log(JSON.stringify({result:'passed',checks:[mac?'Wails WKWebView startup':'Wails WebView2 startup','all views','frame and remote-script CSP enforcement','native CLI bridge',mac?'macOS Keychain encryption and missing-entry recovery':'Windows DPAPI encryption and decryption','SQLite persistence','real clipboard IPC','5051 findings imported by Go','scan submission, monitoring and native event delivery','remediation notes','connection-test result identity','save ordering across navigation and failed writes','source-preview repository isolation','batch mapping failure and retry','JSON export','inconclusive verification','uncertain cancellation','100-row GUI paging','Results toolbar alignment','empty Results header coverage with detail and comparison columns','intelligence panel alignment and responsive stacking','content skeletons and cache-read recovery','baseline evidence recovery and retry focus','complete intelligence filter reset','opt-in intelligence with synthetic providers','native decision dialog and assumptions','changed evidence review and immutable pins','watch events and decision persistence','CVE validation focus, watch toggle and decision return focus','honest CLI setup state and isolated demo warning recovery','known-ID restart recovery without resubmission','CLI child cleanup after host crash',...(uncSource?['loopback SMB/UNC source read and scan']:[]),...(process.env.MARX_VERIFY_EDITOR==='code'?['VS Code protocol launch request']:[])],evidence:mac?'$TMPDIR/marx-wails-test-<generated>':'%TEMP%/marx-wails-test-<generated>'},null,2));
  if(!mac)await command('Browser.close').catch(()=>{});
 } catch(error) {fs.writeFileSync(path.join(root,'runtime-stderr.log'),runtimeStderr);console.error('Wails acceptance failed:',String(error).replaceAll(root,'<fixture>').replaceAll(os.homedir(),'%USERPROFILE%').replaceAll(os.homedir().replaceAll('\\','/'),'%USERPROFILE%'));process.exitCode=1;} finally {
  socket?.close();

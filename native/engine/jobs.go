@@ -65,9 +65,6 @@ func (e *Engine) startJobWithRecords(job Object, c *CLI, resume bool, records ..
 	if current := e.active[str(job, "id")]; current != nil {
 		return clone(current.job), nil
 	}
-	if len(e.active) >= 8 {
-		return nil, errors.New("Eight scans are already active; wait for one to finish")
-	}
 	if resume && str(job, "scanId") == "" {
 		return nil, errors.New("No remote scan ID is known; check Checkmarx One before retrying")
 	}
@@ -75,6 +72,20 @@ func (e *Engine) startJobWithRecords(job Object, c *CLI, resume bool, records ..
 		return nil, errors.New("Restore the job's original CLI connection before reconciling")
 	}
 	working := clone(job)
+	if !resume && e.canceled[str(job, "id")] {
+		working["status"] = "Canceled"
+		working["finishedAt"] = now()
+		working["monitoringStatus"] = "stopped"
+		working["progress"] = Object{"phase": "canceled", "detail": "Local job canceled before submission."}
+		records = append(records, record{kind: "job", scope: c.connection, id: str(working, "id"), value: working})
+		if err := e.store.save(records...); err != nil {
+			return nil, err
+		}
+		return working, nil
+	}
+	if len(e.active) >= 8 {
+		return nil, errors.New("Eight scans are already active; wait for one to finish")
+	}
 	if !resume {
 		working["progress"] = Object{"phase": "submitting", "detail": "The official CLI is preparing and uploading source."}
 	}

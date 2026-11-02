@@ -9,3 +9,5 @@ The 28–36 second handoff beat transitions at 32 seconds from the current promp
 Warm paper (#f4f1e9), charcoal (#17181c), orange (#ff8a4c). System sans-serif, with Arial fallback, at weights 400 and 700. Titles 74–112 px; narrative captions 30–38 px; demo disclosure 28 px. Keep key copy inside the central 80%. Screenshot crops preserve labels and values. Flat screens, no perspective tilt, no decorative particles. Deliberate 0.45–0.6 second moves and 0.18 second state transitions. Captions stay readable for at least two seconds.
 
 Original synthesized instrumental bed and restrained action sounds. No voiceover, stock music, generative media or paid rendering. User motion preferences affect the landing page, not the fixed video. The video player has explicit controls and a text transcript.
+
+The investigation beat opens on the actual content-placeholder loading state, then reveals the loaded findings before opening detail. The brief held read is presentation timing, not a performance measurement. The intelligence beat initially preserves both the watchlist and detail panels before a closer crop of the source context.

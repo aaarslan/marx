@@ -9,7 +9,7 @@ bun run build
 bun scripts/capture-showcase.ts
 ```
 
-The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures nine actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,prompt-copied,workbench,intelligence,decisions,decision-baseline}.webp` with `cwebp`. The handoff pair records the prompt before and after its real clipboard action, including the application's copy confirmation. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
+The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures eleven application DOM states from the native host, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,intelligence-empty,loading,results,detail,prompt,prompt-copied,workbench,intelligence,decisions,decision-baseline}.webp` with `cwebp`. The capture command rebuilds frontend assets first so screenshots cannot silently reuse an older UI. The empty-intelligence image shows aligned panels before a CVE is selected; the loading image holds a real pending result read for presentation, not a latency measurement. These are re-rendered application states, not operating-system screenshots. The handoff pair records the prompt before and after its real clipboard action, including the application's copy confirmation. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
 
 ```sh
 bun scripts/build-showcase.ts
@@ -22,3 +22,5 @@ Set `HYPERFRAMES_EXECUTABLE` to an existing pinned binary and `HYPERFRAMES_BROWS
 Inspect all scene snapshots and decoded final frames before replacing the published media. Keep temporary profiles and tooling outside version control. The site transcript and WebVTT track must match any revised edit.
 
 The public capture uses a dedicated eight-finding synthetic service rather than the 5,051-row paging stress fixture. The decision sequence uses two actual native states: the original active decision and its later evidence-triggered review.
+
+The refreshed investigation beat moves from the pending read to results and then finding detail. The intelligence beat first shows the watchlist alongside its details, then moves closer to the source context. Captions and transcript keep the same 52-second timeline.

@@ -6,10 +6,32 @@ import type { RemediationSession } from '@shared/workbench';
 import { DecisionReview } from '../components/DecisionReview';
 import { api } from '../api';
 import { useApp } from '../store';
-import { Banner, Empty, SeverityBadge, Spinner, StatusBadge, timeAgo, restoreControlFocus } from '../components/ui';
+import { Banner, Empty, LoadingState, SeverityBadge, Spinner, StatusBadge, timeAgo, restoreControlFocus } from '../components/ui';
 import { RemediationDialog, type RemediationSelection } from '../components/RemediationDialog';
 
 const SESSION_LABELS: Record<RemediationSession['status'], string> = { open: 'Open', in_progress: 'In progress', awaiting_verification: 'Awaiting verification', verified: 'Verified absence', unresolved: 'Unresolved' };
+type SessionDraft = Pick<RemediationSession, 'title' | 'notes' | 'changeRef' | 'checks'> & { status: '' | 'open' | 'in_progress' | 'awaiting_verification' };
+const sessionWrites = new Map<string, { pending: SessionDraft | null; promise: Promise<void> }>();
+
+function writeSessionDraft(session: RemediationSession, value: SessionDraft) {
+  const key = JSON.stringify([session.connectionId, session.id]);
+  const current = sessionWrites.get(key);
+  if (current) { current.pending = value; return current.promise; }
+  const writer = { pending: value as SessionDraft | null, promise: Promise.resolve() };
+  sessionWrites.set(key, writer);
+  writer.promise = (async () => {
+    while (writer.pending) {
+      const next = writer.pending;
+      writer.pending = null;
+      try {
+        await api.workbench.updateSession({ id: session.id, title: next.title.trim(), notes: next.notes, changeRef: next.changeRef, checks: next.checks, ...(next.status ? { status: next.status } : {}) });
+      } catch (error) {
+        if (!writer.pending || writer.pending === next) throw error;
+      }
+    }
+  })().finally(() => { sessionWrites.delete(key); });
+  return writer.promise;
+}
 
 export function WorkbenchView() {
   const { tab, setTab, error, refreshWorkbench } = useApp(useShallow((state) => ({ tab: state.workbenchTab, setTab: state.setWorkbenchTab, error: state.workbenchError, refreshWorkbench: state.refreshWorkbench })));
@@ -17,7 +39,7 @@ export function WorkbenchView() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   useEffect(() => { void refreshWorkbench().catch((err) => setRefreshError(err.message)); }, [refreshWorkbench]);
   return <>
-    <div className="row between workspace-heading"><div><div className="page-eyebrow">Evidence and follow-through</div><h1 className="page-title">Workbench</h1><p className="page-sub">Keep remediation work and scan activity across app restarts.</p></div><button className="btn small" disabled={refreshing} onClick={async () => { setRefreshing(true); setRefreshError(null); try { await refreshWorkbench(); } catch (err) { setRefreshError(err instanceof Error ? err.message : String(err)); } finally { setRefreshing(false); } }}><RefreshCw size={14} className={refreshing ? 'spin' : ''} />Refresh</button></div>
+    <div className="row between workspace-heading"><div><h1 className="page-title">Workbench</h1><p className="page-sub">Keep remediation work and scan activity across app restarts.</p></div><button className="btn small" disabled={refreshing} onClick={async () => { setRefreshing(true); setRefreshError(null); try { await refreshWorkbench(); } catch (err) { setRefreshError(err instanceof Error ? err.message : String(err)); } finally { setRefreshing(false); } }}><RefreshCw size={14} className={refreshing ? 'spin' : ''} />Refresh</button></div>
     <div className="workbench-tabs" role="tablist" aria-label="Workbench sections" onKeyDown={event=>{
       const tabs=['sessions','activity','decisions'] as const;
       if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
@@ -52,6 +74,10 @@ function SessionDetail({ session, onBack }: { session: RemediationSession; onBac
   const [notice, setNotice] = useState<string | null>(null);
   const [verificationFeedback, setVerificationFeedback] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null);
   const [baseline, setBaseline] = useState<ResultsPage | null>(null);
+  const evidenceRegion = useRef<HTMLDetailsElement>(null);
+  const [baselineLoading, setBaselineLoading] = useState(true);
+  const [baselineError, setBaselineError] = useState<string | null>(null);
+  const [baselineVersion, setBaselineVersion] = useState(0);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const historyOffset = useRef(0);
@@ -72,9 +98,13 @@ function SessionDetail({ session, onBack }: { session: RemediationSession; onBac
   const candidates = useMemo(() => [...new Map([...cachedScans, ...history].map((scan) => [scan.id, scan])).values()].filter((scan) => scan.projectId === session.projectId && scan.id !== session.baselineScanId && scan.status === 'Completed' && (!baseline?.scan?.createdAt || Date.parse(scan.createdAt) > Date.parse(baseline.scan.createdAt))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [cachedScans, history, session.projectId, session.baselineScanId, baseline?.scan?.createdAt]);
   useEffect(() => {
     let current = true;
-    void api.workbench.evidence(session.id).then((bundle) => { if (current) setBaseline(bundle.baseline); }).catch((err) => { if (current) setError(`Baseline evidence could not be loaded: ${err.message}`); });
+    setBaselineLoading(true);
+    setBaselineError(null);
+    void api.workbench.evidence(session.id).then((bundle) => { if (current) setBaseline(bundle.baseline); })
+      .catch((err) => { if (current) setBaselineError(`Baseline evidence could not be loaded: ${err.message}`); })
+      .finally(() => { if (current) setBaselineLoading(false); });
     return () => { current = false; };
-  }, [session.id]);
+  }, [session.id, baselineVersion]);
   useEffect(() => {
     let current = true;
     setHistoryLoading(true);
@@ -84,11 +114,12 @@ function SessionDetail({ session, onBack }: { session: RemediationSession; onBac
   useEffect(() => { if (verificationJob?.scanId) setVerificationId(verificationJob.scanId); }, [verificationJob?.scanId]);
   draftRef.current = draft;
   dirtyRef.current = dirty;
+  const persistDraft = (value: SessionDraft) => writeSessionDraft(session, value);
   useEffect(() => {
     if (!dirty || !draft.title.trim()) return;
     const version = ++saveVersion.current;
     const timer = setTimeout(() => {
-      void api.workbench.updateSession({ id: session.id, title: draft.title.trim(), notes: draft.notes, changeRef: draft.changeRef, checks: draft.checks, ...(draft.status ? { status: draft.status } : {}) }).then(() => {
+      void persistDraft(draft).then(() => {
         if (mounted.current && version === saveVersion.current) { dirtyRef.current = false; setDirty(false); setDraft((value) => ({ ...value, status: '' })); void refreshWorkbench().catch(() => undefined); }
       }).catch((err) => { if (mounted.current) setError(`Could not save notes: ${err.message}`); });
     }, 800);
@@ -99,17 +130,20 @@ function SessionDetail({ session, onBack }: { session: RemediationSession; onBac
     return () => {
       mounted.current = false;
       const pending = draftRef.current;
-      if (dirtyRef.current && pending.title.trim()) void api.workbench.updateSession({ id: session.id, title: pending.title.trim(), notes: pending.notes, changeRef: pending.changeRef, checks: pending.checks, ...(pending.status ? { status: pending.status } : {}) }).catch(() => undefined);
+      if (dirtyRef.current && pending.title.trim()) void persistDraft(pending).catch(() => undefined);
     };
   }, [session.id]);
   const change = (patch: Partial<typeof draft>) => { saveVersion.current++; dirtyRef.current = true; setDraft((value) => ({ ...value, ...patch })); setDirty(true); };
   const save = async () => {
     if (!draft.title.trim()) throw new Error('Give the remediation a title.');
-    await api.workbench.updateSession({ id: session.id, title: draft.title.trim(), notes: draft.notes, changeRef: draft.changeRef, checks: draft.checks, ...(draft.status ? { status: draft.status } : {}) });
-    saveVersion.current++;
-    dirtyRef.current = false;
-    setDirty(false);
-    setDraft((value) => ({ ...value, status: '' }));
+    const version = saveVersion.current;
+    await persistDraft(draft);
+    if (mounted.current && version === saveVersion.current) {
+      saveVersion.current++;
+      dirtyRef.current = false;
+      setDirty(false);
+      setDraft((value) => ({ ...value, status: '' }));
+    }
     await refreshWorkbench();
   };
   const run = async (name: string, action: () => Promise<void>, origin?: HTMLElement) => {
@@ -131,7 +165,7 @@ function SessionDetail({ session, onBack }: { session: RemediationSession; onBac
   return <>
     <div className="row between session-heading"><button className="btn ghost small" onClick={() => void run('back', async () => { if (dirty) await save(); onBack(); })}><ChevronLeft size={14} />All remediations</button><span className={`session-status ${session.status}`}>{SESSION_LABELS[session.status]}</span></div>
     <div className="session-context"><strong>{session.projectName}</strong><span className="faint">{session.findingIds.length} tracked findings</span><button className="btn ghost small" onClick={() => openScan(session.baselineScanId)}>Baseline {session.baselineScanId.slice(0, 8)}</button></div>
-    {error && <Banner kind="error">{error}</Banner>}{notice && <Banner kind="ok">{notice}</Banner>}
+    {error && <Banner kind="error">{error}</Banner>}{baselineError && <Banner kind="warn" action={<button className="btn small" onClick={() => { setBaselineVersion((version) => version + 1); if (evidenceRegion.current) { evidenceRegion.current.open = true; evidenceRegion.current.focus(); } }}>Retry baseline evidence</button>}>{baselineError}</Banner>}{notice && <Banner kind="ok">{notice}</Banner>}
     <div className="session-editor">
       <div className="card"><label className="field">Remediation title<input aria-label="Remediation title" value={draft.title} maxLength={200} onChange={(event) => change({ title: event.target.value })} /></label><div className="grid-2"><label className="field">Change reference<input aria-label="Change reference" placeholder="Commit, branch, pull request, or patch" value={draft.changeRef} onChange={(event) => change({ changeRef: event.target.value })} /></label><label className="field">Work status<select aria-label="Work status" value={draft.status} onChange={(event) => change({ status: event.target.value as typeof draft.status })}><option value="">Keep current: {SESSION_LABELS[session.status]}</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="awaiting_verification">Awaiting verification</option></select></label></div><label className="field">Investigation and change notes<textarea aria-label="Remediation notes" rows={4} value={draft.notes} onChange={(event) => change({ notes: event.target.value })} placeholder="Root cause, intended change, and remaining questions" /></label><label className="field">Local validation<textarea aria-label="Local validation" rows={3} value={draft.checks} onChange={(event) => change({ checks: event.target.value })} placeholder="Commands run, outcomes, and anything not checked" /></label><div className="row"><button className="btn primary small" disabled={Boolean(busy) || !dirty} onClick={() => void run('save', async () => { await save(); setNotice('Remediation notes saved.'); })}>{busy === 'save' ? <Spinner size={13} /> : <Check size={13} />}Save notes</button><span className="faint" role="status">{dirty ? 'Unsaved changes' : 'Saved on this computer'}</span></div></div>
       <div className="card session-actions"><h2 className="section-heading">Handoff</h2><p className="field-help">Review the exact findings and source context before giving your coding assistant the task.</p><button className="btn" disabled={!selectedFindings.length || Boolean(busy)} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); prepareHandoff(); }}><Sparkles size={14} />Build remediation prompt</button>{session.handoff && <><button className="btn small" disabled={Boolean(busy)} onClick={() => void run('copy', async () => { await api.remediation.copy(session.handoff!); setNotice('Saved handoff copied.'); })}><Copy size={13} />Copy saved handoff</button><button className="btn ghost small" onClick={() => setShowHandoff((value) => !value)}>{showHandoff ? 'Hide saved handoff' : 'Inspect saved handoff'}</button></>}<h2 className="section-heading">Evidence</h2><button className="btn small" disabled={Boolean(busy)} onClick={(event) => void run('export', async () => { if (dirty) await save(); const destination = await api.workbench.exportSession(session.id); if (destination) setNotice(`Evidence exported to ${destination}`); }, event.currentTarget)}><Download size={13} />Export evidence bundle</button><button className="btn ghost small danger-text" disabled={Boolean(busy)} onClick={() => setDeletePending(true)}><Trash2 size={13} />Delete session</button></div>
@@ -139,7 +173,7 @@ function SessionDetail({ session, onBack }: { session: RemediationSession; onBac
     {showHandoff && session.handoff && <textarea className="saved-handoff" aria-label="Saved remediation handoff" value={session.handoff} readOnly spellCheck={false} />}
     {deletePending && <Banner kind="warn" action={<div className="row"><button className="btn small" onClick={() => setDeletePending(false)}>Keep session</button><button className="btn danger small" disabled={Boolean(busy)} onClick={() => void run('delete', async () => { await api.workbench.deleteSession(session.id); await refreshWorkbench(); onBack(); })}>Delete local session</button></div>}>Delete this local session and its notes? This does not change remote Checkmarx findings or source files.</Banner>}
     <div className="card verification-card"><h2 className="section-heading">Verify the change</h2><p className="field-help">Use a completed scan of this project or explicitly run a new scan. Comparison checks coverage and source provenance; missing evidence stays inconclusive.</p>{verificationFeedback && <Banner kind={verificationFeedback.kind}>{verificationFeedback.text}</Banner>}<div className="verification-controls"><label className="field">Completed verification scan<select aria-label="Verification scan" value={verificationId} onChange={(event) => setVerificationId(event.target.value)}><option value="">Choose a later scan…</option>{verificationId && !candidates.some((scan) => scan.id === verificationId) && <option value={verificationId}>{verificationId.slice(0, 12)} · previous verification</option>}{candidates.map((scan) => <option key={scan.id} value={scan.id}>{scan.branch} · {new Date(scan.createdAt).toLocaleString()} · {scan.id.slice(0, 8)}</option>)}</select></label><button className="btn small" disabled={Boolean(busy) || !verificationId} onClick={() => void run('verify', async () => { if (dirty) await save(); await api.workbench.verifySession({ id: session.id, scanId: verificationId }); await refreshWorkbench(); })}>{busy === 'verify' ? <Spinner size={14} /> : <Check size={14} />}Compare evidence</button><button className="btn ghost small" disabled={Boolean(busy) || historyLoading} onClick={() => void run('history', async () => { setHistoryLoading(true); try { const more = await api.scan.history({ projectId: session.projectId, offset: historyOffset.current, limit: 100 }); historyOffset.current += more.length; setHistory((current) => [...new Map([...current, ...more].map((scan) => [scan.id, scan])).values()]); if (!more.length) setVerificationFeedback({ kind: 'ok', text: 'No older scans were returned for this project.' }); } finally { setHistoryLoading(false); } })}>{historyLoading ? 'Loading scans…' : 'Load more scans'}</button></div><div className="row"><button className="btn primary small" disabled={Boolean(busy) || verificationRunning || !session.folderPath} onClick={() => void run('run', async () => { if (dirty) await save(); const job = await api.workbench.runVerification(session.id); if (!useApp.getState().jobs.some((current) => current.id === job.id)) applyEvent({ kind: 'job-updated', job }); await refreshWorkbench(); setVerificationFeedback({ kind: 'ok', text: 'Verification scan started. Its evidence will be linked to this remediation.' }); })}>{busy === 'run' ? <Spinner size={14} /> : <Play size={14} />}Run verification scan</button><span className="field-help">{session.folderPath ? 'Uploads the linked repository through your configured Checkmarx CLI.' : 'Link the repository in Results when creating a session to run a verification scan here.'}</span></div>{verificationJob && <div className="verification-job"><StatusBadge status={verificationJob.status} /><span>{verificationJob.progress.detail ?? verificationJob.progress.phase}</span>{verificationJob.scanId && <button className="btn ghost small" onClick={() => openScan(verificationJob.scanId!)}>Open scan</button>}</div>}{session.verification && <VerificationSummary session={session} onOpen={() => openScan(session.verification!.scanId)} />}</div>
-    <details className="session-evidence"><summary>Tracked findings ({session.findingIds.length})</summary>{baseline && selectedFindings.length !== session.findingIds.length && <Banner kind="warn">Only {selectedFindings.length} of {session.findingIds.length} tracked findings are available in this evidence snapshot.</Banner>}<div className="bounded-list">{selectedFindings.map((finding) => <div className="session-finding" key={finding.id}><SeverityBadge severity={finding.severity} /><div><strong>{finding.title}</strong><div className="mono faint">{finding.where}</div><div className="faint">{finding.id}</div></div></div>)}</div>{!baseline && <p className="field-help">Loading baseline evidence…</p>}</details>
+    <details ref={evidenceRegion} tabIndex={-1} className="session-evidence"><summary>Tracked findings ({session.findingIds.length})</summary>{baseline && selectedFindings.length !== session.findingIds.length && <Banner kind="warn">Only {selectedFindings.length} of {session.findingIds.length} tracked findings are available in this evidence snapshot.</Banner>}<div className="bounded-list">{selectedFindings.map((finding) => <div className="session-finding" key={finding.id}><SeverityBadge severity={finding.severity} /><div><strong>{finding.title}</strong><div className="mono faint">{finding.where}</div><div className="faint">{finding.id}</div></div></div>)}</div>{baselineLoading && <LoadingState label="Loading baseline evidence" compact rows={2} />}</details>
     {remediation && <RemediationDialog selection={remediation} onClose={() => setRemediation(null)} trackLabel="Save handoff to session" onTrack={async ({ findingIds, handoff }) => { const ids = new Set(findingIds); if (session.findingIds.some((id) => !ids.has(id))) throw new Error('Include every tracked finding when saving this session handoff. Create a smaller session from Results for a narrower task.'); if (dirty) await save(); await api.workbench.updateSession({ id: session.id, handoff }); await refreshWorkbench(); }} />}
   </>;
 }

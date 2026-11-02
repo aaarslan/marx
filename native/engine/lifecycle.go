@@ -111,7 +111,7 @@ func (e *Engine) runBatch(ctx context.Context, input Object) (any, error) {
 						e.emit(Object{"kind": "job-updated", "job": job})
 						continue
 					}
-					_, err := e.startJob(job, clients[i], false)
+					startedJob, err := e.startJob(job, clients[i], false)
 					if err != nil {
 						job = clone(job)
 						job["status"] = "Failed"
@@ -121,6 +121,10 @@ func (e *Engine) runBatch(ctx context.Context, input Object) (any, error) {
 						job["progress"] = Object{"phase": "failed"}
 						_ = e.store.saveJob(job)
 						e.emit(Object{"kind": "job-updated", "job": job})
+						continue
+					}
+					if str(startedJob, "status") == "Canceled" {
+						e.emit(Object{"kind": "job-updated", "job": startedJob})
 						continue
 					}
 					for {

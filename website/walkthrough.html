@@ -10,11 +10,13 @@
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>Using Marx — walkthrough</title>
+    <meta name="description" content="Build Marx from source, connect the official Checkmarx CLI, investigate findings, and retain remediation evidence. Current interface examples use synthetic data." />
     <link rel="stylesheet" href="site.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="shell"><a href="index.html">← Marx</a></header>
-    <main class="shell guide">
+    <main id="main" class="shell guide">
       <article class="guide-content">
         <h1>Using Marx</h1>
         <p>
@@ -29,19 +31,40 @@
           <a href="https://github.com/aaarslan/marx/blob/main/docs/building.md"
             >Building Marx</a
           >
-          for pinned toolchains, platform requirements and exact commands. On
-          Apple Silicon, install Go 1.27.3, Bun 1.4.4 and Xcode Command Line
-          Tools, then run:
+          for platform setup and verification. Marx is currently a developer
+          preview built from source; there are no published installer downloads.
         </p>
-        <pre><code>bun install --frozen-lockfile
-bun run dist:mac
+        <ul>
+          <li><strong>Both platforms:</strong> Git, Go 1.27.3 and Bun 1.4.4. Obtain the official Checkmarx CLI separately through your organization.</li>
+          <li><strong>macOS:</strong> Apple Silicon, macOS 13 or later, and Xcode Command Line Tools.</li>
+          <li><strong>Windows:</strong> Windows 11 x64 with Microsoft Edge WebView2 Runtime. NSIS 3.12 is needed only to create an installer.</li>
+        </ul>
+        <p>Open Terminal on macOS or PowerShell on Windows. Check the pinned tools first:</p>
+        <pre><code>go version
+bun --version
+</code></pre>
+        <p>The output should show Go 1.27.3 and Bun 1.4.4. Then clone, build and open Marx:</p>
+        <pre><code>git clone https://github.com/aaarslan/marx.git
+cd marx
+bun install --frozen-lockfile
+bun run build
 bun run start
 </code></pre>
         <p>
-          The local macOS build is ad hoc signed, not notarized. There are
-          currently no published release downloads. Windows builds require the
-          Windows toolchain and WebView2. Cross-compilation on a Mac does not
-          establish Windows runtime acceptance.
+          The build selects your host platform and writes
+          <code>dist/Marx.app</code> on macOS or <code>dist/Marx.exe</code> on
+          Windows. <code>bun run start</code> opens that existing build;
+          <code>bun run dev</code> rebuilds and opens it. Quit any running Marx
+          copy before rebuilding, then reopen it to see the new interface.
+        </p>
+        <p>
+          The macOS bundle is ad hoc signed and not notarized. Windows packages
+          are unsigned. On Windows, <code>bun run dist:win</code> creates the
+          per-user installer when NSIS is available. Native Windows and macOS
+          checks are recorded separately in the
+          <a href="https://github.com/aaarslan/marx/blob/main/docs/final-acceptance.md">verification record</a>,
+          with exact revisions and remaining gaps. Live Checkmarx tenant
+          validation remains outstanding; synthetic checks do not qualify it.
         </p>
         <h2>2. Connect the official CLI</h2>
         <p>
@@ -85,15 +108,18 @@ bun run start
         <p>
           Prepared package selections and scanner overrides remain available
           when you visit another view in the same session. Changing the CLI
-          connection resets that prepared batch.
+          connection resets that prepared batch. A failed project-mapping
+          lookup blocks submission until you retry successfully; it does not
+          silently select a new project.
         </p>
         <h2>4. Investigate results</h2>
         <p>
           In <strong>Results</strong>, choose a scan. Filter by scanner,
           severity and state; search finding names, files and CVEs. Open a
           finding for its location, flow and available evidence. Use
-          <strong>Group by fix</strong> to inspect related work. Only a page of
-          matching results is returned to the view. Saved evidence can be read
+          <strong>Group by fix</strong> to inspect related work. The table displays
+          100 findings at a time, and filters apply to the loaded evidence.
+          Incomplete evidence stays labeled. Saved evidence can be read
           without starting another scan.
         </p>
         <p>
@@ -112,8 +138,20 @@ bun run start
         <img
           loading="lazy"
           src="assets/results.webp"
+          width="1280"
+          height="840"
           alt="Results with synthetic findings"
         />
+        <p>
+          Labeled placeholders distinguish an in-progress read from an empty
+          result. Failed reads show an error and recovery action. Clear filters
+          resets intelligence filtering as well as search, scanner, severity
+          and finding-state filters.
+        </p>
+        <figure>
+          <a href="assets/loading.webp"><img loading="lazy" src="assets/loading.webp" width="1280" height="840" alt="Current Results loading state with content placeholders and a visible status label" /></a>
+          <figcaption>Deliberately delayed synthetic findings demonstrate the loading state.</figcaption>
+        </figure>
         <h2 id="handoff">5. Prepare a change</h2>
         <p>
           Select the relevant findings and choose <strong>Fix with AI</strong>.
@@ -132,6 +170,8 @@ bun run start
         <img
           loading="lazy"
           src="assets/prompt-copied.webp"
+          width="1280"
+          height="840"
           alt="Local remediation prompt with confirmation after copying"
         />
         <h2 id="evidence">6. Keep a workbench session</h2>
@@ -146,11 +186,16 @@ bun run start
         <p>
           Rejected comparisons show their error beside the verification
           controls. The previous comparison retains its original checked time
-          until a new comparison succeeds.
+          until a new comparison succeeds. Notes remain unsaved while a newer
+          edit is pending. If baseline evidence cannot be read, choose
+          <strong>Retry baseline evidence</strong>; the app does not leave a
+          permanent loading message over a failed request.
         </p>
         <img
           loading="lazy"
           src="assets/workbench.webp"
+          width="1280"
+          height="840"
           alt="Workbench with synthetic notes"
         />
         <h2>7. Export and troubleshoot</h2>
@@ -194,6 +239,17 @@ bun run start
           reference tags. Missing or stale data remains visible; intelligence
           filters do not replace scanner severity.
         </p>
+        <figure>
+          <a href="assets/intelligence-empty.webp"><img src="assets/intelligence-empty.webp" width="1280" height="840" alt="Current CVE intelligence view before selection, with aligned watchlist and details panels" loading="lazy" /></a>
+          <figcaption>The initial intelligence view. Sources remain opt-in, and cached context can be read offline.</figcaption>
+        </figure>
+        <p>
+          Enter an exact CVE ID or choose a watched item to open its details.
+          Watchlist actions have their own space, and the panels stack in a
+          narrow desktop window. A cache-read error stays separate from an
+          empty cache; use <strong>Try again</strong> to retry the local read.
+          It does not automatically refresh public providers.
+        </p>
         <p>
           Watch CVEs in the intelligence view. The Watching button confirms a saved watch; choose it again to stop watching. Record a decision with its
           rationale, review date and optional assumptions. Workbench → Decisions
@@ -224,7 +280,7 @@ bun run start
           <strong>5–12:</strong> Choose source and scan settings through a
           graphical workflow.
         </p>
-        <p><strong>12–20:</strong> Filter findings and inspect the evidence.</p>
+        <p><strong>12–20:</strong> Clear loading states, then filter findings and inspect the evidence.</p>
         <p>
           <strong>20–28:</strong> Add known exploitation, published probability
           and named sources. Keep unknowns visible.
@@ -243,10 +299,11 @@ bun run start
         </p>
         <p><strong>48–52:</strong> Marx. Explore the source and build guide.</p>
         <p>
-          The 52-second film is an edited showcase of the actual native
-          interface using synthetic CLI and intelligence data. It does not
-          demonstrate a live Checkmarx tenant. The original instrumental score
-          is generated locally from the checked-in source.
+          The 52-second film is an edited presentation of captured Marx
+          application states using synthetic CLI and intelligence data, not an
+          uninterrupted recording or a live Checkmarx tenant demonstration.
+          The original instrumental score is generated locally from the
+          checked-in source.
         </p>
       </article>
     </main>

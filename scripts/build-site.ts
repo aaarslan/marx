@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 const revision = execFileSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
 }).trim();
+const workingTreeDirty = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim() !== "";
 const root = path.resolve(".cache/website");
 fs.rmSync(root, { recursive: true, force: true });
 fs.mkdirSync(root, { recursive: true });
@@ -19,6 +20,8 @@ const publicFiles = [
   ...[
     "detail.webp",
     "intelligence.webp",
+    "intelligence-empty.webp",
+    "loading.webp",
     "decisions.webp",
     "decision-baseline.webp",
     "marx-showcase.mp4",
@@ -54,12 +57,12 @@ for (const name of ["index.html", "walkthrough.html"]) {
 fs.writeFileSync(
   path.join(root, "source.json"),
   JSON.stringify(
-    { repository: "https://github.com/aaarslan/marx", revision },
+    { repository: "https://github.com/aaarslan/marx", revision, workingTreeDirty },
     null,
     2,
   ) + "\n",
 );
 execFileSync("bun", ["scripts/verify-site.ts", root], { stdio: "inherit" });
 console.log(
-  "Static website prepared in .cache/website with documentation links pinned to its source commit.",
+  workingTreeDirty ? "Static website prepared from local changes in .cache/website. The manifest records a dirty source tree; GitHub documentation links still refer to the base commit. Commit the finished source before publishing." : "Static website prepared in .cache/website with documentation links pinned to its source commit.",
 );

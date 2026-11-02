@@ -6,7 +6,7 @@ import { useIntelligence } from './IntelligencePanel';
 import { findingCVE } from '@shared/intelligence';
 import { createRemediationPrompts, PROMPT_CHARACTER_TARGET, REMEDIATION_TARGETS, type RemediationContext, type RemediationTarget } from '@shared/remediation';
 import { api } from '../api';
-import { Banner, Spinner, keepDialogFocus, restoreControlFocus } from './ui';
+import { Banner, LoadingState, Spinner, keepDialogFocus, restoreControlFocus } from './ui';
 
 export interface RemediationScope {
   id: string;
@@ -84,7 +84,7 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
   return (
     <dialog className="remediation-dialog" ref={dialog} onKeyDown={keepDialogFocus} aria-labelledby="remediation-title" aria-describedby="remediation-description" onCancel={(event) => { event.preventDefault(); onClose(); }}>
       <div className="remediation-heading">
-        <div><div className="page-eyebrow">AI handoff</div><h2 id="remediation-title">Build a remediation prompt</h2></div>
+        <div><h2 id="remediation-title">Build a remediation prompt</h2></div>
         <button className="btn ghost small" aria-label="Close remediation prompt" onClick={onClose} autoFocus><X size={17} /></button>
       </div>
       <p id="remediation-description" className="field-help">Choose what to fix, then paste the prompt into Copilot or another coding assistant in this repository. Prompt generation stays on your computer.</p>
@@ -106,7 +106,7 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
         <label className="field">Findings per batch<select aria-label="Findings per prompt batch" value={batchSize} onChange={(event) => setBatchSize(Number(event.target.value))} disabled={Boolean(busy)}>{[10, 20, 40].map((size) => <option value={size} key={size}>Up to {size} findings</option>)}</select><span className="field-help">Large evidence is split into additional batches without dropping findings.</span></label>
         <label className="field">Additional instructions (optional)<input type="text" aria-label="Additional remediation instructions" value={instructions} maxLength={4000} onChange={(event) => setInstructions(event.target.value)} placeholder="e.g. Keep the current Node.js version" disabled={Boolean(busy)} /></label>
       </div>
-      {intelligenceLoading && <p className="field-help" role="status">Loading cached intelligence for this handoff…</p>}
+      {intelligenceLoading && <LoadingState label="Loading cached intelligence for this handoff" compact rows={1} />}
       {intelligenceError && <Banner kind="warn">Cached intelligence could not be attached: {intelligenceError}. This is disclosed in the prompt.</Banner>}
       {selection.context.truncated && <Banner kind="warn">This scan is only partly loaded. The prompt includes selected loaded findings, not the entire scan.</Banner>}
       {selection.context.demo && <Banner kind="info">Demo evidence is clearly labeled in the generated prompt.</Banner>}

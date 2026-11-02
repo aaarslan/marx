@@ -1,18 +1,20 @@
 # Using Marx
 
-Marx is an independent desktop GUI for the official Checkmarx One CLI. The CLI runs locally; analysis runs in your Checkmarx tenant. Marx does not provide a Checkmarx account or license. All public screenshots and the showcase film use synthetic findings.
+Marx is an independent desktop GUI for the official Checkmarx One CLI. The CLI runs locally; analysis runs in your Checkmarx tenant. Marx does not provide a Checkmarx account or license. All public screenshots and the showcase film use synthetic findings; captured application states are re-rendered for presentation.
 
 ## 1. Build and open
 
-Follow [Building Marx](building.md) for pinned toolchains, platform requirements and exact commands. On Apple Silicon, install Go 1.27.3, Bun 1.4.4 and Xcode Command Line Tools, then run:
+Follow the [macOS](building.md#macos) or [Windows](building.md#windows) build instructions. Install Git, Go 1.27.3 and Bun 1.4.4, then clone and enter the project as described in that guide. From the project directory:
 
 ```sh
 bun install --frozen-lockfile
-bun run dist:mac
+bun run build
 bun run start
 ```
 
-The local macOS build is ad hoc signed, not notarized. There are currently no published release downloads. Windows builds require the Windows toolchain and WebView2. Cross-compilation on a Mac does not establish Windows runtime acceptance.
+The output is `dist/Marx.app` on macOS or `dist\Marx.exe` on Windows. There are currently no published release downloads. macOS requires Apple Silicon and Xcode Command Line Tools; the local bundle is ad hoc signed, not notarized. Windows requires WebView2, and its outputs are unsigned. Cross-compilation on a Mac does not establish Windows runtime acceptance.
+
+After rebuilding, quit and reopen the app to load its new interface. `bun run start` opens the existing build; `bun run dev` rebuilds once and opens it. Replace any app you previously copied elsewhere. You can open **Results → Load demo results** before connecting a CLI to explore the interface with sample findings.
 
 ## 2. Connect the official CLI
 
@@ -22,23 +24,35 @@ Never paste credentials into notes, prompts, screenshots or issue reports. API k
 
 The connection check keeps Settings open so you can read its result and correct the selected fields. **Help → Marx documentation** opens this walkthrough in your external browser while leaving the application available.
 
+Editing the connection fields clears their previous test feedback. Run **Save connection and test** again to verify the changed configuration.
+
 ## 3. Run a scan
 
 Open **Scan**, use the native folder picker (Command+O on macOS, Control+O on Windows), or drop a folder. Map it to the intended Checkmarx project. Check the branch, scanners and effective settings, then start the scan. Review the source before upload: the selected CLI uploads it to your tenant.
+
+Scan actions stay disabled while a replacement folder's repository details and saved mapping are being read. Choosing a different repository resets its proposed new-project name and branch; verify the final displayed folder and target before starting.
 
 Progress and logs stay in the application. Cancel stops the local process tree; cancellation cannot promise a remote scan has stopped. If submission status is uncertain, inspect tenant/history state before starting another scan. Do not assume a timeout means nothing was submitted. Command+R / Control+R starts the configured scan. Review the Scan view before using it.
 
 For **Batch Scan**, inspect the discovered roots and mappings before starting. Shared workspace files can affect multiple packages. Review dependency changes at the workspace root rather than treating every package as independent.
 
+If saved mappings cannot be read, the batch stays blocked instead of treating the folders as new projects. Correct the CLI connection and choose **Retry project mappings**. A job canceled before submission remains canceled rather than uploading later from the queue.
+
 Prepared packages, selections and overrides remain available when you visit another view during the same application session. Changing the CLI connection clears that connection's prepared batch. Deliberate navigation opens the destination at the top of its content; scan updates do not reset the current view's scroll position.
 
 ## 4. Investigate results
 
-In **Results**, choose a scan. Filter by scanner, severity and state; search finding names, files and CVEs. Open a finding for its location, flow and available evidence. Use **Group by fix** to inspect related work. Only a page of matching results is returned to the view. Saved evidence can be read without starting another scan.
+In **Results**, choose a scan. Filter by scanner, severity and state; search finding names, files and CVEs. Open a finding for its location, flow and available evidence. Use **Group by fix** to inspect related work. The table displays 100 findings at a time, and filters apply to the loaded evidence. Incomplete evidence stays labeled. Saved evidence can be read without starting another scan.
+
+Content placeholders identify pending reads. A failed read shows its error or retry action; it does not establish that there are no findings or observations. Navigation remains available while findings load.
+
+![Findings loading with content placeholders](../website/assets/loading.webp)
 
 If **History** cannot load remote scans and has no saved evidence, use **Open CLI settings** to check the connection, then return and refresh. This unavailable state does not establish that your tenant has no scans.
 
 Choose a baseline to compare available evidence. Enable other branches only when the comparison is intentional. Missing source revision or effective configuration stays visibly unavailable. A disappearing finding alone does not prove a code change fixed it when scan scope or evidence differs.
+
+**Clear filters** also clears the separate intelligence filter. When you change the linked repository, Marx discards its previous source preview so an older response cannot appear as code from the new folder.
 
 ![Results with synthetic findings](../website/assets/results.webp)
 
@@ -51,6 +65,8 @@ Select the relevant findings and choose **Fix with AI**. Inspect the generated p
 ## 6. Keep a workbench session
 
 Use **Workbench** to retain a named session, pinned findings and notes. Keep the original evidence while changing the code. Link the relevant repository intentionally. After testing, run a verification scan and compare compatible evidence. Inconclusive verification remains inconclusive; absence of evidence is not a successful fix.
+
+Notes autosave, and **Save notes** offers an explicit save action. Check **Saved on this computer** before closing Marx. Edits made while an earlier save is pending remain unsaved until the current draft is persisted. If baseline evidence cannot be read, **Retry baseline evidence** retries that read while leaving the draft available.
 
 Verification feedback appears beside its controls. If comparison is rejected, the previous comparison remains available with its original checked time; the error explicitly says it was not updated. Choose a completed scan later than the baseline and compare again.
 
@@ -72,9 +88,13 @@ In **Results**, expand a CVE finding's intelligence panel or refresh the scan's 
 
 Use **Watch CVE** to track later observed changes in the **CVE intelligence** view. Its **Watching** state confirms the watch and lets you stop watching. Choose **Record decision** to save a scoped rationale, review date and optional evidence assumptions. **Workbench → Decisions** flags broken assumptions and retains both the original observation and the evidence that prompted review. Revise or close the decision explicitly; none of these actions change Checkmarx result states or verify a fix.
 
+The watchlist and CVE details share an aligned layout on wide windows and stack at narrower desktop sizes. The refresh action is separate from the list. An empty watchlist explains how to begin; cached-context read failures offer a retry rather than claiming no context exists.
+
+![CVE intelligence before selecting a vulnerability](../website/assets/intelligence-empty.webp)
+
 Removing a watched item moves keyboard focus to the nearest remaining item, or reveals the CVE lookup field when the list becomes empty.
 
-Tab and Shift+Tab cycle through the prompt and decision dialogs. Escape dismisses the dialog and returns focus to its launcher without closing the finding underneath. Closed decisions retain pinned evidence and revision history; they are no longer rechecked against current intelligence.
+Tab and Shift+Tab cycle through the prompt and decision dialogs. Escape dismisses the dialog and returns focus to its launcher without closing the finding underneath. Global folder-open and scan shortcuts stay blocked while a dialog is open. Closed decisions retain pinned evidence and revision history; they are no longer rechecked against current intelligence.
 
 Read [CVE intelligence and decision reviews](cve-intelligence.md) for source controls, exact disclosure, export semantics, retention and limits.
 
@@ -82,11 +102,11 @@ Read [CVE intelligence and decision reviews](cve-intelligence.md) for source con
 
 - **0–5 seconds:** Less flag wrangling. More fixing. Marx, a desktop workspace for Checkmarx One.
 - **5–12:** Choose your source and settings through a graphical scan workflow.
-- **12–20:** Filter findings and inspect the available evidence.
+- **12–20:** Clear loading states, then filter findings and inspect the available evidence.
 - **20–28:** Add known-exploitation and published-probability context, with visible sources and unknowns.
 - **28–36:** Preview the scope, then copy a local remediation handoff. Marx confirms the copy.
 - **36–43:** See an active decision move to needs review after exploitation evidence changes; original evidence stays pinned.
 - **43–48:** Scans through the official CLI. Optional public intelligence uses CVE IDs, without source code or credentials.
 - **48–52:** Marx. Explore the source and build guide.
 
-The 52-second film is an edited product showcase, not an uninterrupted recording or live tenant verification. Its screens were captured from the actual native application using an isolated synthetic CLI and acceptance-only intelligence fixture. Music is generated locally from the checked-in score script.
+The 52-second film is an edited product showcase, not an uninterrupted recording or live tenant verification. Application states were captured from the native app using an isolated synthetic CLI and acceptance-only intelligence fixture, then re-rendered for presentation. The loading screenshot uses a controlled pending read to show the state clearly; it is not a latency measurement. Music is generated locally from the checked-in score script.

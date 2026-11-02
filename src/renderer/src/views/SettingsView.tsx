@@ -5,7 +5,7 @@ import type { ScanDefaults, Settings, TestConnectionResult } from '@shared/types
 import { api } from '../api';
 import { useApp } from '../store';
 import { IntelligenceSettings } from '../components/IntelligenceSettings';
-import { Banner, Spinner, Toggle, restoreControlFocus } from '../components/ui';
+import { Banner, LoadingState, Spinner, Toggle, restoreControlFocus } from '../components/ui';
 
 export function SettingsView() {
   const { settings, init } = useApp(useShallow((state) => ({
@@ -28,6 +28,9 @@ export function SettingsView() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [keySaved, setKeySaved] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const connectionIdentity = JSON.stringify([cliPath, cliConfigPath, cliAuthMode, baseUrl, tenant]);
+  const currentConnection = useRef(connectionIdentity);
+  currentConnection.current = connectionIdentity;
 
   useEffect(() => {
     if (settings && !initialized.current) {
@@ -49,7 +52,7 @@ export function SettingsView() {
     return () => clearTimeout(timer);
   }, [savedFlash, keySaved]);
 
-  if (!settings || !defaults) return <div className="empty" role="status"><Spinner /> Loading settings…</div>;
+  if (!settings || !defaults) return <LoadingState label="Loading settings" rows={4} />;
 
   const save = async () => {
     if (saving) return;
@@ -79,15 +82,18 @@ export function SettingsView() {
   };
 
   const test = async () => {
+    const testedConnection = connectionIdentity;
     setTesting(true);
     setTestResult(null);
     setTestError(null);
     try {
       await api.settings.save({ cliPath: cliPath.trim(), cliConfigPath: cliConfigPath.trim(), cliAuthMode, baseUrl: baseUrl.trim(), tenant: tenant.trim() });
       await init();
-      setTestResult(await api.settings.testConnection());
+      if (currentConnection.current !== testedConnection) return;
+      const result = await api.settings.testConnection();
+      if (currentConnection.current === testedConnection) setTestResult(result);
     } catch (e) {
-      setTestError(e instanceof Error ? e.message : String(e));
+      if (currentConnection.current === testedConnection) setTestError(e instanceof Error ? e.message : String(e));
     } finally {
       setTesting(false);
     }
@@ -95,7 +101,7 @@ export function SettingsView() {
 
   return (
     <>
-<div className="page-eyebrow">Preferences</div>
+
       <h1 className="page-title">Settings</h1>
       <p className="page-sub">Use your working Checkmarx CLI installation and choose defaults for future scans.</p>
 

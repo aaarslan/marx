@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import type { IntelligenceSettings as Settings } from "@shared/intelligence";
 import { api } from "../api";
-import { Banner, Spinner, Toggle } from "./ui";
+import { Banner, LoadingState, Spinner, Toggle } from "./ui";
 import { notifyIntelligence } from "./IntelligencePanel";
 
 export function IntelligenceSettings() {
@@ -69,9 +69,7 @@ export function IntelligenceSettings() {
       </p>
       {error && <Banner kind="error">{error}</Banner>}
       {!settings && !error && (
-        <p className="intel-loading" role="status">
-          <Spinner /> Loading source preferences…
-        </p>
+        <LoadingState label="Loading source preferences…" compact rows={2} />
       )}
       {settings?.providers.map((source) => (
         <div key={source.id} className="intel-source">
