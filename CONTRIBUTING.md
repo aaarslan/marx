@@ -1,6 +1,8 @@
 # Contributing to Marx
 
-Focused pull requests are welcome. Describe the user-visible problem, resulting behavior and relevant local checks. Discuss substantial features in an issue before implementing them. Report vulnerabilities through [SECURITY.md](SECURITY.md).
+Focused pull requests are welcome. Describe the user-visible problem, resulting behavior and relevant local checks. Discuss substantial features in an issue before implementing them. Report vulnerabilities through [SECURITY.md](SECURITY.md). For usage questions, start with [Support](SUPPORT.md).
+
+If you are new to the project, documentation fixes, synthetic reproductions and platform verification are useful starting points. See [project status](docs/project-status.md) for evaluation gaps. In issues and reviews, discuss the behavior and evidence, treat contributors respectfully, and keep customer data private. A proposal or pull request is subject to review; it does not commit the project to a feature or delivery date.
 
 ## Set up
 
@@ -18,14 +20,14 @@ Unit tests and synthetic acceptance do not need a tenant or API key. Follow [bui
 ```sh
 bun run typecheck
 bun run test --pool=threads --maxWorkers=2
+bun run build
 bun run test:go
 go vet ./native/... ./tools/resources
-bun run build
 bun run verify:packaging
 bun run audit
 ```
 
-Run the native Go race suite when changing concurrency or process handling. For UI changes, exercise the actual WKWebView or WebView2 application at its 960×640 minimum window size, keyboard navigation and reduced motion. Native synthetic acceptance uses a separately compiled acceptance-tagged host; never distribute that binary. A cross-build does not establish runtime acceptance on another operating system.
+Build before running native Go tests on a clean checkout: the host embeds generated frontend assets. Run the native Go race suite when changing concurrency or process handling. For UI changes, exercise the actual WKWebView or WebView2 application at its 960×640 minimum window size, keyboard navigation and reduced motion. Native synthetic acceptance uses a separately compiled acceptance-tagged host; never distribute that binary. A cross-build does not establish runtime acceptance on another operating system.
 
 For dependency changes, also run `bun run audit:go` with govulncheck installed and inspect the compiled dependency graph. A passing dependency audit does not replace the [documented framework security assessment](SECURITY.md).
 
