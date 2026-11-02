@@ -23,6 +23,7 @@ const publicFiles = [
     "decision-baseline.webp",
     "marx-showcase.mp4",
     "prompt.webp",
+    "prompt-copied.webp",
     "results.webp",
     "scan.webp",
     "showcase.vtt",

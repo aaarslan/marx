@@ -75,6 +75,9 @@ func (e *Engine) startJobWithRecords(job Object, c *CLI, resume bool, records ..
 		return nil, errors.New("Restore the job's original CLI connection before reconciling")
 	}
 	working := clone(job)
+	if !resume {
+		working["progress"] = Object{"phase": "submitting", "detail": "The official CLI is preparing and uploading source."}
+	}
 	if resume {
 		delete(working, "finishedAt")
 		delete(working, "error")

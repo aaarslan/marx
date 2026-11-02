@@ -234,8 +234,15 @@ func (c *CLI) command(ctx context.Context, args []string, timeout time.Duration,
 	cmd.Stdout = output
 	cmd.Stderr = errout
 	cmd.WaitDelay = 2 * time.Second
+	var release func() error
 	if c.guard != nil {
-		prepareGuardedProcess(cmd)
+		var closeGate func()
+		var err error
+		release, closeGate, err = prepareGuardedProcess(cmd)
+		if err != nil {
+			return "", errors.New("The CLI launch could not be isolated")
+		}
+		defer closeGate()
 	}
 	if err := cmd.Start(); err != nil {
 		return "", errors.New("The Checkmarx CLI could not start")
@@ -250,6 +257,11 @@ func (c *CLI) command(ctx context.Context, args []string, timeout time.Duration,
 			return "", errors.New("The CLI process could not be isolated")
 		}
 		defer guard.Close()
+		if err := release(); err != nil {
+			cmd.Process.Kill()
+			cmd.Wait()
+			return "", errors.New("The protected CLI could not start")
+		}
 	}
 	err := cmd.Wait()
 	if output.line != nil && output.partial != "" {

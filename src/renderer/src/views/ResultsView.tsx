@@ -15,7 +15,7 @@ import { DEMO_RESULTS } from '../demo';
 import { RemediationDialog, type RemediationSelection } from '../components/RemediationDialog';
 import { FindingIntelligence, IntelligenceRefresh, useIntelligence } from '../components/IntelligencePanel';
 import { findingCVE, intelligenceLabel, matchesIntelligence } from '@shared/intelligence';
-import { Banner, Empty, SeverityBadge, Spinner, timeAgo, formatCount } from '../components/ui';
+import { Banner, Empty, SeverityBadge, Spinner, timeAgo, formatCount, restoreControlFocus } from '../components/ui';
 
 interface Snippet {
   path: string;
@@ -48,6 +48,9 @@ export function ResultsView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const exportLock = useRef(false);
+  const [exportFeedback, setExportFeedback] = useState<{ kind: 'ok' | 'info' | 'error'; text: string } | null>(null);
   const [demo, setDemo] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const refreshRequested = useRef(false);
@@ -284,10 +287,19 @@ export function ResultsView() {
     openSession(session.id);
   };
   const exportFindings = async (format: 'csv' | 'json' | 'sarif') => {
+    if (exportLock.current) return;
+    exportLock.current = true;
+    setExporting(true);
+    setExportFeedback(null);
     try {
-      if (format === 'sarif' && selectedScanId && !demo) await api.results.sarif(selectedScanId);
-      else if (format !== 'sarif') await api.results.export(format, demo ? 'demo-findings' : `${currentScan?.projectName ?? 'scan'}-${selectedScanId?.slice(0, 8) ?? ''}`, filtered);
-    } catch (err) { setError(`Export failed: ${err instanceof Error ? err.message : String(err)}`); }
+      const destination = format === 'sarif'
+        ? selectedScanId && !demo ? await api.results.sarif(selectedScanId) : null
+        : await api.results.export(format, demo ? 'demo-findings' : `${currentScan?.projectName ?? 'scan'}-${selectedScanId?.slice(0, 8) ?? ''}`, filtered);
+      setExportFeedback(destination
+        ? { kind: 'ok', text: `${format.toUpperCase()} exported to ${destination}` }
+        : { kind: 'info', text: 'Export canceled. No file was saved.' });
+    } catch (err) { setExportFeedback({ kind: 'error', text: `Export failed: ${err instanceof Error ? err.message : String(err)}` }); }
+    finally { exportLock.current = false; setExporting(false); }
   };
   const resize = (clientX: number) => {
     const bounds = splitRef.current?.getBoundingClientRect();
@@ -302,12 +314,14 @@ export function ResultsView() {
       <div className="row between workspace-heading">
         <div><div className="page-eyebrow">Findings explorer</div><h1 className="page-title">Results</h1><p className="page-sub">Investigate evidence, prepare a focused change, and verify it.</p></div>
         <div className="row">
-          {selectedScanId && !demo && <button className="btn small" onClick={async () => {
+          {selectedScanId && !demo && <button className="btn small" onClick={async (event) => {
+            const origin = event.currentTarget;
             try {
               if (!currentScan?.projectId) throw new Error('Load the scan project before linking source.');
               const folder = await api.dialog.selectFolder();
               if (folder) { await api.bindings.save(folder, currentScan.projectId); setSelectedScan(selectedScanId, folder, pendingAutoBaseline); }
             } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+            finally { restoreControlFocus(origin); }
           }}><FolderOpen size={13} />{linkedFolder ? 'Change repository' : 'Link repository'}</button>}
           {selectedScanId && !demo && currentScan && settings?.baseUrl && <button className="btn ghost small" onClick={() => void api.shell.openExternal(`${settings.baseUrl.replace(/\/+$/, '')}/projects/${currentScan.projectId}/results?scanIds=${currentScan.id}`).catch((err) => setError(err.message))}><ExternalLink size={13} />Checkmarx One</button>}
         </div>
@@ -318,10 +332,12 @@ export function ResultsView() {
           {selectedScanId && !allHistory.some((scan) => scan.id === selectedScanId) && <option value={selectedScanId}>{selectedScanId}</option>}
           {allHistory.map((scan) => <option value={scan.id} key={scan.id}>{scan.projectName} · {scan.branch} · {scan.status} · {timeAgo(scan.createdAt)}{cachedScans.some((cached) => cached.id === scan.id) ? ' · saved' : ''}</option>)}
         </select></label>}
-        {activePage && <button className="btn primary small" disabled={loading || !findings.length} onClick={() => openRemediation(activeGroup)}><Sparkles size={14} />Fix with AI</button>}
+        {activePage && <button className="btn primary small" disabled={loading || !findings.length} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); openRemediation(activeGroup); }}><Sparkles size={14} />Fix with AI</button>}
         {selectedScanId && !demo && <button className="btn ghost small" disabled={loading} aria-label="Refresh findings" onClick={() => { refreshRequested.current = true; setRefreshVersion((version) => version + 1); }}><RefreshCw size={14} className={loading ? 'spin' : ''} />Refresh</button>}
-        {activePage && <details className="export-menu"><summary className="btn ghost small">Export evidence</summary><div className="export-actions"><button className="btn small" disabled={!filtered.length} onClick={() => void exportFindings('csv')}>CSV</button><button className="btn small" disabled={!filtered.length} onClick={() => void exportFindings('json')}>JSON</button>{!demo && <button className="btn small" onClick={() => void exportFindings('sarif')}>SARIF</button>}</div></details>}
+        {activePage && <details className="export-menu"><summary className="btn ghost small">Export evidence</summary><div className="export-actions"><button className="btn small" disabled={!filtered.length} aria-disabled={exporting} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); void exportFindings('csv'); }}>CSV</button><button className="btn small" disabled={!filtered.length} aria-disabled={exporting} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); void exportFindings('json'); }}>JSON</button>{!demo && <button className="btn small" aria-disabled={exporting} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); void exportFindings('sarif'); }}>SARIF</button>}</div></details>}
       </div>
+      {exporting && <p className="field-help" role="status">Exporting evidence…</p>}
+      {exportFeedback && <Banner kind={exportFeedback.kind} action={<button className="btn ghost small" aria-label="Dismiss export status" onClick={() => setExportFeedback(null)}><X size={14} /></button>}>{exportFeedback.text}</Banner>}
       {!demo && currentScan && <div className="scan-context">
         <div className="row"><strong>{currentScan.projectName}</strong><span className="mono">{currentScan.branch}</span><span className="faint mono" title={currentScan.id}>{currentScan.id.slice(0, 12)}</span>{page?.cached && <span className="badge">Saved evidence</span>}{linkedFolder && <span className="faint mono" title={linkedFolder}>{folderName(linkedFolder)}</span>}</div>
         {page?.provenance ? <details><summary className="field-help">{page.provenance.source.commit ? `Revision ${page.provenance.source.commit.slice(0, 12)}` : 'Revision unavailable'} · {page.provenance.source.commit ? page.provenance.source.dirty ? 'Uncommitted changes at capture' : 'Clean worktree at capture' : 'Working-folder evidence'} · {page.provenance.requestedScanners.join(' + ').toUpperCase()}</summary><dl className="kv provenance-details"><dt>Captured</dt><dd>{new Date(page.provenance.capturedAt).toLocaleString()}</dd><dt>Scan source</dt><dd>{page.provenance.source.folderPath}</dd><dt>CLI</dt><dd>{page.provenance.cliVersion ?? 'Not recorded'}</dd><dt>Completed engines</dt><dd>{page.provenance.completedScanners?.join(', ') || 'Not confirmed'}</dd><dt>Preset</dt><dd>{page.provenance.options.sastPreset}</dd><dt>Exclusions</dt><dd>{page.provenance.options.excludes.join(', ') || 'CLI defaults'}</dd><dt>Source changed during scan</dt><dd>{page.provenance.sourceChanged === undefined ? 'Not established' : page.provenance.sourceChanged ? 'Yes' : 'No detected change'}</dd></dl></details> : <p className="field-help">Source revision and effective scan configuration were not captured for this scan.</p>}
@@ -343,10 +359,10 @@ export function ResultsView() {
       {error && <Banner kind="error" action={<button className="btn ghost small" aria-label="Dismiss error" onClick={() => setError(null)}><X size={14} /></button>}>{error}</Banner>}
       {loading && <div className="empty" role="status"><Spinner size={22} /><span>Loading findings…</span></div>}
       {activePage && !loading && <>
-        {workspace.groupByFix && !activeGroup && <><div className="remediation-groups">{visibleGroups.map((group) => <article className="remediation-group" key={group.id}><div className="row between"><div className="row"><SeverityBadge severity={group.severity} /><strong>{group.title}</strong></div><span className="faint">{group.findingIds.length} findings</span></div><p className="field-help">{group.rationale}</p><div className="row"><button className="btn small" onClick={() => { setGroupId(group.id); setTablePage(0); }}>Inspect group</button><button className="btn ghost small" onClick={() => openRemediation(group)}><Sparkles size={13} />Prepare fixes</button></div></article>)}</div><div className="pagination" aria-label="Fix group pages"><button className="btn ghost small" disabled={displayedGroupPage === 0} onClick={() => setGroupPage(displayedGroupPage - 1)}><ChevronLeft size={14} />Previous groups</button><span className="faint" aria-live="polite">{groups.length ? displayedGroupPage * PAGE_SIZE + 1 : 0}–{Math.min((displayedGroupPage + 1) * PAGE_SIZE, groups.length)} of {formatCount(groups.length)} fix groups</span><button className="btn ghost small" disabled={displayedGroupPage >= groupPageCount - 1} onClick={() => setGroupPage(displayedGroupPage + 1)}>Next groups<ChevronRight size={14} /></button></div></>}
+        {workspace.groupByFix && !activeGroup && <><div className="remediation-groups">{visibleGroups.map((group) => <article className="remediation-group" key={group.id}><div className="row between"><div className="row"><SeverityBadge severity={group.severity} /><strong>{group.title}</strong></div><span className="faint">{group.findingIds.length} findings</span></div><p className="field-help">{group.rationale}</p><div className="row"><button className="btn small" onClick={() => { setGroupId(group.id); setTablePage(0); }}>Inspect group</button><button className="btn ghost small" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); openRemediation(group); }}><Sparkles size={13} />Prepare fixes</button></div></article>)}</div><div className="pagination" aria-label="Fix group pages"><button className="btn ghost small" disabled={displayedGroupPage === 0} onClick={() => setGroupPage(displayedGroupPage - 1)}><ChevronLeft size={14} />Previous groups</button><span className="faint" aria-live="polite">{groups.length ? displayedGroupPage * PAGE_SIZE + 1 : 0}–{Math.min((displayedGroupPage + 1) * PAGE_SIZE, groups.length)} of {formatCount(groups.length)} fix groups</span><button className="btn ghost small" disabled={displayedGroupPage >= groupPageCount - 1} onClick={() => setGroupPage(displayedGroupPage + 1)}>Next groups<ChevronRight size={14} /></button></div></>}
         {(!workspace.groupByFix || activeGroup) && <>
           {activeGroup && <div className="group-context"><button className="btn ghost small" onClick={() => setGroupId(null)}><ChevronLeft size={13} />All fix groups</button><strong>{activeGroup.title}</strong><p className="field-help">{activeGroup.rationale}</p></div>}
-          {checked.size > 0 && <div className="selection-toolbar"><span>{checked.size} selected</span><button className="btn small" onClick={() => openRemediation()}><Sparkles size={13} />Prepare selected fixes</button><button className="btn ghost small" onClick={() => setChecked(new Set())}>Clear selection</button></div>}
+          {checked.size > 0 && <div className="selection-toolbar"><span>{checked.size} selected</span><button className="btn small" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); openRemediation(); }}><Sparkles size={13} />Prepare selected fixes</button><button className="btn ghost small" onClick={() => setChecked(new Set())}>Clear selection</button></div>}
           <div ref={splitRef} className={`investigation-split ${selected ? 'has-detail' : ''}`} style={{ '--detail-width': `${workspace.detailWidth ?? 48}%` } as React.CSSProperties}>
             <div className="investigation-list">
               <div className="scroller results-table" ref={listRef} onScroll={(event) => updateWorkspace({ scrollTop: event.currentTarget.scrollTop })}><table className="data" aria-label="Scan findings"><thead><tr><th className="selection-cell"><input type="checkbox" aria-label="Select visible findings" checked={visibleFindings.length > 0 && visibleFindings.every((finding) => checked.has(finding.id))} onChange={(event) => setChecked((current) => { const next = new Set(current); for (const finding of visibleFindings) event.target.checked ? next.add(finding.id) : next.delete(finding.id); return next; })} /></th><th className="severity-cell">Severity</th><th>Finding</th>{!selected && <th>Location</th>}<th className="state-cell">State</th>{comparison && <th className="change-cell">Change</th>}</tr></thead><tbody>{visibleFindings.map((finding) => <tr key={finding.id} className={`clickable ${selected?.id === finding.id ? 'selected-finding' : ''}`} onClick={() => selectFinding(finding)}><td onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`Select ${finding.title}`} checked={checked.has(finding.id)} onChange={(event) => setChecked((current) => { const next = new Set(current); event.target.checked ? next.add(finding.id) : next.delete(finding.id); return next; })} /></td><td><SeverityBadge severity={finding.severity} /></td><td><button className="finding-link" data-finding-id={finding.id} title={finding.title} aria-label={`Open finding: ${finding.title}`} onClick={(event) => { event.stopPropagation(); selectFinding(finding); }}>{finding.title}</button><div className="faint finding-subtitle">{[finding.type.toUpperCase(), selected ? finding.where : finding.group].filter(Boolean).join(' · ')}{findingCVE(finding.cve) && <> · {intelligenceLabel(intelligence[findingCVE(finding.cve)!])}</>}</div></td>{!selected && <td className="mono dim">{finding.where || '—'}</td>}<td className="dim">{stateLabel(finding.state)}</td>{comparison && <td className={`change-${comparison.changes[finding.id]?.toLowerCase()}`}>{CHANGE_LABELS[comparison.changes[finding.id]] ?? 'Uncertain'}</td>}</tr>)}{!visibleFindings.length && <tr><td colSpan={selected ? 5 : 7}><div className="empty">{hasFilters ? 'No findings match these filters.' : 'No findings returned for this scan.'}</div></td></tr>}</tbody></table></div>

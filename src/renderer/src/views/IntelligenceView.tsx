@@ -7,7 +7,7 @@ import {
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, Empty, Spinner, timeAgo } from "../components/ui";
+import { Banner, Empty, Spinner, timeAgo, restoreControlFocus } from "../components/ui";
 import {
   IntelligenceFacts,
   IntelligenceRefresh,
@@ -24,6 +24,8 @@ export function IntelligenceView() {
     [pending, setPending] = useState<string | null>(null),
     [notice, setNotice] = useState("");
   const search = useRef<HTMLInputElement>(null);
+  const watchRegion = useRef<HTMLDivElement>(null);
+  const mutationFocus = useRef<{ origin: HTMLButtonElement; index: number } | null>(null);
   const loadVersion = useRef(0);
   const mutation = useRef(false);
   const mounted = useRef(true);
@@ -34,7 +36,7 @@ export function IntelligenceView() {
   } = useIntelligence(selected ? [selected] : []);
   const load = () => {
     const version = ++loadVersion.current;
-    void api.intelligence
+    return api.intelligence
       .watchlist()
       .then((value) => {
         if (mounted.current && version === loadVersion.current) {
@@ -69,9 +71,18 @@ export function IntelligenceView() {
     setInputError(null);
     setNotice("");
   };
-  const changeWatch = async (cve: string, remove: boolean) => {
+  useEffect(() => {
+    const focus = mutationFocus.current;
+    if (pending || !focus) return;
+    mutationFocus.current = null;
+    const items = watchRegion.current?.querySelectorAll<HTMLButtonElement>('.intel-watch-row > button:first-child');
+    if (focus.origin.isConnected) restoreControlFocus(focus.origin);
+    else (items?.[Math.min(focus.index, items.length - 1)] ?? search.current)?.focus();
+  }, [watchlist, pending]);
+  const changeWatch = async (cve: string, remove: boolean, origin: HTMLButtonElement) => {
     if (mutation.current) return;
     mutation.current = true;
+    mutationFocus.current = { origin, index: Math.max(0, watchlist?.items.findIndex((item) => item.cve === cve) ?? 0) };
     setPending(cve);
     setError(null);
     try {
@@ -81,7 +92,7 @@ export function IntelligenceView() {
         setNotice(
           `${cve} ${remove ? "removed from" : "added to"} your watchlist.`,
         );
-        load();
+        await load();
         notifyIntelligence();
       }
     } catch (error) {
@@ -198,6 +209,7 @@ export function IntelligenceView() {
             />
           ) : (
             <div
+              ref={watchRegion}
               className="intel-watch-list"
               role="region"
               aria-label="Watched CVEs"
@@ -222,7 +234,7 @@ export function IntelligenceView() {
                     className="btn ghost small icon"
                     disabled={!!pending}
                     aria-label={`Stop watching ${item.cve}`}
-                    onClick={() => void changeWatch(item.cve, true)}
+                    onClick={(event) => void changeWatch(item.cve, true, event.currentTarget)}
                   >
                     {pending === item.cve ? (
                       <Spinner size={13} />
@@ -249,7 +261,7 @@ export function IntelligenceView() {
                   disabled={!watchlist}
                   aria-disabled={!!pending}
                   aria-pressed={!!watched}
-                  onClick={() => void changeWatch(selected, !!watched)}
+                  onClick={(event) => void changeWatch(selected, !!watched, event.currentTarget)}
                 >
                   {pending === selected ? (
                     <Spinner size={13} />

@@ -82,6 +82,11 @@ bun run start
           packages. Review dependency changes at the workspace root rather than
           treating every package as independent.
         </p>
+        <p>
+          Prepared package selections and scanner overrides remain available
+          when you visit another view in the same session. Changing the CLI
+          connection resets that prepared batch.
+        </p>
         <h2>4. Investigate results</h2>
         <p>
           In <strong>Results</strong>, choose a scan. Filter by scanner,
@@ -90,6 +95,12 @@ bun run start
           <strong>Group by fix</strong> to inspect related work. Only a page of
           matching results is returned to the view. Saved evidence can be read
           without starting another scan.
+        </p>
+        <p>
+          If History cannot load remote scans and has no saved evidence, use
+          <strong>Open CLI settings</strong> to check the connection, then
+          return and refresh. An unavailable response does not establish that
+          your tenant has no scans.
         </p>
         <p>
           Choose a baseline to compare available evidence. Enable other branches
@@ -112,10 +123,16 @@ bun run start
           details and paths can contain proprietary information. Apply and test
           the proposed change in your usual development workflow.
         </p>
+        <p>
+          Choose scope, severity and batch size before copying or saving.
+          Native save cancellation preserves the prompt and returns keyboard
+          focus to its originating control. Escape closes the dialog without
+          closing the finding underneath.
+        </p>
         <img
           loading="lazy"
-          src="assets/prompt.webp"
-          alt="Local remediation prompt"
+          src="assets/prompt-copied.webp"
+          alt="Local remediation prompt with confirmation after copying"
         />
         <h2 id="evidence">6. Keep a workbench session</h2>
         <p>
@@ -126,6 +143,11 @@ bun run start
           compare compatible evidence. Inconclusive verification remains
           inconclusive; absence of evidence is not a successful fix.
         </p>
+        <p>
+          Rejected comparisons show their error beside the verification
+          controls. The previous comparison retains its original checked time
+          until a new comparison succeeds.
+        </p>
         <img
           loading="lazy"
           src="assets/workbench.webp"
@@ -133,8 +155,10 @@ bun run start
         />
         <h2>7. Export and troubleshoot</h2>
         <p>
-          <strong>Export evidence</strong> writes a file you choose through the
-          native save dialog. Exports, logs, screenshots and the local database
+          <strong>Export evidence</strong> writes filtered CSV and JSON to
+          Downloads and reveals the file. Official-CLI SARIF, prompts and
+          Workbench bundles use native save dialogs. The app reports the
+          destination or a canceled save. Exports, logs, screenshots and the local database
           can contain sensitive source details. Store and share them
           accordingly. Database file permissions reduce accidental access; the
           database is not encrypted.
@@ -206,8 +230,8 @@ bun run start
           and named sources. Keep unknowns visible.
         </p>
         <p>
-          <strong>28–36:</strong> Generate a local handoff for your chosen
-          assistant.
+          <strong>28–36:</strong> Preview the scope, then copy a local handoff
+          for your chosen assistant. The app confirms the copy.
         </p>
         <p>
           <strong>36–43:</strong> Revisit a decision when its reasons change.

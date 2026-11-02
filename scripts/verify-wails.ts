@@ -58,6 +58,10 @@ try {
  const command=(method:string,params:any={})=>new Promise<any>((resolve,reject)=>{const id=++sequence;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('WebView operation timed out'))},60000);pending.set(id,result=>{clearTimeout(timer);resolve(result)});socket!.send(JSON.stringify({id,method,params}))});
  const evaluate=async(expression:string)=>{if(mac)return macEvaluate(expression);const r=await command('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.result?.exceptionDetails)throw new Error(r.result.exceptionDetails.exception?.description||r.result.exceptionDetails.text);return r.result?.result?.value};
  const wait=async(expression:string)=>{const end=Date.now()+30000;while(Date.now()<end){if(await evaluate(expression))return;await Bun.sleep(100)}throw new Error('Workflow did not settle: '+expression)};
+ const dialogFocus=async()=>{
+  assert.equal(await evaluate(`(()=>{const dialog=document.querySelector('dialog[open]');const close=dialog.querySelector('button');close.focus();close.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));return dialog.contains(document.activeElement)&&document.activeElement!==close})()`),true,'Reverse Tab did not wrap inside the dialog');
+  assert.equal(await evaluate(`(()=>{const last=document.activeElement;last.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));return document.activeElement===document.querySelector('dialog[open] button')})()`),true,'Forward Tab did not return to the dialog close control');
+ };
  await wait('!!window.marx');assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
  await evaluate(`(()=>{
   window.frameProbeRan=false;window.policyViolations=[];
@@ -77,19 +81,44 @@ try {
  await wait(`!!document.querySelector('.settings-actions')`);
  const shellScroll=await evaluate(`(()=>{document.querySelector('.settings-actions button').scrollIntoView();for(const element of [document.documentElement,document.body,document.querySelector('#root')])element.scrollTop=10000;const sidebar=document.querySelector('.sidebar').getBoundingClientRect();return {top:sidebar.top,bottom:sidebar.bottom,height:innerHeight,outerScroll:document.scrollingElement.scrollTop,mainScroll:document.querySelector('main').scrollTop}})()`);
  assert.equal(shellScroll.outerScroll,0,'Settings focus scrolled the outer document');assert.ok(shellScroll.top>=-1&&shellScroll.bottom<=shellScroll.height+1,'Settings focus moved navigation outside the window');assert.ok(shellScroll.mainScroll>0,'Settings did not scroll within its content pane');
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Scan').click()`);
+ await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()===${JSON.stringify(path.basename(source))}).click()`);
+ await wait(`!!document.querySelector('.scanner-grid')`);
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
+ await wait(`!!document.querySelector('.settings-actions button')`);
+ await evaluate(`document.querySelector('.settings-actions button').scrollIntoView()`);
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Scan').click()`);
+ assert.equal(await evaluate(`document.querySelector('main').scrollTop`),0,'Scan inherited the Settings scroll position');
+ await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
  assert.equal(await evaluate(`document.querySelector('.connection-dot').classList.contains('configured')`),false,'CLI configuration used an unconditional success indicator');
  fs.renameSync(cli,cli+'.offline');
  try {
+  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='History').click()`);
+  await wait(`document.querySelector('main').textContent.includes('No saved history available')`);
+  assert.equal(await evaluate(`document.querySelector('main').textContent.includes('No scans in this workspace yet')`),false,'Unavailable remote history was presented as an empty remote workspace');
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Open CLI settings').click()`);
+  await wait(`document.querySelector('.nav-item[aria-current="page"]')?.textContent.trim()==='Settings'`);
   await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Results').click()`);
   await wait(`document.querySelector('.banner.warn')?.textContent.includes('Recent remote scans could not be refreshed')`);
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Load demo results').click()`);
   await wait(`document.querySelector('main').textContent.includes('Demo scan')`);
   assert.equal(await evaluate(`!!document.querySelector('.banner.warn')`),false,'A remote history warning leaked into the local demo');
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Fix with AI').click()`);
+  await wait(`!!document.querySelector('dialog[open]')`);await dialogFocus();
+  await evaluate(`document.querySelector('dialog[open] button').click()`);
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Close demo').click()`);
   await wait(`!!document.querySelector('.banner.warn')`);
  } finally { fs.renameSync(cli+'.offline',cli); }
  await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Settings').click()`);
  const settings=await evaluate("window.marx.settings.setApiKey('disposable-wails-test')");assert.equal(settings.hasStoredApiKey,true);assert.ok(!fs.readFileSync(path.join(profile,'settings.key')).includes(Buffer.from('disposable-wails-test')));
+ const alternateCli=path.join(root,mac?'cx-alternate':'cx-alternate.exe');fs.copyFileSync(cli,alternateCli);if(mac)fs.chmodSync(alternateCli,0o700);
+ await evaluate(`(()=>{const e=document.querySelector('input[aria-label="CLI executable"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(alternateCli)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+ await evaluate(`document.querySelector('.settings-connection-check button').click()`);
+ await wait(`document.querySelector('.settings-connection-check .banner.ok')?.textContent.includes('CLI')`);
+ assert.equal(await evaluate(`document.querySelector('.nav-item[aria-current="page"]').textContent.trim()`),'Settings','Saving a changed CLI connection dismissed its test result');
+ await evaluate(`(()=>{const e=document.querySelector('input[aria-label="CLI executable"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(cli)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+ await evaluate(`document.querySelector('.settings-connection-check button').click()`);
+ await wait(`document.querySelector('.settings-connection-check .banner.ok')?.textContent.includes('CLI')`);
  fs.writeFileSync(path.join(root,'expectedKey'),'disposable-wails-test');
  await evaluate("window.marx.settings.save({cliAuthMode:'marx'})");assert.equal((await evaluate('window.marx.settings.testConnection()')).ok,true);
  if(mac){
@@ -163,7 +192,13 @@ try {
  await wait(`document.querySelector('.intel-panel').textContent.includes('2.00%')`);
  await evaluate(`Array.from(document.querySelectorAll('.intel-panel button')).find(b=>b.textContent.trim()==='Record decision').click()`);
  await wait(`!!document.querySelector('dialog[open] textarea[aria-label="Decision rationale"]')`);
+ await evaluate(`(()=>{const dialog=document.querySelector('dialog[open]');dialog.querySelector('button').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));dialog.dispatchEvent(new Event('cancel',{cancelable:true}))})()`);
+ await wait(`!document.querySelector('dialog[open]')`);
+ assert.equal(await evaluate(`!!document.querySelector('.findings-layout')`),true,'Canceling a decision also closed its finding');
+ await evaluate(`Array.from(document.querySelectorAll('.intel-panel button')).find(b=>b.textContent.trim()==='Record decision').click()`);
+ await wait(`!!document.querySelector('dialog[open] textarea[aria-label="Decision rationale"]')`);
  await evaluate(`(()=>{const e=document.querySelector('textarea[aria-label="Decision rationale"]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,'Synthetic deferral pending compatible update; review if exploitation changes.');e.dispatchEvent(new Event('input',{bubbles:true}));const inputs=document.querySelectorAll('.decision-dialog fieldset input[type="checkbox"]');inputs[0].click();inputs[1].click();})()`);
+ await dialogFocus();
  await evaluate(`Array.from(document.querySelectorAll('.decision-dialog button')).find(b=>b.textContent.trim()==='Save decision').click()`);
  await wait(`!document.querySelector('dialog[open]')`);
  const nativeDecision=(await evaluate('window.marx.intelligence.decisions()'))[0];assert.equal(nativeDecision.verdict,'defer');assert.equal(nativeDecision.revision,1);
@@ -187,6 +222,16 @@ try {
  await wait(`document.querySelector('.intel-watch')?.textContent.includes('CVE-2024-1234')`);
  assert.ok((await evaluate('window.marx.intelligence.watchlist()')).events.length>0);
  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.page-content *')).some(e=>e.getBoundingClientRect().right>innerWidth+2)`),false,'CVE intelligence layout exceeds the native window');
+ await evaluate(`window.marx.intelligence.watch('CVE-2024-5678').then(()=>window.dispatchEvent(new Event('marx-intelligence-changed')))`);
+ await wait(`document.querySelectorAll('.intel-watch-row').length===2`);
+ await evaluate(`(()=>{const button=document.querySelector('button[aria-label="Stop watching CVE-2024-1234"]');button.focus();button.click()})()`);
+ await wait(`document.querySelectorAll('.intel-watch-row').length===1&&document.activeElement===document.querySelector('.intel-watch-row > button:first-child')`);
+ assert.ok(await evaluate(`document.activeElement.textContent.includes('CVE-2024-5678')`),'Removing a watch did not focus the next watched CVE');
+ await evaluate(`(()=>{const button=document.querySelector('button[aria-label="Stop watching CVE-2024-5678"]');button.scrollIntoView({block:'start'});button.focus();button.click()})()`);
+ await wait(`!document.querySelector('.intel-watch-row')&&document.activeElement===document.querySelector('#cve-lookup')`);
+ assert.equal(await evaluate(`(()=>{const field=document.querySelector('#cve-lookup').getBoundingClientRect();return field.top>=document.querySelector('main').getBoundingClientRect().top&&field.bottom<=innerHeight})()`),true,'Watch removal restored focus outside the visible viewport');
+ await evaluate(`window.marx.intelligence.watch('CVE-2024-1234').then(()=>window.dispatchEvent(new Event('marx-intelligence-changed')))`);
+ await wait(`document.querySelector('.intel-watch')?.textContent.includes('CVE-2024-1234')`);
  fs.rmSync(path.join(root,'submissionStarted'),{force:true});
  fs.writeFileSync(path.join(root,'holdSubmission'),'hold');
  const held=await evaluate(`window.marx.scan.run(${JSON.stringify(input)})`);const submissionDeadline=Date.now()+15000;while(!fs.existsSync(path.join(root,'submissionStarted'))&&Date.now()<submissionDeadline)await Bun.sleep(50);assert.ok(fs.existsSync(path.join(root,'submissionStarted')));
@@ -214,6 +259,7 @@ try {
  while(!mac&&Date.now()<end&&!restarted){try{restarted=(await(await fetch('http://127.0.0.1:19332/json')).json() as any[]).find((t:any)=>t.type==='page')}catch{}if(!restarted)await Bun.sleep(100);}
  if(!mac){assert.ok(restarted);socket=new WebSocket(restarted.webSocketDebuggerUrl);await new Promise<void>(resolve=>socket!.onopen=()=>resolve());if(socket)socket.onmessage=onMessage;}
  await wait('!!window.marx');assert.equal((await evaluate('window.marx.workbench.workspace("native-test")')).search,'persisted');
+ await wait(`document.querySelector('.nav-item[aria-current="page"]')?.textContent.trim()==='Results'`);
  assert.equal((await evaluate('window.marx.workbench.bootstrap()')).sessions[0].notes,'Synthetic notes');
  assert.ok((await evaluate('window.marx.scan.jobs()')).some((j:any)=>j.status==='Unknown'));
  await wait(`window.marx.scan.jobs().then(jobs=>jobs.some(j=>j.id===${JSON.stringify(recovering.id)}&&j.status==='Completed'))`);

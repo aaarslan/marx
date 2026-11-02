@@ -24,6 +24,12 @@
       max-width: none;
       transform: translateX(-140px);
     }
+    .handoff-after {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+    }
     .handoff-label {
       position: absolute;
       top: 120px;
@@ -60,9 +66,18 @@
         data-start="0"
         data-duration="8"
       />
+      <img
+        data-layout-allow-overflow
+        id="handoff-image-2"
+        src="assets/prompt-copied.webp"
+        alt="The same prompt after copying, with visible confirmation"
+        class="clip handoff-after"
+        data-start="0"
+        data-duration="8"
+      />
     </div>
     <div class="caption handoff-caption">
-      Generate locally. Copy when ready.<br />Stay in control of the change.
+      Preview the scope. Copy when ready.<br />Your context stays intact.
     </div>
     <div class="demo">SYNTHETIC DEMO DATA</div>
   </div>
@@ -92,6 +107,7 @@
         { y: 0, opacity: 1, duration: 0.5 },
         2.6,
       )
+      .to(".handoff-after", { opacity: 1, duration: 0.2 }, 4)
       .to(".handoff-pane", { y: -25, duration: 3.6, ease: "sine.inOut" }, 3.4);
     window.__timelines.handoff = tl;
   </script></template

@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow';
 import { hasScanCredentials } from '@shared/types';
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon, ShieldCheck, Wrench } from 'lucide-react';
 import { useApp, type View } from './store';
 import { api, isMac } from './api';
@@ -25,13 +25,18 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function App() {
-  const { view, setView, init, triggerMenuAction, settings } = useApp(useShallow((state) => ({
+  const { view, setView, init, triggerMenuAction, settings, connectionId } = useApp(useShallow((state) => ({
     view: state.view,
     setView: state.setView,
     init: state.init,
     triggerMenuAction: state.triggerMenuAction,
-    settings: state.settings
+    settings: state.settings,
+    connectionId: state.connectionId
   })));
+  const [batchVisited, setBatchVisited] = useState(view === 'batch');
+  const main = useRef<HTMLElement>(null);
+  useLayoutEffect(() => { if (main.current) main.current.scrollTop = 0; }, [view]);
+  useEffect(() => { if (view === 'batch') setBatchVisited(true); }, [view]);
 
   useEffect(() => {
     void init();
@@ -87,12 +92,12 @@ export function App() {
             <SettingsIcon size={14} aria-hidden="true" />
           </button>
         </aside>
-        <main className={`main ${view === 'scan' || view === 'settings' ? 'narrow' : ''}`}>
+        <main ref={main} className={`main ${view === 'scan' || view === 'settings' ? 'narrow' : ''}`}>
           <div className="page-content">
           <div hidden={view !== 'scan'}><ScanView /></div>
           <Suspense fallback={<div className="field-help" role="status">Loading view…</div>}>
           {view === 'intelligence' && <IntelligenceView />}
-          {view === 'batch' && <BatchView />}
+          {(view === 'batch' || batchVisited) && <div hidden={view !== 'batch'}><BatchView key={connectionId} /></div>}
           {view === 'results' && <ResultsView />}
           {view === 'history' && <HistoryView />}
           {view === 'workbench' && <WorkbenchView />}

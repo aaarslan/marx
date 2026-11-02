@@ -16,6 +16,9 @@ import (
 var fixtureExecutable string
 
 func TestMain(m *testing.M) {
+	if RunGuardedCLI() {
+		return
+	}
 	dir, err := os.MkdirTemp("", "marx-go-fixture-")
 	if err != nil {
 		os.Exit(1)
@@ -228,6 +231,9 @@ func TestUncertainCancellationNeverResubmits(t *testing.T) {
 	f := fixture(t)
 	f.marker(t, "holdSubmission")
 	job := object(invoke(t, f.e, "scan:run", f.input()))
+	if str(object(job["progress"]), "phase") != "submitting" {
+		t.Fatal("Admitted submission returned idle progress")
+	}
 	awaitMarker(t, f, "submissionStarted")
 	invoke(t, f.e, "scan:cancel-job", job)
 	actual := settled(t, f, str(job, "id"))

@@ -6,7 +6,7 @@ import { Play, Zap, FolderOpen, Settings2, ShieldCheck } from 'lucide-react';
 import type { GitInfo, ProjectInfo, ScanJobState, ScanOptions, ScannerType } from '@shared/types';
 import { api, commandKey } from '../api';
 import { useApp } from '../store';
-import { Banner } from '../components/ui';
+import { Banner, restoreControlFocus } from '../components/ui';
 import { Dropzone, ProgressCard, ScanOptionsEditor } from '../components/ScanOptions';
 
 export function ScanView() {
@@ -139,7 +139,7 @@ export function ScanView() {
       projectId: projectMode === 'existing' ? projectId : undefined,
       options
     });
-    applyEvent({ kind: 'job-updated', job });
+    if (!useApp.getState().jobs.some((current) => current.id === job.id)) applyEvent({ kind: 'job-updated', job });
     void init();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { submitLock.current = false; setSubmitting(false); }
@@ -175,7 +175,7 @@ export function ScanView() {
       }
     });
     storyJobId.current = job.id;
-    applyEvent({ kind: 'job-updated', job });
+    if (!useApp.getState().jobs.some((current) => current.id === job.id)) applyEvent({ kind: 'job-updated', job });
     void init();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { submitLock.current = false; setSubmitting(false); }
@@ -197,7 +197,9 @@ export function ScanView() {
   useEffect(() => {
     if (menuActionId === 0 || !menuAction) return;
     if (menuAction === 'open-folder') {
-      void api.dialog.selectFolder().then((f) => f && void pickFolder(f));
+      void api.dialog.selectFolder().then((f) => f && void pickFolder(f))
+        .catch((error) => setError(error instanceof Error ? error.message : String(error)))
+        .finally(() => restoreControlFocus(document.querySelector<HTMLElement>('[data-file-drop-target]')));
     } else if (menuAction === 'run-scan') {
       runRef.current();
     }

@@ -12,7 +12,7 @@ import {
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, Empty, Spinner, timeAgo } from "./ui";
+import { Banner, Empty, Spinner, timeAgo, restoreControlFocus } from "./ui";
 import {
   DecisionDialog,
   IntelligenceFacts,
@@ -33,6 +33,7 @@ export function DecisionReview() {
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true);
   const returnFocus = useRef<string | null>(null);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const loadVersion = useRef(0);
   const load = () => {
     const request = ++loadVersion.current;
@@ -74,7 +75,7 @@ export function DecisionReview() {
       window.removeEventListener("marx-intelligence-changed", load);
     };
   }, [connection]);
-  const run = async (action: () => Promise<unknown>) => {
+  const run = async (action: () => Promise<unknown>, origin?: HTMLElement) => {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -86,6 +87,7 @@ export function DecisionReview() {
       setError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
+      if (origin) restoreControlFocus(origin);
     }
   };
   useEffect(() => {
@@ -209,7 +211,7 @@ export function DecisionReview() {
         </details>
         <details>
           <summary>Current intelligence</summary>
-          <IntelligenceFacts snapshot={selected.currentEvidence} />
+          {selected.closed && !selected.currentEvidence ? <p className="field-help">Closed decisions are not rechecked. Pinned observations and revision history remain available in this review.</p> : <IntelligenceFacts snapshot={selected.currentEvidence} />}
         </details>
         <details>
           <summary>
@@ -345,12 +347,13 @@ export function DecisionReview() {
         <button
           className="btn small"
           disabled={busy || !items.length}
-          onClick={() => void run(() => api.intelligence.exportDecisions())}
+          onClick={(event) => void run(async () => { setExportNotice(null); const destination = await api.intelligence.exportDecisions(); setExportNotice(destination ? `Decision archive exported to ${destination}` : 'Export canceled. No file was saved.'); }, event.currentTarget)}
         >
           <Download size={13} />
           Export decisions
         </button>
       </div>
+      {exportNotice && <Banner kind="info">{exportNotice}</Banner>}
       <p className="field-help">
         Decisions belong to the current Checkmarx connection and exact
         project/finding/package scope. Refresh intelligence to recheck

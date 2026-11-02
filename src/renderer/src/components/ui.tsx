@@ -2,23 +2,53 @@ import React from 'react';
 import { SEVERITY_COLOR, SEVERITY_LABEL } from '@shared/severity';
 import type { ScanStatus, Severity } from '@shared/types';
 
+export function restoreControlFocus(origin: HTMLElement | null) {
+  const focus = (attempt: number) => {
+    if (!origin?.isConnected || !origin.getClientRects().length) return;
+    if (origin.matches(':disabled')) {
+      if (attempt < 3) requestAnimationFrame(() => focus(attempt + 1));
+      return;
+    }
+    origin.focus({ preventScroll: true });
+  };
+  requestAnimationFrame(() => focus(0));
+}
+
+export function keepDialogFocus(event: React.KeyboardEvent<HTMLDialogElement>) {
+  if (event.key === 'Escape') { event.stopPropagation(); return; }
+  if (event.key !== 'Tab') return;
+  const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href], [tabindex]'))
+    .filter((element) => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+  const first = controls[0];
+  const last = controls[controls.length - 1];
+  if (!first) { event.preventDefault(); return; }
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault(); last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault(); first.focus();
+  }
+}
+
 export function Toggle({
   checked,
   onChange,
   label,
   sub,
-  disabled = false
+  disabled = false,
+  accessibleLabel
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: React.ReactNode;
   sub?: string;
   disabled?: boolean;
+  accessibleLabel?: string;
 }) {
   return (
     <label className="toggle">
       <input
         type="checkbox"
+        aria-label={accessibleLabel}
         disabled={disabled}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}

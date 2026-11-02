@@ -1278,7 +1278,7 @@ select {
 .intel-search { display: flex; gap: 10px; flex-wrap: wrap; }
 .intel-search input { min-width: 180px; }
 .intel-settings { margin-top: 24px; }
-.decision-dialog { width: min(620px, calc(100vw - 40px)); max-height: calc(100vh - 50px); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-solid); color: var(--text); padding: 24px; }
+.decision-dialog { margin: auto; width: min(620px, calc(100vw - 40px)); max-height: calc(100vh - 50px); overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-solid); color: var(--text); padding: 24px; }
 .decision-dialog::backdrop { background: #000a; }
 .decision-dialog .field { margin: 16px 0; }
 .decision-dialog fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin: 20px 0; }

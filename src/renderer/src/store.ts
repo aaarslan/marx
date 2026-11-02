@@ -50,11 +50,24 @@ function navigation(state: AppState): WorkspaceState {
 }
 
 export const useApp = create<AppState>((set, get) => {
+  let pendingNavigation: { connectionId: string | null; state: WorkspaceState } | null = null;
+  let savingNavigation = false;
   const persist = () => {
     if (!get().initialized) return;
-    void api.workbench.saveWorkspace('navigation', navigation(get())).catch((error) => {
-      set({ workbenchError: `Could not save workspace: ${error instanceof Error ? error.message : String(error)}` });
-    });
+    pendingNavigation = { connectionId: get().connectionId, state: navigation(get()) };
+    if (savingNavigation) return;
+    savingNavigation = true;
+    void (async () => {
+      try {
+        while (pendingNavigation) {
+          const next = pendingNavigation;
+          pendingNavigation = null;
+          if (next.connectionId !== get().connectionId) continue;
+          try { await api.workbench.saveWorkspace('navigation', next.state); }
+          catch (error) { set({ workbenchError: `Could not save workspace: ${error instanceof Error ? error.message : String(error)}` }); }
+        }
+      } finally { savingNavigation = false; }
+    })();
   };
   return {
     view: 'scan',
@@ -113,7 +126,7 @@ export const useApp = create<AppState>((set, get) => {
         initialized: true,
         workbenchError: null,
         ...(restore ? {
-          view: saved?.view && VIEWS.includes(saved.view as View) ? saved.view as View : saved?.selectedScanId ? 'results' as const : 'scan' as const,
+          view: get().initialized && get().view === 'settings' ? 'settings' as const : saved?.view && VIEWS.includes(saved.view as View) ? saved.view as View : saved?.selectedScanId ? 'results' as const : 'scan' as const,
           selectedScanId: saved?.selectedScanId ?? null,
           linkedFolder: saved?.linkedFolder ?? null,
           selectedSessionId: saved?.selectedSessionId ?? null,

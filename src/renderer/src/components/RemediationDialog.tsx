@@ -6,7 +6,7 @@ import { useIntelligence } from './IntelligencePanel';
 import { findingCVE } from '@shared/intelligence';
 import { createRemediationPrompts, PROMPT_CHARACTER_TARGET, REMEDIATION_TARGETS, type RemediationContext, type RemediationTarget } from '@shared/remediation';
 import { api } from '../api';
-import { Banner, Spinner } from './ui';
+import { Banner, Spinner, keepDialogFocus, restoreControlFocus } from './ui';
 
 export interface RemediationScope {
   id: string;
@@ -56,7 +56,7 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
     return () => clearTimeout(timer);
   }, [copied]);
 
-  const run = async (action: 'copy' | 'save' | 'track') => {
+  const run = async (action: 'copy' | 'save' | 'track', origin: HTMLButtonElement) => {
     if (!batch || actionLock.current) return;
     actionLock.current = true;
     setBusy(action);
@@ -75,11 +75,14 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
         setFeedback('Saved the findings and handoff in Workbench.');
       }
     } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
-    finally { actionLock.current = false; setBusy(null); }
+    finally {
+      actionLock.current = false; setBusy(null);
+      if (dialog.current?.open) restoreControlFocus(origin);
+    }
   };
 
   return (
-    <dialog className="remediation-dialog" ref={dialog} aria-labelledby="remediation-title" aria-describedby="remediation-description" onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    <dialog className="remediation-dialog" ref={dialog} onKeyDown={keepDialogFocus} aria-labelledby="remediation-title" aria-describedby="remediation-description" onCancel={(event) => { event.preventDefault(); onClose(); }}>
       <div className="remediation-heading">
         <div><div className="page-eyebrow">AI handoff</div><h2 id="remediation-title">Build a remediation prompt</h2></div>
         <button className="btn ghost small" aria-label="Close remediation prompt" onClick={onClose} autoFocus><X size={17} /></button>
@@ -112,10 +115,10 @@ export function RemediationDialog({ selection, onClose, onTrack, trackLabel = 'T
       {batch && batch.text.length > PROMPT_CHARACTER_TARGET && <Banner kind="warn">One finding has unusually large evidence. Its full content is preserved; check your assistant’s input limit before pasting.</Banner>}
       {error && <Banner kind="error">{error}</Banner>}
       {feedback && <div className="remediation-feedback" role="status">{feedback}</div>}
-      {onTrack && !selection.context.demo && <div className="remediation-track"><span className="field-help">Keep this evidence and handoff together, then verify the change with a fresh scan.</span><button className="btn" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={() => void run('track')}>{busy === 'track' ? <Spinner size={13} /> : <Check size={14} />}{trackLabel}</button></div>}
+      {onTrack && !selection.context.demo && <div className="remediation-track"><span className="field-help">Keep this evidence and handoff together, then verify the change with a fresh scan.</span><button className="btn" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={(event) => void run('track', event.currentTarget)}>{busy === 'track' ? <Spinner size={13} /> : <Check size={14} />}{trackLabel}</button></div>}
       <div className="remediation-footer">
         <div className="row"><button className="btn ghost small" aria-label="Previous prompt batch" disabled={!batch || batchIndex === 0 || Boolean(busy)} onClick={() => setIndex(batchIndex - 1)}><ChevronLeft size={15} /></button><span aria-live="polite">Batch {batches.length ? batchIndex + 1 : 0} of {batches.length}</span><button className="btn ghost small" aria-label="Next prompt batch" disabled={!batch || batchIndex >= batches.length - 1 || Boolean(busy)} onClick={() => setIndex(batchIndex + 1)}><ChevronRight size={15} /></button></div>
-        <div className="row"><button className="btn" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={() => void run('save')}>{busy === 'save' ? <Spinner size={13} /> : <Download size={14} />}Save {batches.length > 1 ? 'all batches' : 'prompt'}</button><button className="btn primary" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={() => void run('copy')}>{busy === 'copy' ? <Spinner size={13} /> : copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : batches.length > 1 ? 'Copy this batch' : 'Copy prompt'}</button></div>
+        <div className="row"><button className="btn" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={(event) => void run('save', event.currentTarget)}>{busy === 'save' ? <Spinner size={13} /> : <Download size={14} />}Save {batches.length > 1 ? 'all batches' : 'prompt'}</button><button className="btn primary" disabled={!batch || Boolean(busy) || intelligenceLoading} onClick={(event) => void run('copy', event.currentTarget)}>{busy === 'copy' ? <Spinner size={13} /> : copied ? <Check size={14} /> : <Copy size={14} />}{copied ? 'Copied' : batches.length > 1 ? 'Copy this batch' : 'Copy prompt'}</button></div>
       </div>
     </dialog>
   );

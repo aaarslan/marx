@@ -20,6 +20,8 @@ Obtain your organization's approved Checkmarx CLI separately. Open **Settings**,
 
 Never paste credentials into notes, prompts, screenshots or issue reports. API keys and existing CLI authentication are different modes; changing modes is an explicit action.
 
+The connection check keeps Settings open so you can read its result and correct the selected fields. **Help → Marx documentation** opens this walkthrough in your external browser while leaving the application available.
+
 ## 3. Run a scan
 
 Open **Scan**, use the native folder picker (Command+O on macOS, Control+O on Windows), or drop a folder. Map it to the intended Checkmarx project. Check the branch, scanners and effective settings, then start the scan. Review the source before upload: the selected CLI uploads it to your tenant.
@@ -28,9 +30,13 @@ Progress and logs stay in the application. Cancel stops the local process tree; 
 
 For **Batch Scan**, inspect the discovered roots and mappings before starting. Shared workspace files can affect multiple packages. Review dependency changes at the workspace root rather than treating every package as independent.
 
+Prepared packages, selections and overrides remain available when you visit another view during the same application session. Changing the CLI connection clears that connection's prepared batch. Deliberate navigation opens the destination at the top of its content; scan updates do not reset the current view's scroll position.
+
 ## 4. Investigate results
 
 In **Results**, choose a scan. Filter by scanner, severity and state; search finding names, files and CVEs. Open a finding for its location, flow and available evidence. Use **Group by fix** to inspect related work. Only a page of matching results is returned to the view. Saved evidence can be read without starting another scan.
+
+If **History** cannot load remote scans and has no saved evidence, use **Open CLI settings** to check the connection, then return and refresh. This unavailable state does not establish that your tenant has no scans.
 
 Choose a baseline to compare available evidence. Enable other branches only when the comparison is intentional. Missing source revision or effective configuration stays visibly unavailable. A disappearing finding alone does not prove a code change fixed it when scan scope or evidence differs.
 
@@ -46,11 +52,13 @@ Select the relevant findings and choose **Fix with AI**. Inspect the generated p
 
 Use **Workbench** to retain a named session, pinned findings and notes. Keep the original evidence while changing the code. Link the relevant repository intentionally. After testing, run a verification scan and compare compatible evidence. Inconclusive verification remains inconclusive; absence of evidence is not a successful fix.
 
+Verification feedback appears beside its controls. If comparison is rejected, the previous comparison remains available with its original checked time; the error explicitly says it was not updated. Choose a completed scan later than the baseline and compare again.
+
 ![Workbench with synthetic notes](../website/assets/workbench.webp)
 
 ## 7. Export and troubleshoot
 
-**Export evidence** writes a file you choose through the native save dialog. Exports, logs, screenshots and the local database can contain sensitive source details. Store and share them accordingly. Database file permissions reduce accidental access; the database is not encrypted.
+**Export evidence** offers CSV, JSON and SARIF. CSV and JSON write the filtered findings to Downloads and reveal the file; SARIF uses the official CLI and a native save dialog. The application reports the destination or a canceled save. Remediation prompts, Workbench bundles and decision archives also use native save dialogs. Canceling preserves the underlying view and returns keyboard focus to the originating control. Exports, logs, screenshots and the local database can contain sensitive source details. Store and share them accordingly. Database file permissions reduce accidental access; the database is not encrypted.
 
 If the CLI is missing, correct its executable path in Settings. For authentication errors, verify the selected mode and tenant with your administrator. For unsupported/corrupt databases, preserve the original profile and test with a fresh isolated profile as described in the build guide. Do not delete your working profile as a first troubleshooting step.
 
@@ -64,6 +72,10 @@ In **Results**, expand a CVE finding's intelligence panel or refresh the scan's 
 
 Use **Watch CVE** to track later observed changes in the **CVE intelligence** view. Its **Watching** state confirms the watch and lets you stop watching. Choose **Record decision** to save a scoped rationale, review date and optional evidence assumptions. **Workbench → Decisions** flags broken assumptions and retains both the original observation and the evidence that prompted review. Revise or close the decision explicitly; none of these actions change Checkmarx result states or verify a fix.
 
+Removing a watched item moves keyboard focus to the nearest remaining item, or reveals the CVE lookup field when the list becomes empty.
+
+Tab and Shift+Tab cycle through the prompt and decision dialogs. Escape dismisses the dialog and returns focus to its launcher without closing the finding underneath. Closed decisions retain pinned evidence and revision history; they are no longer rechecked against current intelligence.
+
 Read [CVE intelligence and decision reviews](cve-intelligence.md) for source controls, exact disclosure, export semantics, retention and limits.
 
 ## Showcase transcript
@@ -72,7 +84,7 @@ Read [CVE intelligence and decision reviews](cve-intelligence.md) for source con
 - **5–12:** Choose your source and settings through a graphical scan workflow.
 - **12–20:** Filter findings and inspect the available evidence.
 - **20–28:** Add known-exploitation and published-probability context, with visible sources and unknowns.
-- **28–36:** Generate a local remediation handoff for your chosen assistant.
+- **28–36:** Preview the scope, then copy a local remediation handoff. Marx confirms the copy.
 - **36–43:** See an active decision move to needs review after exploitation evidence changes; original evidence stays pinned.
 - **43–48:** Scans through the official CLI. Optional public intelligence uses CVE IDs, without source code or credentials.
 - **48–52:** Marx. Explore the source and build guide.

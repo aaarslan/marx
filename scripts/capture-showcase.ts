@@ -106,7 +106,7 @@ const view = async (name: string) => {
 };
 const capture = async (name: string) => {
   const html = await evaluate(
-    `(()=>{const copy=document.documentElement.cloneNode(true);copy.querySelectorAll('input').forEach((node,index)=>node.setAttribute('value',document.querySelectorAll('input')[index].value));copy.querySelectorAll('textarea').forEach((node,index)=>node.textContent=document.querySelectorAll('textarea')[index].value);copy.querySelectorAll('option').forEach((node,index)=>{if(document.querySelectorAll('option')[index].selected)node.setAttribute('selected','');else node.removeAttribute('selected')});copy.querySelectorAll('script').forEach(e=>e.remove());return '<!doctype html>'+copy.outerHTML})()`,
+    `(()=>{const copy=document.documentElement.cloneNode(true);const active=Array.from(document.documentElement.querySelectorAll('*')).indexOf(document.activeElement);if(active>=0)copy.querySelectorAll('*')[active].setAttribute('data-captured-focus','true');copy.querySelectorAll('input').forEach((node,index)=>node.setAttribute('value',document.querySelectorAll('input')[index].value));copy.querySelectorAll('textarea').forEach((node,index)=>node.textContent=document.querySelectorAll('textarea')[index].value);copy.querySelectorAll('option').forEach((node,index)=>{if(document.querySelectorAll('option')[index].selected)node.setAttribute('selected','');else node.removeAttribute('selected')});copy.querySelectorAll('script').forEach(e=>e.remove());return '<!doctype html>'+copy.outerHTML})()`,
   );
   fs.mkdirSync(path.join(captureDir, name), { recursive: true });
   let frozen = html
@@ -119,7 +119,7 @@ const capture = async (name: string) => {
     );
   frozen = frozen.replace(
     "</body>",
-    `<script src="assets/gsap.min.js"></script><script>document.querySelectorAll('dialog[open]').forEach(d=>{d.removeAttribute('open');d.showModal()});window.__timelines={capture:gsap.timeline({paused:true}).to({clock:0},{clock:1,duration:1})};</script></body>`,
+    `<script src="assets/gsap.min.js"></script><script>document.querySelectorAll('dialog[open]').forEach(d=>{d.removeAttribute('open');d.showModal()});document.querySelector('[data-captured-focus]')?.focus({preventScroll:true});window.__timelines={capture:gsap.timeline({paused:true}).to({clock:0},{clock:1,duration:1})};</script></body>`,
   );
   fs.writeFileSync(path.join(captureDir, name, "index.html"), frozen);
   fs.cpSync(
@@ -160,7 +160,11 @@ try {
     `Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Fix with AI').click()`,
   );
   await wait('!!document.querySelector("dialog[open]")');
+  await wait(`Array.from(document.querySelectorAll('dialog button')).some(button=>button.textContent.trim()==='Copy prompt'&&!button.disabled)`);
   await capture("prompt");
+  await evaluate(`Array.from(document.querySelectorAll('dialog button')).find(button=>button.textContent.trim()==='Copy prompt').click()`);
+  await wait(`Array.from(document.querySelectorAll('dialog button')).some(button=>button.textContent.trim()==='Copied')`);
+  await capture("prompt-copied");
   await evaluate(
     `document.querySelector('dialog button[aria-label="Close remediation prompt"]')?.click()`,
   );
@@ -242,6 +246,7 @@ for (const name of [
   "results",
   "detail",
   "prompt",
+  "prompt-copied",
   "workbench",
   "intelligence",
   "decisions",
@@ -277,4 +282,4 @@ for (const name of [
     `website/assets/${name}.webp`,
   );
 }
-console.log("Captured and encoded eight synthetic native application screens.");
+console.log("Captured and encoded nine synthetic native application states.");

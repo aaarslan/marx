@@ -12,7 +12,7 @@ import {
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, Spinner, timeAgo } from "./ui";
+import { Banner, Spinner, timeAgo, keepDialogFocus } from "./ui";
 
 export function notifyIntelligence() {
   window.dispatchEvent(new Event("marx-intelligence-changed"));
@@ -425,7 +425,7 @@ export function FindingIntelligence({
             <Star size={13} />
             Watch CVE
           </button>
-          <button className="btn ghost small" onClick={() => setDecision(true)}>
+          <button className="btn ghost small" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setDecision(true); }}>
             Record decision
           </button>
         </div>
@@ -538,6 +538,7 @@ export function DecisionDialog({
     <dialog
       ref={dialog}
       className="decision-dialog"
+      onKeyDown={keepDialogFocus}
       aria-labelledby="decision-title"
       onCancel={(event) => {
         event.preventDefault();

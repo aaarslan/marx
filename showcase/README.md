@@ -9,7 +9,7 @@ bun run build
 bun scripts/capture-showcase.ts
 ```
 
-The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures eight actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,workbench,intelligence,decisions,decision-baseline}.webp` with `cwebp`. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
+The capture script builds a private acceptance host and fixture, uses a fresh isolated profile, captures nine actual native DOM states, and terminates its host. Never ship the acceptance binary. The script snapshots each frozen state in `.cache/showcase/captured/` with the pinned animation runtime. It encodes the resulting PNG frames to `website/assets/{scan,results,detail,prompt,prompt-copied,workbench,intelligence,decisions,decision-baseline}.webp` with `cwebp`. The handoff pair records the prompt before and after its real clipboard action, including the application's copy confirmation. The frozen marketing copies omit the app CSP so the local renderer can initialize; the application CSP is unchanged.
 
 ```sh
 bun scripts/build-showcase.ts

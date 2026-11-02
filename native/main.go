@@ -162,6 +162,9 @@ func secureAssets(next http.Handler) http.Handler {
 	})
 }
 func main() {
+	if engine.RunGuardedCLI() {
+		return
+	}
 	if runProcessGuard() {
 		return
 	}
@@ -187,6 +190,8 @@ func main() {
 	identity := sha256.Sum256([]byte(engine.PathIdentity(profile)))
 	windowsOptions := browserOptions()
 	windowsOptions.WebviewUserDataPath = filepath.Join(profile, "webview2")
+	macOptions := application.MacWindow{TitleBar: application.MacTitleBarHiddenInset}
+	macOptions.WebviewPreferences.TabFocusesLinks.Set(true)
 	s := &DesktopService{ready: make(chan struct{})}
 	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Mac: application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true}, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 		if s.win != nil {
@@ -194,7 +199,15 @@ func main() {
 			s.win.Focus()
 		}
 	}}})
-	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, Mac: application.MacWindow{TitleBar: application.MacTitleBarHiddenInset}, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true})
+	s.win = s.app.Window.NewWithOptions(application.WebviewWindowOptions{Title: "Marx", Width: 1280, Height: 840, MinWidth: 960, MinHeight: 640, Mac: macOptions, BackgroundColour: application.NewRGB(23, 24, 28), URL: "/", EnableFileDrop: true})
+	menu := application.DefaultApplicationMenu()
+	menu.RemoveMenuItem(menu.FindByLabel("Help"))
+	menu.AddSubmenu("Help").Add("Marx documentation").OnClick(func(_ *application.Context) {
+		if _, err := s.native("external", engine.Object{"url": "https://github.com/aaarslan/marx/blob/feature/wails-desktop/docs/walkthrough.md"}); err != nil {
+			s.app.Dialog.Error().SetTitle("Could not open Marx documentation").SetMessage(err.Error()).Show()
+		}
+	})
+	s.app.Menu.Set(menu)
 	var runtimeReady sync.Once
 	s.win.OnWindowEvent(events.Common.WindowRuntimeReady, func(_ *application.WindowEvent) {
 		runtimeReady.Do(func() {

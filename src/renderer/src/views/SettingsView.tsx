@@ -5,7 +5,7 @@ import type { ScanDefaults, Settings, TestConnectionResult } from '@shared/types
 import { api } from '../api';
 import { useApp } from '../store';
 import { IntelligenceSettings } from '../components/IntelligenceSettings';
-import { Banner, Spinner, Toggle } from '../components/ui';
+import { Banner, Spinner, Toggle, restoreControlFocus } from '../components/ui';
 
 export function SettingsView() {
   const { settings, init } = useApp(useShallow((state) => ({
@@ -107,9 +107,11 @@ export function SettingsView() {
             CLI executable
             <div className="row">
               <input type="text" aria-label="CLI executable" value={cliPath} onChange={(event) => setCliPath(event.target.value)} placeholder="Auto-detect cx from PATH" style={{ flex: 1 }} />
-              <button className="btn" aria-label="Browse for Checkmarx CLI" disabled={testing || saving} onClick={async () => {
+              <button className="btn" aria-label="Browse for Checkmarx CLI" disabled={testing || saving} onClick={async (event) => {
+                const origin = event.currentTarget;
                 try { const selected = await api.dialog.selectCli(); if (selected) { setCliPath(selected); setTestResult(null); } }
                 catch (error) { setSaveError(error instanceof Error ? error.message : String(error)); }
+                finally { restoreControlFocus(origin); }
               }}>Browse…</button>
             </div>
             <span className="faint">Select the same cx executable that works in your terminal. Marx does not download or replace your CLI.</span>
@@ -153,7 +155,7 @@ export function SettingsView() {
                 placeholder={settings.hasApiKey ? '••••••••••••  (enter a new key to replace)' : 'Paste your Checkmarx One API key'}
                 style={{ flex: 1 }}
               />
-              <button className="btn" disabled={!apiKey.trim() || !settings.credentialStorageAvailable || savingKey || saving || testing} onClick={() => void saveKey()}>
+              <button className="btn" aria-label="Save API key" disabled={!apiKey.trim() || !settings.credentialStorageAvailable || savingKey || saving || testing} onClick={() => void saveKey()}>
                 {savingKey ? <Spinner size={12} /> : null}{savingKey ? 'Saving…' : 'Save key'}
               </button>
             </div>

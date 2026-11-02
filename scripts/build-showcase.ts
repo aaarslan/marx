@@ -15,6 +15,7 @@ for (const name of [
   "results",
   "detail",
   "prompt",
+  "prompt-copied",
   "workbench",
   "intelligence",
   "decisions",

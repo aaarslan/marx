@@ -4,7 +4,7 @@ import { FolderOpen, UploadCloud, Check, ArrowUpRight } from 'lucide-react';
 import type { ScanJobState, ScanOptions, ScannerType } from '@shared/types';
 import { SEVERITY_COLOR } from '@shared/severity';
 import { api, commandKey } from '../api';
-import { Toggle, formatCount } from './ui';
+import { Toggle, formatCount, restoreControlFocus } from './ui';
 
 export function Dropzone({
   folder,
@@ -26,10 +26,12 @@ export function Dropzone({
       type="button"
       className={`dropzone ${over ? 'over' : ''} ${folder ? 'has-folder' : ''}`}
       aria-label={folder ? `Change project folder: ${folder}` : 'Choose a project folder'}
-      onClick={async () => {
+      onClick={async (event) => {
+        const origin = event.currentTarget;
         setDropError(null);
         try { const folder = await api.dialog.selectFolder(); if (folder) onPick(folder); }
         catch (e) { setDropError(e instanceof Error ? e.message : String(e)); }
+        finally { restoreControlFocus(origin); }
       }}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={(e) => { if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setOver(false); }}
@@ -77,6 +79,7 @@ export function ScannerToggles({
         </div>
         <Toggle
           checked={scanners.includes('sast')}
+          accessibleLabel="SAST scanning"
           onChange={() => flip('sast')}
           label={scanners.includes('sast') ? 'Enabled' : 'Disabled'}
         />
@@ -96,6 +99,7 @@ export function ScannerToggles({
         </div>
         <Toggle
           checked={scanners.includes('sca')}
+          accessibleLabel="SCA scanning"
           onChange={() => flip('sca')}
           label={scanners.includes('sca') ? 'Enabled' : 'Disabled'}
         />
@@ -166,7 +170,7 @@ export function ScanOptionsEditor({
 
       <div className="section-title">Excludes</div>
       <label className="field">
-        Folders / files to skip (one per line). Add <span className="mono">!name</span> to re-include a default.
+        <span>Folders / files to skip (one per line). Add <span className="mono">!name</span> to re-include a default.</span>
         <textarea
           rows={3}
           value={options.excludes.join('\n')}
@@ -183,7 +187,7 @@ export function ScanOptionsEditor({
 
       <div className="section-title">Tags</div>
       <label className="field">
-        Tags applied to the scan (<span className="mono">key:value</span>, comma-separated)
+        <span>Tags applied to the scan (<span className="mono">key:value</span>, comma-separated)</span>
         <input
           type="text"
           placeholder="team:frontend, tier:critical"
