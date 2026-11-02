@@ -1072,6 +1072,11 @@ select {
   background-repeat: no-repeat;
 }
 
+select option {
+  background: var(--surface-solid);
+  color: var(--text);
+}
+
 .remediation-dialog {
   width: min(1000px, calc(100vw - 48px));
   margin: auto;

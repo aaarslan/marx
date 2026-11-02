@@ -14,7 +14,10 @@ export async function verifyIntelligenceLayout(evaluate: Evaluate, wait: Wait) {
   if (layout.width > 1100) {
     assert.ok(Math.abs(layout.watch.top-layout.details.top)<=1, 'Intelligence panels do not share a top edge');
     assert.ok(Math.abs(layout.watch.bottom-layout.details.bottom)<=1, 'Intelligence panels do not share a bottom edge');
-  } else assert.ok(layout.details.top>=layout.watch.bottom+16, 'Minimum-size intelligence panels did not stack');
+  } else {
+    const stackedGap = Math.round((layout.details.top-layout.watch.bottom)*64)/64;
+    assert.ok(stackedGap>=16, 'Minimum-size intelligence panels did not stack: '+JSON.stringify(layout));
+  }
   assert.ok(layout.empty.top-layout.refresh.bottom>=16, 'Refresh action is cramped against watchlist content');
   assert.ok(layout.overflow<=1, 'Intelligence layout overflows the native content area');
   await evaluate(`(()=>{window.uiWatchProbe={original:window.marx.intelligence.watchlist};window.marx.intelligence.watchlist=()=>new Promise(resolve=>window.uiWatchProbe.resolve=resolve);Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Scan').click()})()`);
@@ -80,6 +83,15 @@ export async function verifyIntelligenceFilterReset(evaluate: Evaluate, wait: Wa
 export async function verifyResultsLoading(evaluate: Evaluate, wait: Wait) {
   await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Results').click()`);
   await wait(`!!document.querySelector('select[aria-label="Scan"] option[value="large-paging"]')`);
+  await evaluate(`(()=>{const field=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(field,'s1');field.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+  await wait(`document.querySelectorAll('.finding-link').length>0`);
+  await evaluate(`(()=>{const field=document.querySelector('input[aria-label="Search findings"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,'synthetic-no-matching-findings');field.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+  await wait(`!!document.querySelector('.results-table .empty')`);
+  const emptyTable = await evaluate(`(()=>{const table=document.querySelector('.results-table table');const headers=Array.from(table.querySelectorAll('th'));return {columns:headers.length,span:table.querySelector('tbody td').colSpan,headerRight:headers.at(-1).getBoundingClientRect().right,tableRight:table.getBoundingClientRect().right}})()`);
+  assert.equal(emptyTable.span,emptyTable.columns,'Empty results introduced columns without headers');
+  assert.ok(Math.abs(emptyTable.headerRight-emptyTable.tableRight)<=1,'Empty results header does not span the table');
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Clear filters').click()`);
+  await wait(`document.querySelectorAll('.finding-link').length>0`);
   await evaluate(`(()=>{
     window.uiResultsProbe={original:window.marx.results.get};
     window.marx.results.get=(...args)=>new Promise((resolve,reject)=>window.uiResultsProbe.original(...args).then(data=>{window.uiResultsProbe.release=()=>resolve(data)},reject));
