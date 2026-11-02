@@ -20,9 +20,9 @@
       height: 820px;
     }
     .intelligence-pane img {
-      width: 1600px;
+      width: 1280px;
       max-width: none;
-      transform: translate(-570px, -190px);
+      transform: translate(-230px, -20px);
     }
     .intelligence-label {
       position: absolute;
@@ -92,6 +92,7 @@
         { opacity: 1, y: 0, duration: 0.5 },
         2.5,
       )
+      .to(".intelligence-pane img", { scale: 1.25, x: -570, y: -190, transformOrigin: "0 0", duration: 0.6, ease: "power3.out" }, 2.9)
       .to(
         ".intelligence-pane",
         { y: -20, duration: 3.5, ease: "sine.inOut" },

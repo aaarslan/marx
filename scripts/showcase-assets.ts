@@ -1,8 +1,13 @@
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+let animationRuntime: Buffer | undefined;
 
 export async function writeAnimationRuntime(destination: string) {
+  if (animationRuntime) {
+    fs.writeFileSync(destination, animationRuntime);
+    return;
+  }
   const response = await fetch(
     "https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js",
     { signal: AbortSignal.timeout(20000) },
@@ -25,6 +30,7 @@ export async function writeAnimationRuntime(destination: string) {
   )
     throw new Error("Animation runtime checksum mismatch");
   fs.writeFileSync(destination, runtime);
+  animationRuntime = runtime;
 }
 
 export function encodeWebP(source: string, destination: string) {

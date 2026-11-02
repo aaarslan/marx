@@ -27,8 +27,11 @@ for (const name of ["index.html", "walkthrough.html", "404.html"]) {
         `Missing anchor: ${value}`,
       );
   }
-  for (const match of html.matchAll(/<img\b([^>]+)>/g))
+  for (const match of html.matchAll(/<img\b([^>]+)>/g)) {
     assert.match(match[1], /alt="[^"]*"/);
+    assert.match(match[1], /width="[1-9]\d*"/, `Missing image width in ${name}`);
+    assert.match(match[1], /height="[1-9]\d*"/, `Missing image height in ${name}`);
+  }
 }
 const landing = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.ok(

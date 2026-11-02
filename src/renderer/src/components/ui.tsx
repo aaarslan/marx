@@ -116,8 +116,10 @@ export function Banner({
 export const Spinner = ({ size = 14 }: { size?: number }) => (
   <span
     className="spin"
+    aria-hidden="true"
     style={{
       display: 'inline-block',
+      flexShrink: 0,
       width: size,
       height: size,
       border: '2px solid var(--border-strong)',
@@ -126,5 +128,16 @@ export const Spinner = ({ size = 14 }: { size?: number }) => (
     }}
   />
 );
+
+export function LoadingState({ label, compact = false, rows = 3 }: { label: string; compact?: boolean; rows?: number }) {
+  return (
+    <div className={`loading-state${compact ? ' compact' : ''}`} role="status" aria-live="polite" aria-atomic="true">
+      <span className="loading-state-label">{label}</span>
+      <div className="loading-placeholders" aria-hidden="true">
+        {Array.from({ length: rows }, (_, index) => <span className="loading-placeholder" key={index} />)}
+      </div>
+    </div>
+  );
+}
 
 export { timeAgo, formatCount } from '@shared/format';

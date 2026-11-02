@@ -15,7 +15,7 @@ import { DEMO_RESULTS } from '../demo';
 import { RemediationDialog, type RemediationSelection } from '../components/RemediationDialog';
 import { FindingIntelligence, IntelligenceRefresh, useIntelligence } from '../components/IntelligencePanel';
 import { findingCVE, intelligenceLabel, matchesIntelligence } from '@shared/intelligence';
-import { Banner, Empty, SeverityBadge, Spinner, timeAgo, formatCount, restoreControlFocus } from '../components/ui';
+import { Banner, Empty, LoadingState, SeverityBadge, Spinner, timeAgo, formatCount, restoreControlFocus } from '../components/ui';
 
 interface Snippet {
   path: string;
@@ -96,8 +96,6 @@ export function ResultsView() {
     setChecked(new Set());
     setGroupId(null);
     setGroupPage(0);
-    setSnippet(null);
-    setSnippetError(null);
     setComparison(null);
     if (!selectedScanId || demo) { setWorkspaceReady(demo ? 'demo' : workspaceKey); return; }
     void api.workbench.workspace(workspaceKey).then((saved) => {
@@ -149,8 +147,6 @@ export function ResultsView() {
   useEffect(() => {
     setPage(null);
     setError(null);
-    setSnippet(null);
-    setSnippetError(null);
     if (!selectedScanId || demo) { setLoading(false); return; }
     let current = true;
     const requestId = `results-${crypto.randomUUID()}`;
@@ -162,6 +158,13 @@ export function ResultsView() {
     }).catch((err) => { if (current) setError(err.message); }).finally(() => { if (current) setLoading(false); });
     return () => { current = false; void api.results.cancel(requestId).catch(() => undefined); };
   }, [selectedScanId, connectionId, refreshVersion, demo]);
+
+  useEffect(() => {
+    snippetRequest.current++;
+    setSnippet(null);
+    setSnippetError(null);
+    return () => { snippetRequest.current++; };
+  }, [linkedFolder, selectedScanId, connectionId, refreshVersion, demo]);
 
   useEffect(() => {
     if (demo || !selectedScanId || !page || loading || !workspace.baselineId || workspaceReady !== workspaceKey) { setComparison(null); setDiffLoading(false); return; }
@@ -312,7 +315,7 @@ export function ResultsView() {
       event.preventDefault(); moveFinding(event.key === 'ArrowDown' ? 1 : -1);
     }}>
       <div className="row between workspace-heading">
-        <div><div className="page-eyebrow">Findings explorer</div><h1 className="page-title">Results</h1><p className="page-sub">Investigate evidence, prepare a focused change, and verify it.</p></div>
+        <div><h1 className="page-title">Results</h1><p className="page-sub">Investigate evidence, prepare a focused change, and verify it.</p></div>
         <div className="row">
           {selectedScanId && !demo && <button className="btn small" onClick={async (event) => {
             const origin = event.currentTarget;
@@ -347,17 +350,17 @@ export function ResultsView() {
       {(demo || !selectedScanId) && <Banner kind="info" action={<div className="row"><button className="btn small" onClick={() => { setDemo((value) => !value); setError(null); }}>{demo ? 'Close demo' : 'Load demo results'}</button>{!hasScanCredentials(settings) && <button className="btn small" onClick={() => setView('settings')}>Connect account</button>}</div>}>{demo ? 'Demo scan · 9 sample findings. Triage and remediation tracking are read-only.' : 'Open saved evidence or explore a sample scan. Saved evidence stays available without a new scan.'}</Banner>}
       {!demo && notice && <Banner kind="warn" action={<button className="btn ghost small" aria-label="Dismiss notice" onClick={() => setNotice(null)}><X size={14} /></button>}>{notice}</Banner>}
       {activePage && !demo && currentScan && <div className="comparison-controls"><label className="field">Baseline<select aria-label="Baseline scan" value={workspace.baselineId ?? ''} onChange={(event) => updateWorkspace({ baselineId: event.target.value || null, change: 'ALL' })}><option value="">Choose baseline…</option>{workspace.baselineId && !candidates.some((scan) => scan.id === workspace.baselineId) && <option value={workspace.baselineId}>{workspace.baselineId.slice(0, 12)} · saved selection</option>}{candidates.map((scan) => <option key={scan.id} value={scan.id}>{scan.branch} · {new Date(scan.createdAt).toLocaleString()} · {scan.id.slice(0, 8)}</option>)}</select></label><label className="check"><input type="checkbox" checked={Boolean(workspace.includeOtherBranches)} onChange={(event) => updateWorkspace({ includeOtherBranches: event.target.checked, baselineId: null, change: 'ALL' })} />Show other branches</label><button className="btn ghost small" disabled={historyLoading} onClick={async () => { if (!currentScan?.projectId) return; setHistoryLoading(true); try { const more = await api.scan.history({ projectId: currentScan.projectId, offset: historyOffset.current, limit: 100 }); historyOffset.current += more.length; setProjectHistory((current) => mergeHistory(current, more)); if (!more.length) setNotice('No older scans were returned for this project.'); } catch (err) { setNotice(err instanceof Error ? err.message : String(err)); } finally { setHistoryLoading(false); } }}>{historyLoading ? 'Loading scans…' : 'Find older baselines'}</button></div>}
-      {diffLoading && <div className="field-help" role="status">Comparing complete saved evidence…</div>}
+      {diffLoading && <LoadingState label="Comparing complete saved evidence" compact rows={1} />}
       {comparison && !diffLoading && <div className="comparison-summary"><Banner kind={comparison.verdict === 'pass' ? 'ok' : comparison.verdict === 'attention' ? 'error' : 'warn'}><strong>{comparison.headline}</strong>{comparison.reasons.length > 0 && <ul>{comparison.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}</Banner><div className="row comparison-counts"><span>{comparison.newCount} new</span><span>{comparison.persistentCount} persistent</span><span>{comparison.escalatedCount} escalated</span><span>{comparison.reducedCount} reduced</span><span>{comparison.absent.length} absent</span></div>{comparison.absent.length > 0 && <details className="absent-findings"><summary>Review absent baseline findings ({comparison.absent.length})</summary><p className="field-help">Absence is not proof of remediation. Check coverage and comparison reasons above.</p><div className="bounded-list">{comparison.absent.map((finding) => <div className="row absent-row" key={finding.id}><SeverityBadge severity={finding.severity} /><span>{finding.title}</span><span className="mono faint">{finding.where}</span></div>)}</div></details>}</div>}
       {activePage && <>
         {!!cves.length && !demo && <div className="intel-results-toolbar"><IntelligenceRefresh cves={cves}/><select aria-label="Intelligence filter" value={workspace.intelligenceFilter ?? 'all'} onChange={event=>updateWorkspace({intelligenceFilter:event.target.value})}><option value="all">All intelligence states</option><option value="kev">KEV evidence, including cached</option><option value="epss">Fresh EPSS ≥ 10%</option><option value="unknown">No current intelligence</option></select><span className="field-help">Severity stays as reported by Checkmarx.</span></div>}
         {intelligenceError && <Banner kind="warn">{intelligenceError}</Banner>}
-        <div className="toolbar result-filters"><div className="search-field"><Search size={14} /><input type="search" aria-label="Search findings" placeholder="Search findings, files, CVEs…" value={workspace.search ?? ''} onChange={(event) => updateWorkspace({ search: event.target.value })} /></div><select aria-label="Scanner filter" value={workspace.scanner ?? 'ALL'} onChange={(event) => updateWorkspace({ scanner: event.target.value })}><option value="ALL">All scanners</option>{[...new Set(findings.map((finding) => finding.type))].map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}</select><select aria-label="State filter" value={workspace.state ?? 'ALL'} onChange={(event) => updateWorkspace({ state: event.target.value })}><option value="ALL">All states</option>{RESULT_STATES.map((state) => <option key={state.value} value={state.value}>{state.label}</option>)}</select>{comparison && <select aria-label="Change filter" value={workspace.change ?? 'ALL'} onChange={(event) => updateWorkspace({ change: event.target.value })}><option value="ALL">All changes</option>{Object.entries(CHANGE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>}<button className={`btn small ${workspace.groupByFix ? 'selected' : ''}`} aria-pressed={Boolean(workspace.groupByFix)} onClick={() => { updateWorkspace({ groupByFix: !workspace.groupByFix }); setGroupId(null); }}><Layers size={14} />Group by fix</button>{hasFilters && <button className="btn ghost small" onClick={() => updateWorkspace({ search: '', severities: [], scanner: 'ALL', state: 'ALL', change: 'ALL' })}><X size={13} />Clear filters</button>}</div>
+        <div className="toolbar result-filters"><div className="search-field"><Search size={14} /><input type="search" aria-label="Search findings" placeholder="Search findings, files, CVEs…" value={workspace.search ?? ''} onChange={(event) => updateWorkspace({ search: event.target.value })} /></div><select aria-label="Scanner filter" value={workspace.scanner ?? 'ALL'} onChange={(event) => updateWorkspace({ scanner: event.target.value })}><option value="ALL">All scanners</option>{[...new Set(findings.map((finding) => finding.type))].map((type) => <option key={type} value={type}>{type.toUpperCase()}</option>)}</select><select aria-label="State filter" value={workspace.state ?? 'ALL'} onChange={(event) => updateWorkspace({ state: event.target.value })}><option value="ALL">All states</option>{RESULT_STATES.map((state) => <option key={state.value} value={state.value}>{state.label}</option>)}</select>{comparison && <select aria-label="Change filter" value={workspace.change ?? 'ALL'} onChange={(event) => updateWorkspace({ change: event.target.value })}><option value="ALL">All changes</option>{Object.entries(CHANGE_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>}<button className={`btn small ${workspace.groupByFix ? 'selected' : ''}`} aria-pressed={Boolean(workspace.groupByFix)} onClick={() => { updateWorkspace({ groupByFix: !workspace.groupByFix }); setGroupId(null); }}><Layers size={14} />Group by fix</button>{hasFilters && <button className="btn ghost small" onClick={() => updateWorkspace({ search: '', severities: [], scanner: 'ALL', state: 'ALL', change: 'ALL', intelligenceFilter: 'all' })}><X size={13} />Clear filters</button>}</div>
         <div className="row severity-filters">{SEVERITIES.map((severity) => <button key={severity} className={`chip clickable ${workspace.severities?.includes(severity) ? 'on' : ''}`} aria-pressed={workspace.severities?.includes(severity) ?? false} aria-label={`${SEVERITY_LABEL[severity]} severity, ${counts[severity]} findings`} onClick={() => updateWorkspace({ severities: workspace.severities?.includes(severity) ? workspace.severities.filter((value) => value !== severity) : [...(workspace.severities ?? []), severity] })}><span className="dot" style={{ background: SEVERITY_COLOR[severity] }} />{SEVERITY_LABEL[severity]}<span className="count">{formatCount(counts[severity])}</span></button>)}<span className="faint result-count">{formatCount(filtered.length)} of {formatCount(findings.length)} findings</span></div>
       </>}
       {activePage?.truncated && <Banner kind="warn">This evidence is incomplete: {formatCount(findings.length)} of {formatCount(activePage.totalCount)} findings are available. Exports include available evidence; verification cannot pass.</Banner>}
       {error && <Banner kind="error" action={<button className="btn ghost small" aria-label="Dismiss error" onClick={() => setError(null)}><X size={14} /></button>}>{error}</Banner>}
-      {loading && <div className="empty" role="status"><Spinner size={22} /><span>Loading findings…</span></div>}
+      {loading && <LoadingState label="Loading findings" rows={5} />}
       {activePage && !loading && <>
         {workspace.groupByFix && !activeGroup && <><div className="remediation-groups">{visibleGroups.map((group) => <article className="remediation-group" key={group.id}><div className="row between"><div className="row"><SeverityBadge severity={group.severity} /><strong>{group.title}</strong></div><span className="faint">{group.findingIds.length} findings</span></div><p className="field-help">{group.rationale}</p><div className="row"><button className="btn small" onClick={() => { setGroupId(group.id); setTablePage(0); }}>Inspect group</button><button className="btn ghost small" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); openRemediation(group); }}><Sparkles size={13} />Prepare fixes</button></div></article>)}</div><div className="pagination" aria-label="Fix group pages"><button className="btn ghost small" disabled={displayedGroupPage === 0} onClick={() => setGroupPage(displayedGroupPage - 1)}><ChevronLeft size={14} />Previous groups</button><span className="faint" aria-live="polite">{groups.length ? displayedGroupPage * PAGE_SIZE + 1 : 0}–{Math.min((displayedGroupPage + 1) * PAGE_SIZE, groups.length)} of {formatCount(groups.length)} fix groups</span><button className="btn ghost small" disabled={displayedGroupPage >= groupPageCount - 1} onClick={() => setGroupPage(displayedGroupPage + 1)}>Next groups<ChevronRight size={14} /></button></div></>}
         {(!workspace.groupByFix || activeGroup) && <>

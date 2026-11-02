@@ -5,6 +5,7 @@ import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon,
 import { useApp, type View } from './store';
 import { api, isMac } from './api';
 import { ScanView } from './views/ScanView';
+import { LoadingState } from './components/ui';
 import { desktopShortcut } from '@shared/desktopShortcuts';
 
 const IntelligenceView = lazy(() => import('./views/IntelligenceView').then(m => ({default:m.IntelligenceView})));
@@ -44,6 +45,7 @@ export function App() {
 
   useEffect(() => {
     const dispatch = (action: import('@shared/ipc').MenuAction) => {
+      if (document.querySelector('dialog[open]')) return;
       triggerMenuAction(action);
       setView('scan');
     };
@@ -95,7 +97,7 @@ export function App() {
         <main ref={main} className={`main ${view === 'scan' || view === 'settings' ? 'narrow' : ''}`}>
           <div className="page-content">
           <div hidden={view !== 'scan'}><ScanView /></div>
-          <Suspense fallback={<div className="field-help" role="status">Loading view…</div>}>
+          <Suspense fallback={<LoadingState label={`Loading ${NAV.find((item) => item.id === view)?.label ?? 'view'}`} />}>
           {view === 'intelligence' && <IntelligenceView />}
           {(view === 'batch' || batchVisited) && <div hidden={view !== 'batch'}><BatchView key={connectionId} /></div>}
           {view === 'results' && <ResultsView />}

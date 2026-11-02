@@ -190,7 +190,7 @@ func main() {
 	identity := sha256.Sum256([]byte(engine.PathIdentity(profile)))
 	windowsOptions := browserOptions()
 	windowsOptions.WebviewUserDataPath = filepath.Join(profile, "webview2")
-	macOptions := application.MacWindow{TitleBar: application.MacTitleBarHiddenInset}
+	macOptions := application.MacWindow{TitleBar: application.MacTitleBarHiddenInset, InvisibleTitleBarHeight: 38}
 	macOptions.WebviewPreferences.TabFocusesLinks.Set(true)
 	s := &DesktopService{ready: make(chan struct{})}
 	s.app = application.New(application.Options{Name: "Marx", Windows: windowsOptions, Mac: application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true}, Description: "Checkmarx One desktop client", Services: []application.Service{application.NewService(s)}, Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets), Middleware: secureAssets}, OnShutdown: s.stop, SingleInstance: &application.SingleInstanceOptions{UniqueID: "com.marx.scanner." + hex.EncodeToString(identity[:8]), OnSecondInstanceLaunch: func(application.SecondInstanceData) {

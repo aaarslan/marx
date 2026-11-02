@@ -18,6 +18,7 @@
       inset: 0;
       opacity: 0;
     }
+    .investigate-list { position: absolute; inset: 0; opacity: 0; }
     .investigate-cursor {
       left: 590px;
       top: 610px;
@@ -39,6 +40,7 @@
       Find the finding that matters.
     </h2>
     <div class="pane investigate-pane">
+      <img data-layout-allow-overflow id="investigate-loading" class="clip" src="assets/loading.webp" alt="Marx findings loading state with quiet content placeholders" data-start="0" data-duration="8" />
       <img
         data-layout-allow-overflow
         id="investigate-image-1"
@@ -87,6 +89,7 @@
         { y: 0, opacity: 1, duration: 0.5 },
         0.1,
       )
+      .to(".investigate-list", { opacity: 1, duration: 0.18 }, 0.95)
       .fromTo(
         ".investigate-cursor",
         { x: 400, y: 150, opacity: 0 },

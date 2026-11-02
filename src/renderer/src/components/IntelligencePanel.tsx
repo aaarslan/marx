@@ -12,7 +12,7 @@ import {
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, Spinner, timeAgo, keepDialogFocus } from "./ui";
+import { Banner, LoadingState, Spinner, timeAgo, keepDialogFocus } from "./ui";
 
 export function notifyIntelligence() {
   window.dispatchEvent(new Event("marx-intelligence-changed"));
@@ -63,7 +63,7 @@ export function useIntelligence(cves: string[]) {
       current = false;
     };
   }, [key, version]);
-  return { snapshots, error, loading };
+  return { snapshots, error, loading, reload: () => setVersion((value) => value + 1) };
 }
 
 export function IntelligenceRefresh({
@@ -387,7 +387,7 @@ export function FindingIntelligence({
   readOnly?: boolean;
 }) {
   const cve = findingCVE(finding.cve);
-  const { snapshots, error } = useIntelligence(cve && !readOnly ? [cve] : []);
+  const { snapshots, error, loading } = useIntelligence(cve && !readOnly ? [cve] : []);
   const [notice, setNotice] = useState<string | null>(null);
   const [decision, setDecision] = useState(false);
   if (!cve) return null;
@@ -430,10 +430,10 @@ export function FindingIntelligence({
           </button>
         </div>
       )}
-      <IntelligenceFacts
+      {loading && !snapshots[cve] && !readOnly ? <LoadingState label="Reading cached intelligence…" compact /> : error && !snapshots[cve] ? <p className="field-help">Cached intelligence is unavailable.</p> : <IntelligenceFacts
         snapshot={readOnly ? undefined : snapshots[cve]}
         scannerScore={finding.cvssScore}
-      />
+      />}
       {decision && (
         <DecisionDialog
           finding={finding}

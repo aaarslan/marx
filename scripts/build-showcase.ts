@@ -12,6 +12,8 @@ fs.copyFileSync("showcase/film.css", path.join(root, "assets/film.css"));
 fs.copyFileSync("website/icon.png", path.join(root, "assets/icon.png"));
 for (const name of [
   "scan",
+  "intelligence-empty",
+  "loading",
   "results",
   "detail",
   "prompt",

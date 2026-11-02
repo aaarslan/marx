@@ -12,7 +12,7 @@ import {
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, Empty, Spinner, timeAgo, restoreControlFocus } from "./ui";
+import { Banner, Empty, LoadingState, Spinner, timeAgo, restoreControlFocus } from "./ui";
 import {
   DecisionDialog,
   IntelligenceFacts,
@@ -361,9 +361,7 @@ export function DecisionReview() {
       </p>
       {error && <Banner kind="error">{error}</Banner>}
       {loading ? (
-        <p className="intel-loading" role="status">
-          <Spinner /> Reading local decisions…
-        </p>
+        <LoadingState label="Reading local decisions…" rows={3} />
       ) : (
         !visible.length && (
           <Empty

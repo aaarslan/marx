@@ -10,7 +10,7 @@ bun run site:build
 python3 -m http.server 4173 --bind 127.0.0.1 --directory .cache/website
 ```
 
-Open `http://127.0.0.1:4173/`. The build copies only the public site to ignored staging and pins GitHub documentation links to the source commit, so an unmerged preview links to the correct build instructions. `source.json` records the source revision without machine-specific data.
+Open `http://127.0.0.1:4173/`. The build copies only public site files to ignored staging and pins GitHub documentation links to the base source commit. `source.json` records that revision and whether the working tree is dirty, without machine-specific data. A local preview can include uncommitted changes, but its GitHub links cannot display uncommitted documentation. Review and commit the completed source before publishing so those links and the media identify the same revision.
 
 ## Publish
 

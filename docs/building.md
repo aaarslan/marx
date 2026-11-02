@@ -2,23 +2,52 @@
 
 Marx targets native Windows x64 and macOS Apple Silicon with Wails 3.1.0 and Go 1.27.3. Go implements the scan engine, SQLite workbench, CLI process management, credentials and desktop integration. React runs in system WKWebView on macOS and the installed Microsoft WebView2 runtime on Windows. Bun 1.4.4 is a frontend build/test tool only; it is not distributed.
 
+[Prerequisites](#prerequisites) · [macOS](#macos) · [Windows](#windows) · [Updating a local build](#updating-a-local-build) · [Troubleshooting](#troubleshooting) · [Local validation](#local-validation)
+
+There are no published installers yet. Build from a trusted source checkout on the target operating system. A macOS build does not produce a Windows installer or establish Windows runtime compatibility.
+
+## Prerequisites
+
+| Tool or requirement | macOS | Windows |
+| --- | --- | --- |
+| Target system | Apple Silicon, macOS 13 or later | Windows 11 x64 |
+| Source checkout | [Git](https://git-scm.com/downloads) | [Git](https://git-scm.com/downloads) |
+| Go | [1.27.3](https://go.dev/dl/) | [1.27.3](https://go.dev/dl/) |
+| Bun | [1.4.4](https://bun.com/docs/installation) | [1.4.4](https://bun.com/docs/installation) |
+| Native webview | System WKWebView | [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) |
+| Build tools | Xcode Command Line Tools | No C compiler needed for the normal build |
+| Installer creation | Not available as a signed installer | [NSIS 3.12](https://nsis.sourceforge.io/Download), only for `dist:win` |
+
+For real scans, obtain the official Checkmarx CLI and tenant access through your organization. Marx does not download the CLI or provide an account. Building and opening the sample Results view does not require Checkmarx credentials. Node, Electron and the Wails CLI are not required.
+
+Clone the project and confirm the tool versions in a new terminal:
+
+```sh
+git clone https://github.com/aaarslan/marx.git
+cd marx
+go version
+bun --version
+```
+
+Use Go `1.27.3` and Bun `1.4.4`, matching `.go-version` and `.bun-version`. Every following command runs from this project directory. If a tool is not found after installation, reopen your terminal and check its PATH setup.
+
+`GO_EXECUTABLE` can select the Go executable for build scripts without committing a machine-specific path. Direct Go commands still require Go on PATH. `NSIS_EXECUTABLE` can select `makensis` for installer creation. Do not commit either local path.
+
 ## macOS
 
-Install Go 1.27.3, Bun 1.4.4 and Xcode Command Line Tools. Build natively on Apple Silicon:
+Check Xcode Command Line Tools with `xcode-select -p`. If they are missing, run `xcode-select --install` and finish that installer before continuing. Then build natively on Apple Silicon:
 
 ```sh
 bun install --frozen-lockfile
-bun run typecheck
-bun run test --pool=threads --maxWorkers=2
 bun run dist:mac
-go test -race -p=2 ./native/... -count=1 -timeout=5m
-go vet ./native/... ./tools/resources
-bun run verify:packaging
-bun run audit
 bun run start
 ```
 
 The output is `dist/Marx.app`, built for the host architecture with a macOS 13 minimum matching Go's requirement. The build uses the existing icon, embeds frontend assets, and ad hoc signs the bundle. It is suitable for local use; Developer ID signing, notarization, Intel Macs and distribution on other Macs remain unqualified. The build does not use an Apple signing account.
+
+You can open the app bundle from Finder. To keep an installed copy, quit Marx and copy the whole `dist/Marx.app` bundle to your Applications folder. A later rebuild updates `dist/Marx.app`, not any copied installation. Keep the preview's signing limitations visible when sharing it.
+
+### macOS runtime and acceptance details
 
 The default profile is `~/Library/Application Support/MarxWails`. Set `MARX_USER_DATA_DIR` to a disposable directory for testing. API-key files use authenticated AES-GCM encryption with a random Keychain entry per saved credential, bound to the canonical profile. Valid credentials from the previous format remain readable. Availability checks do not create encryption keys. Locked or denied Keychain access fails closed. Ad hoc executable replacement or relocation can make a previous entry inaccessible. Native tests verified prompt-free failure and explicit recovery: replace the saved API key in Settings, or remove it and save it again. Replacement allocates a new Keychain entry before atomically committing the file; failed commits retain the old credential. Using the CLI's existing authentication avoids application-managed credential storage. No existing Keychain access controls are changed. Marx disables legacy Keychain authorization dialogs within its own process so denied access returns an error instead of blocking a service call. This uses the deprecated legacy interaction API because `LAContext.interactionNotAllowed` does not suppress file-based Keychain authorization.
 
@@ -33,33 +62,71 @@ MARX_TEST_EXECUTABLE=/tmp/Marx-acceptance bun run verify:runtime
 
 The macOS harness uses a token-authenticated loopback evaluation transport compiled only with the acceptance tag. CSP remains enabled. Never distribute acceptance binaries. The regular packaging verifier rejects binaries containing the acceptance endpoint. The Windows harness continues to use WebView2 debugging. Set `MARX_VERIFY_MINIMUM_SIZE=1` when running either platform harness to exercise the 960×640 minimum window and toolbar alignment.
 
-## Prerequisites
+## Windows
 
-- Windows 11 x64 with WebView2.
-- Go 1.27.3 and Bun 1.4.4 on PATH.
-- NSIS 3.12; set `NSIS_EXECUTABLE` if makensis is not on PATH.
-- An organization-approved official Checkmarx CLI for real scans. Marx does not download it.
-
-`GO_EXECUTABLE` can select the Go executable for build scripts without committing a local path. Go tests and govulncheck also require the toolchain on PATH. The Wails CLI is unnecessary; `tools/resources` generates Windows resources.
-
-Run natively in PowerShell:
+Install WebView2 Runtime if it is missing, then run natively in PowerShell:
 
 ```powershell
 bun install --frozen-lockfile
+bun run build
+bun run start
+```
+
+The output is `dist\Marx.exe`, which you can also open from File Explorer. NSIS is not required for this standalone build. The build generates Windows resources through `tools/resources`; the Wails CLI is unnecessary.
+
+For a per-user installer, install NSIS 3.12, make `makensis` available on PATH or set `NSIS_EXECUTABLE`, quit Marx, and run:
+
+```powershell
+bun run dist:win
+```
+
+The installer is `dist\Marx-0.9.0-win-x64-setup.exe`. It offers a destination picker and retains application data on uninstall. Close Marx before installing, upgrading or uninstalling. Windows outputs are unsigned. `bun run dist:win:dir` rebuilds the standalone executable without creating an installer.
+
+Frontend assets and the pure-Go SQLite driver are embedded. No Bun, Node, Electron, workflow sidecar, report-worker executable, source files or test fixtures are distributed.
+
+## Updating a local build
+
+Quit every running Marx copy before rebuilding. A process that is already running keeps its earlier interface and behavior; opening the same profile can bring that window forward instead of starting the new binary.
+
+| Command | Behavior |
+| --- | --- |
+| `bun run start` | Opens the existing `dist` executable; it does not rebuild |
+| `bun run build` | Rebuilds for the host platform without launching |
+| `bun run dev` | Rebuilds once and launches; it is not a live-reload server |
+| `bun run dist:mac` | Builds the local macOS app bundle |
+| `bun run dist:win` | Builds the Windows executable and NSIS installer |
+
+After obtaining updated source, rerun `bun install --frozen-lockfile`, rebuild, and reopen the result. Replace any app copied outside `dist`, or run the newly built Windows installer. Existing CLI authentication remains the simplest way to avoid app-managed key replacement issues; [credential replacement verification](#credential-replacement-verification) explains those boundaries.
+
+## Troubleshooting
+
+| Symptom | Next step |
+| --- | --- |
+| `bun`, `go` or `makensis` is not found | Check the required version, PATH and optional executable override; reopen the terminal after installing tools |
+| Native Go build says `frontend/dist` is missing | Run `bun run build` first; the Go host embeds the generated frontend |
+| macOS compiler or SDK error | Confirm `xcode-select -p` works and the Xcode Command Line Tools installation completed |
+| Windows app opens blank or fails before rendering | Confirm WebView2 Runtime is installed; check the [support guide](../SUPPORT.md) before changing system settings |
+| The old interface still appears | Quit every running copy, rebuild, and open the output you just built; replace any copied installation |
+| Official Checkmarx CLI not found | In Settings, select the approved executable and use **Save connection and test**; Marx does not install it |
+| Saved API key becomes unavailable after replacement | Replace it through Settings or choose the CLI's existing authentication; preserve the original profile |
+
+## Local validation
+
+These checks are separate from the quick build. Run the build before native tests because the host embeds generated frontend assets:
+
+```sh
 bun run typecheck
 bun run test --pool=threads --maxWorkers=2
 bun run build
-go test -p=2 ./native/... -count=1
+go test -p=2 ./native/... -count=1 -timeout=5m
 go vet ./native/... ./tools/resources
 bun run verify:packaging
+bun run verify:site
+bun run verify:privacy -- --all
 bun run audit
-go install golang.org/x/vuln/cmd/govulncheck@latest
-govulncheck ./native/... ./tools/resources
-bun run dist:win
-bun run dist:win:dir
 ```
 
-Outputs are `dist/Marx.exe` and `dist/Marx-0.9.0-win-x64-setup.exe`. The NSIS payload contains one application executable and its uninstaller. Frontend assets and the pure-Go SQLite driver are embedded. No Bun, Node, Electron, workflow sidecar, report-worker executable, source files or test fixtures are included. The installer runs per user, offers a destination picker, and retains application data on uninstall. Close Marx before installing or uninstalling. Builds are unsigned.
+For macOS race coverage, also run `go test -race -p=2 ./native/... -count=1 -timeout=5m`. Windows race coverage needs the separate C-toolchain setup below. `bun run audit:go` is optional vulnerability analysis and requires `govulncheck` installed separately; it is not needed to build Marx.
 
 ## Runtime and storage
 

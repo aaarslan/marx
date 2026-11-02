@@ -7,7 +7,7 @@ import {
 } from "@shared/intelligence";
 import { api } from "../api";
 import { useApp } from "../store";
-import { Banner, Empty, Spinner, timeAgo, restoreControlFocus } from "../components/ui";
+import { Banner, Empty, LoadingState, Spinner, timeAgo } from "../components/ui";
 import {
   IntelligenceFacts,
   IntelligenceRefresh,
@@ -25,7 +25,9 @@ export function IntelligenceView() {
     [notice, setNotice] = useState("");
   const search = useRef<HTMLInputElement>(null);
   const watchRegion = useRef<HTMLDivElement>(null);
-  const mutationFocus = useRef<{ origin: HTMLButtonElement; index: number } | null>(null);
+  const watchSection = useRef<HTMLElement>(null);
+  const detailsRegion = useRef<HTMLElement>(null);
+  const mutationFocus = useRef<{ origin: HTMLButtonElement; index: number; removedCve?: string } | null>(null);
   const loadVersion = useRef(0);
   const mutation = useRef(false);
   const mounted = useRef(true);
@@ -33,6 +35,7 @@ export function IntelligenceView() {
     snapshots,
     error: lookupError,
     loading,
+    reload: reloadLookup,
   } = useIntelligence(selected ? [selected] : []);
   const load = () => {
     const version = ++loadVersion.current;
@@ -74,11 +77,16 @@ export function IntelligenceView() {
   useEffect(() => {
     const focus = mutationFocus.current;
     if (pending || !focus) return;
-    mutationFocus.current = null;
-    const items = watchRegion.current?.querySelectorAll<HTMLButtonElement>('.intel-watch-row > button:first-child');
-    if (focus.origin.isConnected) restoreControlFocus(focus.origin);
-    else (items?.[Math.min(focus.index, items.length - 1)] ?? search.current)?.focus();
-  }, [watchlist, pending]);
+    if (focus.removedCve && watchlist?.items.some((item) => item.cve === focus.removedCve) && !error) return;
+    const frame = requestAnimationFrame(() => {
+      if (mutationFocus.current !== focus) return;
+      mutationFocus.current = null;
+      const items = watchRegion.current?.querySelectorAll<HTMLButtonElement>('.intel-watch-row > button:first-child');
+      const target = focus.removedCve && error ? watchSection.current : focus.origin.isConnected ? focus.origin : items?.[Math.min(focus.index, items.length - 1)] ?? search.current;
+      target?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [watchlist, pending, error]);
   const changeWatch = async (cve: string, remove: boolean, origin: HTMLButtonElement) => {
     if (mutation.current) return;
     mutation.current = true;
@@ -88,6 +96,7 @@ export function IntelligenceView() {
     try {
       if (remove) await api.intelligence.unwatch(cve);
       else await api.intelligence.watch(cve);
+      if (remove && mutationFocus.current) mutationFocus.current.removedCve = cve;
       if (mounted.current) {
         setNotice(
           `${cve} ${remove ? "removed from" : "added to"} your watchlist.`,
@@ -106,7 +115,6 @@ export function IntelligenceView() {
   const watched = watchlist?.items.some((item) => item.cve === selected);
   return (
     <>
-      <div className="page-eyebrow">Public context, local decisions</div>
       <h1 className="page-title">CVE intelligence</h1>
       <p className="page-sub">
         Understand exploitation signals and watch what changes. Lookups do not
@@ -176,7 +184,7 @@ export function IntelligenceView() {
         {notice}
       </p>
       <div className="intelligence-layout">
-        <section className="card intel-watch" aria-labelledby="watchlist-title">
+        <section ref={watchSection} tabIndex={-1} className="card intel-watch" aria-labelledby="watchlist-title" aria-busy={!watchlist && !error}>
           <div className="row between">
             <h2 id="watchlist-title">Watchlist</h2>
             <span className="intel-count">
@@ -191,16 +199,15 @@ export function IntelligenceView() {
             cves={watchlist?.items.map((item) => item.cve) ?? []}
             onComplete={load}
           />
-          {!watchlist ? (
-            <p className="intel-loading" role="status">
-              {!error && <Spinner />}{" "}
-              {error ? "Watchlist unavailable." : "Loading watchlist…"}
-              {error && (
-                <button className="btn ghost small" onClick={load}>
+          {!watchlist ? error ? (
+            <div className="intel-unavailable">
+              <p>Watchlist unavailable.</p>
+                <button className="btn ghost small" onClick={() => { void load().then(() => watchSection.current?.focus({ preventScroll: true })); }}>
                   Try again
                 </button>
-              )}
-            </p>
+            </div>
+          ) : (
+            <LoadingState label="Loading watchlist…" compact rows={3} />
           ) : !watchlist.items.length ? (
             <Empty
               icon={<Star size={26} strokeWidth={1.5} />}
@@ -248,6 +255,8 @@ export function IntelligenceView() {
           )}
         </section>
         <section
+          ref={detailsRegion}
+          tabIndex={-1}
           className="card intel-lookup-result"
           aria-label="CVE details"
           aria-busy={loading}
@@ -273,11 +282,14 @@ export function IntelligenceView() {
                   {watched ? "Watching" : "Watch CVE"}
                 </button>
               </div>
-              <IntelligenceRefresh cves={[selected]} onComplete={load} />
+              <IntelligenceRefresh key={selected} cves={[selected]} onComplete={load} />
               {loading && !snapshots[selected] ? (
-                <p className="intel-loading" role="status">
-                  <Spinner /> Reading cached intelligence…
-                </p>
+                <LoadingState label="Reading cached intelligence…" compact />
+              ) : lookupError && !snapshots[selected] ? (
+                <div className="intel-unavailable">
+                  <p>Cached intelligence could not be read.</p>
+                  <button className="btn small" onClick={() => { reloadLookup(); detailsRegion.current?.focus({ preventScroll: true }); }}>Try again</button>
+                </div>
               ) : (
                 <IntelligenceFacts snapshot={snapshots[selected]} />
               )}
@@ -308,7 +320,11 @@ export function IntelligenceView() {
           preserves earlier events. This is a record of your observations, not a
           complete threat timeline.
         </p>
-        {watchlist?.events.length ? (
+        {!watchlist ? error ? (
+          <p className="field-help">Observed changes are unavailable until the watchlist can be read.</p>
+        ) : (
+          <LoadingState label="Reading observed changes…" compact rows={2} />
+        ) : watchlist.events.length ? (
           watchlist.events.map((event) => (
             <article key={event.id}>
               <div className="row between">

@@ -3,10 +3,10 @@ import { hasScanCredentials } from '@shared/types';
 import { folderName } from '@shared/path';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Zap, FolderOpen, Settings2, ShieldCheck } from 'lucide-react';
-import type { GitInfo, ProjectInfo, ScanJobState, ScanOptions, ScannerType } from '@shared/types';
+import type { GitInfo, ProjectInfo, RepositoryBinding, ScanJobState, ScanOptions, ScannerType } from '@shared/types';
 import { api, commandKey } from '../api';
 import { useApp } from '../store';
-import { Banner, restoreControlFocus } from '../components/ui';
+import { Banner, LoadingState, restoreControlFocus } from '../components/ui';
 import { Dropzone, ProgressCard, ScanOptionsEditor } from '../components/ScanOptions';
 
 export function ScanView() {
@@ -33,6 +33,7 @@ export function ScanView() {
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectingFolder, setSelectingFolder] = useState(false);
   const submitLock = useRef(false);
   const defaults = settings?.defaults;
   const [options, setOptions] = useState<ScanOptions>({
@@ -87,44 +88,48 @@ export function ScanView() {
   }, [folderSelected, settings?.cliAuthMode, settings?.hasApiKey, settings?.cliPath, settings?.cliConfigPath]);
 
   const folderRequest = useRef(0);
+  const folderLoading = useRef(false);
   const pickFolder = async (path: string) => {
+    if (submitLock.current) return;
     const request = ++folderRequest.current;
+    folderLoading.current = true;
+    setSelectingFolder(true);
     setError(null);
-    let info: GitInfo;
-    try { info = await api.git.info(path); } catch (e) {
-      if (request === folderRequest.current) setError(e instanceof Error ? e.message : 'Could not open that folder.');
-      return;
-    }
-    if (request !== folderRequest.current) return;
-    setFolder(path);
-    setGit(info);
-    setOptions((o) => ({ ...o, branch: info?.branch ?? 'master' }));
-    setProjectName((prev) => prev || info?.repoName || folderName(path) || 'project');
-    setProjectId('');
-    setBoundProjectId('');
     try {
-      const binding = await api.bindings.get(path);
+      const info = await api.git.info(path);
       if (request !== folderRequest.current) return;
-      if (binding) {
-        setProjectMode('existing');
-        setProjectId(binding.projectId);
-        setBoundProjectId(binding.projectId);
-      }
+      let binding: RepositoryBinding | null = null;
+      try { binding = await api.bindings.get(path); }
+      catch (e) { if (request === folderRequest.current) setError(e instanceof Error ? e.message : String(e)); }
+      if (request !== folderRequest.current) return;
+      setFolder(path);
+      setGit(info);
+      setOptions((o) => ({ ...o, branch: info.branch ?? 'master' }));
+      setProjectName((prev) => folder === path ? prev : info.repoName || folderName(path) || 'project');
+      setProjectId(binding?.projectId ?? '');
+      setBoundProjectId(binding?.projectId ?? '');
+      if (binding) setProjectMode('existing');
     } catch (e) { if (request === folderRequest.current) setError(e instanceof Error ? e.message : String(e)); }
+    finally {
+      if (request === folderRequest.current) {
+        folderLoading.current = false;
+        setSelectingFolder(false);
+      }
+    }
   };
 
   const canRun =
     Boolean(folder) &&
     options.scanners.length > 0 &&
     (projectMode === 'new' ? projectName.trim().length > 0 : Boolean(projectId)) &&
-    Boolean(hasScanCredentials(settings)) && !projectsLoading;
+    Boolean(hasScanCredentials(settings)) && !projectsLoading && !selectingFolder;
 
   const running =
     currentJob != null &&
     !['completed', 'failed', 'canceled'].includes(currentJob.progress.phase);
 
   const run = async () => {
-    if (!folder || !canRun || running || submitLock.current) return;
+    if (!folder || !canRun || running || submitLock.current || folderLoading.current) return;
     submitLock.current = true;
     setSubmitting(true);
     setError(null);
@@ -152,7 +157,7 @@ export function ScanView() {
 
   const storyJobId = useRef<string | null>(null);
   const runStoryCheck = async () => {
-    if (!folder || !canRun || running || submitLock.current) return;
+    if (!folder || !canRun || running || submitLock.current || folderLoading.current) return;
     submitLock.current = true;
     setSubmitting(true);
     setError(null);
@@ -209,7 +214,7 @@ export function ScanView() {
 
   return (
     <>
-<div className="page-eyebrow">Source security</div>
+
       <h1 className="page-title">Scan a project</h1>
       <p className="page-sub">
         Choose a folder and Marx runs the official Checkmarx CLI for you. Source is uploaded to Checkmarx One for analysis.
@@ -230,6 +235,7 @@ export function ScanView() {
       )}
 
       <Dropzone folder={folder} onPick={(p) => void pickFolder(p)} hint=".git, dependencies, and build output are excluded by default" />
+      {selectingFolder && <LoadingState label="Loading repository details and project mapping" compact rows={1} />}
 
       {error && <Banner kind="error" action={error.includes("CLI") ? <button className="btn small" onClick={() => setView("settings")}>Open CLI settings</button> : undefined}>{error}</Banner>}
 

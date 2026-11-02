@@ -7,7 +7,7 @@ import type { ProjectInfo, RepositoryBinding, ScanJobState, ScanOptions } from '
 import type { WorkspacePlan } from '@shared/workspace';
 import { api } from '../api';
 import { useApp } from '../store';
-import { Banner, StatusBadge } from '../components/ui';
+import { Banner, LoadingState, StatusBadge } from '../components/ui';
 import { Dropzone, ScanOptionsEditor, SeveritySummaryCounts } from '../components/ScanOptions';
 
 export function BatchView() {
@@ -27,7 +27,9 @@ export function BatchView() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [discovering, setDiscovering] = useState(false);
+  const [mappingsReady, setMappingsReady] = useState(false);
   const submitLock = useRef(false);
+  const discoveryPending = useRef(false);
   const folderRequest = useRef(0);
   const [concurrency, setConcurrency] = useState(settings?.defaults.batchConcurrency ?? 2);
   const defaults = settings?.defaults;
@@ -38,30 +40,44 @@ export function BatchView() {
 
   useEffect(() => {
     let active = true;
-    if (hasScanCredentials(settings)) api.projects.list().then((items) => { if (active) setProjects(items); }).catch((cause) => { if (active) setError(String(cause)); });
+    if (hasScanCredentials(settings)) api.projects.list().then((items) => { if (active) setProjects(items); }).catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : String(cause)); });
     return () => { active = false; };
   }, [settings?.cliPath, settings?.cliConfigPath, settings?.cliAuthMode, settings?.tenant, settings?.baseUrl, settings?.hasApiKey]);
 
   const pickParent = async (folder: string) => {
+    if (submitLock.current) return;
     const request = ++folderRequest.current;
+    discoveryPending.current = true;
     setError(null);
     setDiscovering(true);
+    setMappingsReady(false);
+    setParent(folder);
+    setPlan(null);
+    setSelected(new Set());
+    setBindings({});
+    setTargets({});
+    setNames({});
+    setOverrides({});
     try {
       const next = await api.git.plan(folder);
-      const saved: Record<string, RepositoryBinding> = {};
-      const mapped = await Promise.all(next.projects.map(async (item) => ({ folder: item.folderPath, binding: await api.bindings.get(item.folderPath).catch(() => null) })));
       if (request !== folderRequest.current) return;
-      for (const item of mapped) if (item.binding) saved[item.folder] = item.binding;
-      setBindings(saved);
-      setTargets(Object.fromEntries(Object.entries(saved).map(([key, value]) => [key, value.projectId])));
-      setNames({});
-      setOverrides({});
       setParent(next.rootPath);
       setPlan(next);
-      setSelected(new Set(next.projects.map((item) => item.folderPath)));
       setNamePrefix(`${folderName(next.rootPath)}-`);
+      const saved: Record<string, RepositoryBinding> = {};
+      for (const item of next.projects) {
+        let binding: RepositoryBinding | null;
+        try { binding = await api.bindings.get(item.folderPath); }
+        catch (cause) { throw new Error(`Could not load saved project mappings. Check the CLI connection, then retry. ${cause instanceof Error ? cause.message : String(cause)}`); }
+        if (request !== folderRequest.current) return;
+        if (binding) saved[item.folderPath] = binding;
+      }
+      setBindings(saved);
+      setTargets(Object.fromEntries(Object.entries(saved).map(([key, value]) => [key, value.projectId])));
+      setSelected(new Set(next.projects.map((item) => item.folderPath)));
+      setMappingsReady(true);
     } catch (cause) { if (request === folderRequest.current) setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { if (request === folderRequest.current) setDiscovering(false); }
+    finally { if (request === folderRequest.current) { discoveryPending.current = false; setDiscovering(false); } }
   };
 
   const running = jobs.some((job) => !job.finishedAt);
@@ -69,7 +85,7 @@ export function BatchView() {
   const newName = (folder: string) => names[folder] ?? `${namePrefix}${plan?.projects.find((item) => item.folderPath === folder)?.relativePath.replaceAll('/', '-') ?? folderName(folder)}`;
 
   const runAll = async () => {
-    if (submitLock.current || running || !selected.size) return;
+    if (submitLock.current || discoveryPending.current || !mappingsReady || running || !selected.size) return;
     submitLock.current = true;
     setSubmitting(true);
     setError(null);
@@ -96,27 +112,26 @@ export function BatchView() {
   };
 
   return <>
-    <div className="page-eyebrow">Workspace planning</div>
     <h1 className="page-title">Batch scan</h1>
     <p className="page-sub">Discover nested npm, Yarn and pnpm workspaces, map each folder to an exact Checkmarx project, and review its scan options before submitting.</p>
     {!hasScanCredentials(settings) && <Banner kind="warn" action={<button className="btn small" onClick={() => setView('settings')}>Set up connection</button>}>Connect your account to scan multiple projects. You can choose folders first.</Banner>}
     <Dropzone folder={parent} onPick={(folder) => { if (!submitting && !running) void pickParent(folder); }} hint="Workspace root or parent folder containing code projects" />
-    {discovering && <p role="status" className="dim">Discovering projects and dependency relationships…</p>}
-    {error && <Banner kind="error">{error}</Banner>}
+    {discovering && <LoadingState label="Discovering projects and dependency relationships…" compact rows={2} />}
+    {error && <Banner kind={error.includes('CLI') ? 'warn' : 'error'} action={!mappingsReady && parent && plan ? <button className="btn small" disabled={discovering} onClick={() => void pickParent(parent)}>Retry project mappings</button> : error.includes('CLI') ? <button className="btn small" onClick={() => setView('settings')}>Open CLI settings</button> : undefined}>{error}</Banner>}
     {plan && <>
       {plan.warnings.map((warning) => <Banner key={warning} kind="warn">{warning}</Banner>)}
       {plan.sharedFiles.length > 0 && <p className="faint">Shared workspace files: {plan.sharedFiles.join(', ')}. Scans upload each selected folder; use a root scan when a package needs lockfiles or build context outside its folder.</p>}
       <div className="row between" style={{ flexWrap: 'wrap', marginBottom: 12 }}>
         <div className="section-title">{selected.size} of {plan.projects.length} projects selected</div>
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <button className="btn small" disabled={submitting || running} onClick={() => setSelected(new Set(plan.projects.map((item) => item.folderPath)))}>Select all</button>
-          <button className="btn small" disabled={submitting || running} onClick={() => setSelected(new Set())}>Clear</button>
-          {plan.impactAvailable && <button className="btn small" disabled={submitting || running} onClick={() => setSelected(new Set(plan.projects.filter((item) => item.affected).map((item) => item.folderPath)))}>Select affected ({plan.projects.filter((item) => item.affected).length})</button>}
+          <button className="btn small" disabled={submitting || running || !mappingsReady} onClick={() => setSelected(new Set(plan.projects.map((item) => item.folderPath)))}>Select all</button>
+          <button className="btn small" disabled={submitting || running || !mappingsReady} onClick={() => setSelected(new Set())}>Clear</button>
+          {plan.impactAvailable && <button className="btn small" disabled={submitting || running || !mappingsReady} onClick={() => setSelected(new Set(plan.projects.filter((item) => item.affected).map((item) => item.folderPath)))}>Select affected ({plan.projects.filter((item) => item.affected).length})</button>}
         </div>
       </div>
       {plan.impactAvailable && <p className="faint">Affected is a suggestion based on uncommitted Git changes and local package dependencies. Shared changes include every project. Review the selection before scanning.</p>}
       {!plan.projects.length && <div className="card dim">No project folders detected. Choose a workspace root or a parent with package.json, pom.xml, go.mod or another supported project manifest.</div>}
-      <fieldset disabled={submitting || running} style={{ border: 0, padding: 0, minWidth: 0 }}>
+      <fieldset disabled={submitting || running || !mappingsReady} style={{ border: 0, padding: 0, minWidth: 0 }}>
         {plan.projects.map((item) => <div className="card" key={item.folderPath}>
           <div className="row between" style={{ flexWrap: 'wrap', gap: 10 }}>
             <label className="check"><input type="checkbox" checked={selected.has(item.folderPath)} onChange={(event) => setSelected((current) => { const next = new Set(current); if (event.target.checked) next.add(item.folderPath); else next.delete(item.folderPath); return next; })} /><strong>{item.name}</strong><span className="faint mono">{item.relativePath}</span></label>
@@ -126,12 +141,12 @@ export function BatchView() {
           <div className="grid-2" style={{ marginTop: 12 }}>
             <label className="field">Checkmarx project
               <select aria-label={`Project for ${item.relativePath}`} value={targets[item.folderPath] ?? ''} onChange={(event) => setTargets((current) => ({ ...current, [item.folderPath]: event.target.value }))}>
-                <option value="">Create a new project</option>
+                <option value="">{mappingsReady ? 'Create a new project' : 'Project mapping unavailable'}</option>
                 {bindings[item.folderPath] && !projects.some((entry) => entry.id === bindings[item.folderPath].projectId) && <option value={bindings[item.folderPath].projectId}>{bindings[item.folderPath].projectName} · {bindings[item.folderPath].projectId}</option>}
                 {projects.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {entry.id}</option>)}
               </select>
             </label>
-            {targets[item.folderPath] ? <p className="faint">Exact ID: <span className="mono">{targets[item.folderPath]}</span><br />{bindings[item.folderPath]?.projectId === targets[item.folderPath] ? 'Saved mapping' : 'Mapping will be saved when this batch starts'}</p> : <label className="field">New project name<input value={newName(item.folderPath)} onChange={(event) => setNames((current) => ({ ...current, [item.folderPath]: event.target.value }))} /></label>}
+            {targets[item.folderPath] ? <p className="faint">Exact ID: <span className="mono">{targets[item.folderPath]}</span><br />{bindings[item.folderPath]?.projectId === targets[item.folderPath] ? 'Saved mapping' : 'Mapping will be saved when this batch starts'}</p> : mappingsReady ? <label className="field">New project name<input value={newName(item.folderPath)} onChange={(event) => setNames((current) => ({ ...current, [item.folderPath]: event.target.value }))} /></label> : <p className="field-help">Load saved project mappings before choosing scan targets.</p>}
           </div>
           <details style={{ marginTop: 10 }}><summary className="dim">{overrides[item.folderPath] ? 'Custom scan options' : 'Uses shared scan options'}</summary>
             <label className="check" style={{ margin: '12px 0' }}><input type="checkbox" checked={Boolean(overrides[item.folderPath])} onChange={(event) => setOverrides((current) => { const next = { ...current }; if (event.target.checked) next[item.folderPath] = structuredClone(options); else delete next[item.folderPath]; return next; })} />Customize this project</label>
@@ -149,7 +164,7 @@ export function BatchView() {
         </div>
       </fieldset>
       <div className="row" style={{ margin: '16px 0' }}>
-        <button className="btn primary" disabled={!hasScanCredentials(settings) || !selected.size || running || submitting || discovering} onClick={() => void runAll()}><Play size={14} />{submitting ? 'Starting batch…' : `Scan ${selected.size} ${selected.size === 1 ? 'project' : 'projects'}`}</button>
+        <button className="btn primary" disabled={!hasScanCredentials(settings) || !selected.size || running || submitting || discovering || !mappingsReady} onClick={() => void runAll()}><Play size={14} />{submitting ? 'Starting batch…' : `Scan ${selected.size} ${selected.size === 1 ? 'project' : 'projects'}`}</button>
         {running && <button className="btn danger" onClick={() => void Promise.all(jobs.filter((job) => !job.finishedAt).map((job) => api.scan.cancelJob(job))).catch((cause) => setError(String(cause)))}><Square size={12} />Cancel all</button>}
       </div>
     </>}
