@@ -105,7 +105,7 @@ Marx uses Wails 3.1.0, Go, SQLite and React with the system webview. No Bun, Nod
 | Platform | Current status |
 | --- | --- |
 | macOS Apple Silicon | Native synthetic workflow and locally built app verified; ad hoc signed, without notarization |
-| Windows 11 x64 | Prior revision passed native synthetic acceptance, race checks and install/uninstall; latest interaction changes need native Windows follow-up |
+| Windows 11 x64 | Native synthetic acceptance, race checks and isolated install/uninstall passed; Results layout fixes passed Windows acceptance and bounded production checks. The newest Results workspace-save repair awaits Windows follow-up. See [exact revisions and remaining gaps](docs/final-acceptance.md). |
 
 Linux, Intel macOS and Windows ARM64 are outside the supported targets. Windows packages are unsigned. Synthetic checks do not establish live tenant acceptance. See [current limitations](docs/limitations.md) and the [final acceptance checklist](docs/final-acceptance.md) for evaluation boundaries.
 

@@ -60,9 +60,11 @@ bun run start
         <p>
           The macOS bundle is ad hoc signed and not notarized. Windows packages
           are unsigned. On Windows, <code>bun run dist:win</code> creates the
-          per-user installer when NSIS is available. Latest native Windows
-          interaction checks and live Checkmarx tenant validation remain
-          outstanding; a local macOS build does not qualify them.
+          per-user installer when NSIS is available. Native Windows and macOS
+          checks are recorded separately in the
+          <a href="https://github.com/aaarslan/marx/blob/main/docs/final-acceptance.md">verification record</a>,
+          with exact revisions and remaining gaps. Live Checkmarx tenant
+          validation remains outstanding; synthetic checks do not qualify it.
         </p>
         <h2>2. Connect the official CLI</h2>
         <p>

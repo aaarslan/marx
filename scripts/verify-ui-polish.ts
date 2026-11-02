@@ -81,16 +81,38 @@ export async function verifyIntelligenceFilterReset(evaluate: Evaluate, wait: Wa
 }
 
 export async function verifyResultsLoading(evaluate: Evaluate, wait: Wait) {
+  const verifyEmptyTable = async (columns: number, scenario: string) => {
+    console.log(`Checking empty Results table: ${scenario}`);
+    await wait(`!!document.querySelector('.results-table .empty')`);
+    const table = await evaluate(`(()=>{const table=document.querySelector('.results-table table');const headers=Array.from(table.querySelectorAll('th'));return {columns:headers.length,span:table.querySelector('tbody td').colSpan,headerRight:headers.at(-1).getBoundingClientRect().right,tableRight:table.getBoundingClientRect().right}})()`);
+    assert.equal(table.columns,columns,'Unexpected visible Results columns');
+    assert.equal(table.span,columns,'Empty results introduced columns without headers');
+    assert.ok(Math.abs(table.headerRight-table.tableRight)<=1,`Empty results header does not span the table: ${JSON.stringify(table)}`);
+  };
   await evaluate(`Array.from(document.querySelectorAll('.nav-item')).find(b=>b.textContent.trim()==='Results').click()`);
   await wait(`!!document.querySelector('select[aria-label="Scan"] option[value="large-paging"]')`);
   await evaluate(`(()=>{const field=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(field,'s1');field.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+  await wait(`!!document.querySelector('.results-table table')&&!document.querySelector('.results-workspace .loading-state')`);
+  await evaluate(`(()=>{Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Clear filters')?.click();Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='All findings')?.click()})()`);
   await wait(`document.querySelectorAll('.finding-link').length>0`);
   await evaluate(`(()=>{const field=document.querySelector('input[aria-label="Search findings"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,'synthetic-no-matching-findings');field.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-  await wait(`!!document.querySelector('.results-table .empty')`);
-  const emptyTable = await evaluate(`(()=>{const table=document.querySelector('.results-table table');const headers=Array.from(table.querySelectorAll('th'));return {columns:headers.length,span:table.querySelector('tbody td').colSpan,headerRight:headers.at(-1).getBoundingClientRect().right,tableRight:table.getBoundingClientRect().right}})()`);
-  assert.equal(emptyTable.span,emptyTable.columns,'Empty results introduced columns without headers');
-  assert.ok(Math.abs(emptyTable.headerRight-emptyTable.tableRight)<=1,'Empty results header does not span the table');
+  await verifyEmptyTable(5, 'filtered findings');
   await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Clear filters').click()`);
+  await wait(`document.querySelectorAll('.finding-link').length>0`);
+  await evaluate(`document.querySelector('.finding-link').click()`);
+  await wait(`!!document.querySelector('.investigation-detail .finding-heading')`);
+  await evaluate(`(()=>{const field=document.querySelector('input[aria-label="Search findings"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(field,'synthetic-no-matching-findings');field.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+  await verifyEmptyTable(4, 'filtered findings with details');
+  await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Clear filters').click()`);
+  await wait(`document.querySelectorAll('.finding-link').length>0`);
+  await wait(`!!document.querySelector('select[aria-label="Scan"] option[value="s2"]')`);
+  await evaluate(`(()=>{const field=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(field,'s2');field.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+  await verifyEmptyTable(5, 'empty scan');
+  await wait(`!!document.querySelector('select[aria-label="Baseline scan"] option[value="s1"]')`);
+  await evaluate(`(()=>{const field=document.querySelector('select[aria-label="Baseline scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(field,'s1');field.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+  await wait(`!!document.querySelector('.results-table .change-cell')`);
+  await verifyEmptyTable(6, 'empty scan with comparison');
+  await evaluate(`(()=>{const field=document.querySelector('select[aria-label="Scan"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(field,'s1');field.dispatchEvent(new Event('change',{bubbles:true}))})()`);
   await wait(`document.querySelectorAll('.finding-link').length>0`);
   await evaluate(`(()=>{
     window.uiResultsProbe={original:window.marx.results.get};

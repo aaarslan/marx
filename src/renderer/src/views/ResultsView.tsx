@@ -29,6 +29,23 @@ interface Snippet {
 const PAGE_SIZE = 100;
 const INITIAL_WORKSPACE: WorkspaceState = { search: '', severities: [], scanner: 'ALL', state: 'ALL', change: 'ALL', includeOtherBranches: false, groupByFix: false, pageIndex: 0, detailWidth: 48, scrollTop: 0 };
 const CHANGE_LABELS: Record<string, string> = { NEW: 'New', PERSISTENT: 'Persistent', ESCALATED: 'Escalated', REDUCED: 'Reduced', UNCERTAIN: 'Uncertain' };
+const workspaceWrites = new Map<string, { pending: WorkspaceState | null; promise: Promise<void> }>();
+
+function writeResultsWorkspace(key: string, state: WorkspaceState) {
+  const current = workspaceWrites.get(key);
+  if (current) { current.pending = state; return current.promise; }
+  const writer = { pending: state as WorkspaceState | null, promise: Promise.resolve() };
+  workspaceWrites.set(key, writer);
+  writer.promise = (async () => {
+    while (writer.pending) {
+      const next = writer.pending;
+      writer.pending = null;
+      try { await api.workbench.saveWorkspace(key, next); }
+      catch (error) { if (!writer.pending) throw error; }
+    }
+  })().finally(() => { workspaceWrites.delete(key); });
+  return writer.promise;
+}
 
 function mergeHistory(...lists: ScanHistoryItem[][]): ScanHistoryItem[] {
   return [...new Map(lists.flat().map((item) => [item.id, item])).values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
@@ -88,6 +105,13 @@ export function ResultsView() {
     setWorkspace((current) => ({ ...current, ...patch, ...(resetResults ? { pageIndex: 0, scrollTop: 0 } : {}) }));
   };
   const setTablePage = (pageIndex: number) => updateWorkspace({ pageIndex, scrollTop: 0 });
+  const flushWorkspaceSave = () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    const pending = pendingSave.current;
+    pendingSave.current = null;
+    return pending ? writeResultsWorkspace(pending.key, pending.state) : Promise.resolve();
+  };
 
   useEffect(() => {
     let current = true;
@@ -98,7 +122,10 @@ export function ResultsView() {
     setGroupPage(0);
     setComparison(null);
     if (!selectedScanId || demo) { setWorkspaceReady(demo ? 'demo' : workspaceKey); return; }
-    void api.workbench.workspace(workspaceKey).then((saved) => {
+    void (async () => {
+      await workspaceWrites.get(workspaceKey)?.promise.catch(() => undefined);
+      return api.workbench.workspace(workspaceKey);
+    })().then((saved) => {
       if (!current) return;
       setWorkspace({ ...INITIAL_WORKSPACE, ...saved });
       if (saved?.linkedFolder && !linkedFolder) setSelectedScan(selectedScanId, saved.linkedFolder, pendingAutoBaseline);
@@ -106,7 +133,10 @@ export function ResultsView() {
     }).catch((err) => {
       if (current) { setError(`Could not restore this workspace: ${err.message}`); setWorkspaceReady(workspaceKey); }
     });
-    return () => { current = false; };
+    return () => {
+      current = false;
+      void flushWorkspaceSave().catch((err) => setError(`Could not save workspace: ${err.message}`));
+    };
   }, [workspaceKey, demo]);
 
   useEffect(() => {
@@ -114,16 +144,12 @@ export function ResultsView() {
     pendingSave.current = { key: workspaceKey, state: { ...workspace, selectedScanId, linkedFolder } };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      const pending = pendingSave.current;
-      pendingSave.current = null;
-      if (pending) void api.workbench.saveWorkspace(pending.key, pending.state).catch((err) => setError(`Could not save workspace: ${err.message}`));
+      void flushWorkspaceSave().catch((err) => setError(`Could not save workspace: ${err.message}`));
     }, 200);
   }, [workspace, workspaceReady, workspaceKey, linkedFolder, selectedScanId, demo]);
 
   useEffect(() => () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    const pending = pendingSave.current;
-    if (pending) void api.workbench.saveWorkspace(pending.key, pending.state).catch(() => undefined);
+    void flushWorkspaceSave().catch(() => undefined);
     snippetRequest.current++;
   }, []);
 
