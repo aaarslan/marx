@@ -4,6 +4,10 @@ Validate the exact PR head and record its commit, Windows/WebView2 versions, too
 
 ## Current evidence
 
+### Windows confirmation and merge authorization, November 2, 2026
+
+The user reported successful Windows verification of the latest Results workspace-save repair at `22de33de7207bc6961e67d033a15097d9aa2826d` and authorized merging the branch into `main`. No additional Windows logs were supplied in this macOS session; this is reported confirmation, separate from the detailed native runs below. The application source is unchanged. Earlier manual macOS minimum-size, pointer-hover, live-tenant and signing boundaries remain explicit.
+
 ### Results workspace persistence and delivery follow-up, November 2, 2026
 
 Continued from `c185f6709329b2409416922cee39aea49aba0700` after the user authorized polish, committing, pushing and updating the public presentation. Expanded native coverage now checks filtered-empty Results, the four-column list with finding details open, a genuinely empty five-column scan, and the six-column empty comparison. The test explicitly waits for the uncached scan's history option before selecting it.
