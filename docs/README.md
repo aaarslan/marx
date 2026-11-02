@@ -8,6 +8,11 @@
 - [Remediation prompts](remediation-prompts.md): local assistant handoffs and batch selection.
 - [Current limitations](limitations.md): platform, evidence and integration boundaries.
 
+## Project and community
+
+- [Project status and collaboration](project-status.md): scope, evaluation gaps and contribution opportunities.
+- [Support](../SUPPORT.md): help, bug reports and sensitive-data handling.
+
 ## Build and maintain
 
 - [Build and native verification](building.md).
