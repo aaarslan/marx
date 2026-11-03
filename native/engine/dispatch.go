@@ -401,6 +401,9 @@ func (e *Engine) dispatch(ctx context.Context, ch string, args []any) (any, erro
 		if arg(args, 1) == nil || len(jsonValue(state)) > 32768 {
 			return nil, errors.New("Workspace state is invalid or too large")
 		}
+		if expected := str(state, "connectionId"); expected != "" && expected != connection {
+			return nil, errors.New("Connection changed; workspace state was not saved")
+		}
 		return nil, e.store.save(record{kind: "workspace", id: key, value: state})
 	case "session:create":
 		return e.createSession(ctx, m)

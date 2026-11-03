@@ -12,6 +12,8 @@
 ## Project and community
 
 - [Project status and collaboration](project-status.md): scope, evaluation gaps and contribution opportunities.
+- [Sponsorship and technical evaluation](sponsor-evaluation.md): proposed Checkmarx collaboration, measurable evaluation and support scope.
+- [November 3 security and release review](security-review-2026-11-03.md): repaired defects, checked dependencies and remaining validation boundaries.
 - [Support](../SUPPORT.md): help, bug reports and sensitive-data handling.
 
 ## Build and maintain

@@ -5,7 +5,7 @@ import { FolderSearch, Layers, ListChecks, ScanSearch, Settings as SettingsIcon,
 import { useApp, type View } from './store';
 import { api, isMac } from './api';
 import { ScanView } from './views/ScanView';
-import { LoadingState } from './components/ui';
+import { Banner, LoadingState } from './components/ui';
 import { desktopShortcut } from '@shared/desktopShortcuts';
 
 const IntelligenceView = lazy(() => import('./views/IntelligenceView').then(m => ({default:m.IntelligenceView})));
@@ -26,15 +26,19 @@ const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function App() {
-  const { view, setView, init, triggerMenuAction, settings, connectionId } = useApp(useShallow((state) => ({
+  const { view, setView, init, triggerMenuAction, settings, connectionId, workbenchError, initialized } = useApp(useShallow((state) => ({
     view: state.view,
     setView: state.setView,
     init: state.init,
     triggerMenuAction: state.triggerMenuAction,
     settings: state.settings,
-    connectionId: state.connectionId
+    connectionId: state.connectionId,
+    workbenchError: state.workbenchError,
+    initialized: state.initialized
   })));
   const [batchVisited, setBatchVisited] = useState(view === 'batch');
+  const [retrying, setRetrying] = useState(false);
+  const settingsUnavailable = initialized && !settings;
   const main = useRef<HTMLElement>(null);
   useLayoutEffect(() => { if (main.current) main.current.scrollTop = 0; }, [view]);
   useEffect(() => { if (view === 'batch') setBatchVisited(true); }, [view]);
@@ -96,7 +100,8 @@ export function App() {
         </aside>
         <main ref={main} className={`main ${view === 'scan' || view === 'settings' ? 'narrow' : ''}`}>
           <div className="page-content">
-          <div hidden={view !== 'scan'}><ScanView /></div>
+          {(settingsUnavailable || workbenchError && view !== 'workbench') && <Banner kind="error" action={<button className="btn small" disabled={retrying} onClick={async () => { setRetrying(true); try { await init(); } finally { setRetrying(false); } }}>{retrying ? 'Retrying…' : 'Retry workspace'}</button>}>{settingsUnavailable ? 'Connection settings could not be loaded.' : 'Workspace could not be loaded or saved.'} {workbenchError}</Banner>}
+          <div hidden={view !== 'scan'}><ScanView key={connectionId} /></div>
           <Suspense fallback={<LoadingState label={`Loading ${NAV.find((item) => item.id === view)?.label ?? 'view'}`} />}>
           {view === 'intelligence' && <IntelligenceView />}
           {(view === 'batch' || batchVisited) && <div hidden={view !== 'batch'}><BatchView key={connectionId} /></div>}

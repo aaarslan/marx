@@ -85,7 +85,11 @@ func readSnippet(folder, relative string, line int) (Object, error) {
 	}
 	defer root.Close()
 	rel, _ := filepath.Rel(folder, target)
-	file, err := root.Open(rel)
+	info, err := root.Stat(rel)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > 8<<20 {
+		return nil, errors.New("Source file is unreadable, too large, or not a regular file")
+	}
+	file, err := root.OpenFile(rel, regularReadFlags, 0)
 	if err != nil {
 		return nil, errors.New("Source file is outside the selected folder or inaccessible")
 	}
@@ -255,11 +259,15 @@ func captureProvenance(ctx context.Context, folder string, options Object, conne
 				captureErr = errors.New("Source link escaped the selected folder")
 				break
 			}
+			if !stat.Mode().IsRegular() {
+				captureErr = errors.New("Source contains a nonregular file")
+				break
+			}
 			if stat.Size() > 16<<20 || total+stat.Size() > 256<<20 {
 				captureErr = errors.New("Source fingerprint exceeded its 16 MiB per-file or 256 MiB total limit")
 				break
 			}
-			file, err := root.Open(rel)
+			file, err := root.OpenFile(rel, regularReadFlags, 0)
 			if err != nil {
 				captureErr = errors.New("Source file is outside the selected folder or inaccessible")
 				break

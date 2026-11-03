@@ -141,7 +141,7 @@ export function ResultsView() {
 
   useEffect(() => {
     if (demo || !selectedScanId || workspaceReady !== workspaceKey) return;
-    pendingSave.current = { key: workspaceKey, state: { ...workspace, selectedScanId, linkedFolder } };
+    pendingSave.current = { key: workspaceKey, state: { ...workspace, connectionId: connectionId ?? undefined, selectedScanId, linkedFolder } };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void flushWorkspaceSave().catch((err) => setError(`Could not save workspace: ${err.message}`));

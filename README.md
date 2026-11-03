@@ -130,6 +130,8 @@ Start with [Contributing](CONTRIBUTING.md) for setup and local validation. Usefu
 
 For help, use [Support](SUPPORT.md). For evaluation and collaboration, see [Project status and collaboration](docs/project-status.md), including the remaining release work and ways organizations can contribute. Security reports belong in the [private reporting channel](SECURITY.md).
 
+The [November 3 security review](docs/security-review-2026-11-03.md) records repaired defects, dependency-check scope and remaining release gaps. Organizations considering support can review the [technical evaluation proposal](docs/sponsor-evaluation.md), with a bounded pilot and proposed measures of user value.
+
 ## License
 
 Marx is [MIT licensed](LICENSE). Checkmarx services and the official CLI have their own licensing. See [CVE intelligence](docs/cve-intelligence.md), [third-party notices](THIRD_PARTY_NOTICES.md), [dependency maintenance](docs/dependencies.md) and [showcase sources](showcase/README.md) for tooling and media details.

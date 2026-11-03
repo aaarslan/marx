@@ -203,7 +203,7 @@ func main() {
 	menu := application.DefaultApplicationMenu()
 	menu.RemoveMenuItem(menu.FindByLabel("Help"))
 	menu.AddSubmenu("Help").Add("Marx documentation").OnClick(func(_ *application.Context) {
-		if _, err := s.native("external", engine.Object{"url": "https://github.com/aaarslan/marx/blob/feature/wails-desktop/docs/walkthrough.md"}); err != nil {
+		if _, err := s.native("external", engine.Object{"url": "https://github.com/aaarslan/marx/blob/main/docs/walkthrough.md"}); err != nil {
 			s.app.Dialog.Error().SetTitle("Could not open Marx documentation").SetMessage(err.Error()).Show()
 		}
 	})

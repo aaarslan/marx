@@ -103,6 +103,48 @@ func TestOverlappingEnvironmentSecretsRedactLongestFirst(t *testing.T) {
 	}
 }
 
+func TestAuthorizationHeadersNeverExposeCredentialSuffixes(t *testing.T) {
+	c := &CLI{}
+	for _, line := range []string{
+		"Authorization: Bearer synthetic-opaque-credential",
+		"Authorization: Basic synthetic-opaque-credential",
+		"Authorization Bearer synthetic-opaque-credential",
+		"Proxy-Authorization: Negotiate synthetic-opaque-credential",
+		`{"authorization":"Bearer synthetic-opaque-credential"}`,
+		"map[Authorization:[Bearer synthetic-opaque-credential]]",
+		`Authorization: Digest username="test", response="synthetic-opaque-credential"`,
+	} {
+		got := c.redact("request failed\n" + line + "\nretry disabled")
+		if strings.Contains(got, "synthetic-opaque-credential") || !strings.Contains(got, "[redacted]") {
+			t.Fatal("An authorization credential survived redaction")
+		}
+		if !strings.HasPrefix(got, "request failed\n") || !strings.HasSuffix(got, "\nretry disabled") {
+			t.Fatal("Authorization redaction changed unrelated log lines")
+		}
+		if c.redact(got) != got {
+			t.Fatal("Repeated log redaction changed the sanitized header")
+		}
+	}
+}
+
+func TestWorkspaceSaveRejectsStaleConnection(t *testing.T) {
+	f := fixture(t)
+	connection, err := f.e.connection(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	invoke(t, f.e, "workspace:save", "results", Object{"connectionId": connection, "search": "current"})
+	invokeError(t, f.e, "workspace:save", "results", Object{"connectionId": "previous-connection", "search": "stale"})
+	saved := object(invoke(t, f.e, "workspace:get", "results"))
+	if str(saved, "search") != "current" || str(saved, "connectionId") != connection {
+		t.Fatal("Stale workspace data replaced the current connection state")
+	}
+	invoke(t, f.e, "workspace:save", "legacy", Object{"search": "compatible"})
+	if str(object(invoke(t, f.e, "workspace:get", "legacy")), "search") != "compatible" {
+		t.Fatal("A legacy workspace without a connection ID was rejected")
+	}
+}
+
 func TestFindingsQueryKeepsCountsAndPageBoundaries(t *testing.T) {
 	f := fixture(t)
 	invoke(t, f.e, "results:get", "large-paging")
