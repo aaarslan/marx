@@ -60,16 +60,65 @@ describe('workspace refresh ordering and connection scope', () => {
   it('ignores navigation restored after a newer refresh has completed', async () => {
     const store = await createStore();
     const firstNavigation = deferred<WorkspaceState | null>();
-    api.workbench.bootstrap.mockResolvedValueOnce(bootstrap('old')).mockResolvedValueOnce(bootstrap('new'));
+    const running = job('old-job', 'old');
+    api.workbench.bootstrap.mockResolvedValueOnce(bootstrap('old', [running])).mockResolvedValueOnce(bootstrap('new'));
     api.workbench.workspace.mockReturnValueOnce(firstNavigation.promise).mockResolvedValueOnce({ view: 'history' });
     const earlier = store.getState().refreshWorkbench();
     await vi.waitFor(() => expect(api.workbench.workspace).toHaveBeenCalledTimes(1));
+    store.getState().applyEvent({ kind: 'job-updated', job: { ...running, status: 'Completed', finishedAt: 2, progress: { phase: 'completed' } } });
+    expect(store.getState().jobs).toEqual([]);
     await store.getState().refreshWorkbench();
     firstNavigation.resolve({ view: 'results', selectedScanId: 'old-scan' });
     await earlier;
     expect(store.getState().connectionId).toBe('new');
+    expect(store.getState().jobs).toEqual([]);
     expect(store.getState().view).toBe('history');
     expect(store.getState().selectedScanId).toBeNull();
+    expect(api.workbench.bootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([null, 'previous'])('reconciles completion during navigation restoration from %s', async (connectionId) => {
+    const store = await createStore();
+    const previousJobs = connectionId ? [job('previous-job', connectionId)] : [];
+    store.setState({ initialized: Boolean(connectionId), connectionId, jobs: previousJobs });
+    const running = job('incoming-job');
+    const completed: ScanJobState = { ...running, status: 'Completed', finishedAt: 2, progress: { phase: 'completed' } };
+    const firstNavigation = deferred<WorkspaceState | null>();
+    api.workbench.bootstrap.mockResolvedValueOnce(bootstrap('current', [running])).mockResolvedValueOnce(bootstrap('current', [completed]));
+    api.workbench.workspace.mockReturnValueOnce(firstNavigation.promise).mockResolvedValueOnce({ connectionId: 'current', view: 'history' });
+    const refresh = store.getState().refreshWorkbench();
+    await vi.waitFor(() => expect(api.workbench.workspace).toHaveBeenCalledTimes(1));
+    store.getState().applyEvent({ kind: 'job-updated', job: { ...completed, id: 'foreign-job', connectionId: 'foreign' } });
+    store.getState().applyEvent({ kind: 'job-updated', job: completed });
+    store.getState().applyEvent({ kind: 'log', jobId: running.id, line: 'Incoming connection diagnostic' });
+    expect(store.getState().connectionId).toBe(connectionId);
+    expect(store.getState().jobs).toEqual(previousJobs);
+    expect(store.getState().logs).toEqual({});
+    expect(api.workbench.bootstrap).toHaveBeenCalledTimes(1);
+    firstNavigation.resolve({ connectionId: 'current', view: 'results', selectedScanId: 'stale-scan' });
+    await refresh;
+    expect(store.getState().connectionId).toBe('current');
+    expect(store.getState().jobs).toEqual([completed]);
+    expect(store.getState().view).toBe('history');
+    expect(store.getState().selectedScanId).toBeNull();
+    expect(api.workbench.bootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a failed reconciliation after completion during restoration', async () => {
+    const store = await createStore();
+    const running = job('incoming-job');
+    const firstNavigation = deferred<WorkspaceState | null>();
+    api.settings.get.mockResolvedValue({ tenant: 'current' });
+    api.workbench.bootstrap.mockResolvedValueOnce(bootstrap('current', [running])).mockRejectedValueOnce(new Error('Synthetic reconciliation failure'));
+    api.workbench.workspace.mockReturnValueOnce(firstNavigation.promise);
+    const initialization = store.getState().init();
+    await vi.waitFor(() => expect(api.workbench.workspace).toHaveBeenCalledTimes(1));
+    store.getState().applyEvent({ kind: 'job-updated', job: { ...running, status: 'Completed', finishedAt: 2, progress: { phase: 'completed' } } });
+    firstNavigation.resolve(null);
+    await initialization;
+    expect(store.getState().workbenchError).toBe('Synthetic reconciliation failure');
+    expect(store.getState().initialized).toBe(true);
+    expect(store.getState().jobs).toEqual([]);
   });
 
   it('does not overwrite a newer success with a superseded read error', async () => {

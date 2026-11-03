@@ -53,6 +53,7 @@ function navigation(state: AppState): WorkspaceState {
 export const useApp = create<AppState>((set, get) => {
   let initializationRead = 0;
   let workbenchRead = 0;
+  let pendingWorkbench: { request: number; settledConnections: Set<string> } | null = null;
   let jobRevision = 0;
   const jobRevisions = new Map<string, number>();
   let pendingNavigation: { connectionId: string | null; state: WorkspaceState } | null = null;
@@ -118,12 +119,15 @@ export const useApp = create<AppState>((set, get) => {
     refreshWorkbench: async () => {
       const request = ++workbenchRead;
       const revision = jobRevision;
+      const pending = { request, settledConnections: new Set<string>() };
+      pendingWorkbench = pending;
       try {
         const data = await api.workbench.bootstrap();
         if (request !== workbenchRead) return;
         const restore = !get().initialized || data.connectionId !== get().connectionId;
         const restored = restore ? await api.workbench.workspace('navigation') : null;
         if (request !== workbenchRead) return;
+        if (restore && data.connectionId && pending.settledConnections.has(data.connectionId)) return get().refreshWorkbench();
         const saved = restored?.connectionId && restored.connectionId !== data.connectionId ? null : restored;
         const active = restore ? [] : get().jobs;
         const jobs = new Map(data.jobs.map((job) => [job.id, job]));
@@ -152,18 +156,23 @@ export const useApp = create<AppState>((set, get) => {
         });
       } catch (error) {
         if (request === workbenchRead) throw error;
+      } finally {
+        if (pendingWorkbench === pending) pendingWorkbench = null;
       }
     },
 
     applyEvent: (event) => {
       if (event.kind === 'job-updated') {
-        if (!get().connectionId || event.job.connectionId !== get().connectionId) return;
+        const settled = Boolean(event.job.finishedAt) || ['completed', 'failed', 'canceled'].includes(event.job.progress.phase);
+        if (!get().connectionId || event.job.connectionId !== get().connectionId) {
+          if (settled && event.job.connectionId && pendingWorkbench?.request === workbenchRead) pendingWorkbench.settledConnections.add(event.job.connectionId);
+          return;
+        }
         jobRevisions.set(event.job.id, ++jobRevision);
         const jobs = [...get().jobs];
         const index = jobs.findIndex((job) => job.id === event.job.id);
         if (index >= 0) jobs[index] = event.job;
         else jobs.unshift(event.job);
-        const settled = Boolean(event.job.finishedAt) || ['completed', 'failed', 'canceled'].includes(event.job.progress.phase);
         set(settled ? { jobs, historyVersion: get().historyVersion + 1 } : { jobs });
         if (settled) void get().refreshWorkbench().catch((error) => set({ workbenchError: error instanceof Error ? error.message : String(error) }));
       } else if (event.kind === 'job-list') {
