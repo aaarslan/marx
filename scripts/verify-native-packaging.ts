@@ -40,4 +40,4 @@ assert.match(metadata,new RegExp('GOOS='+(mac?'darwin':'windows')));assert.match
 assert.match(metadata,/-trimpath=true/);
 assert.doesNotMatch(metadata,/git\.sr\.ht\/\~jackmordaunt\/go-toast/,'Desktop toast support was linked into the application');
 assert.equal(executable.includes(Buffer.from('/__marx_acceptance_result')),false,'Acceptance transport was packaged');
-console.log(`${mac?'macOS Mach-O app bundle and ad hoc signature':'Windows x64 PE and single-executable installer payload'}, Go SQLite engine, embedded lazy views, and absence of test/runtime sidecars verified.`);
+console.log(`${mac?'macOS Mach-O app bundle and ad hoc signature':'Windows x64 PE and single-executable NSIS payload declaration'}, Go SQLite engine, embedded lazy views, and absence of test/runtime sidecars verified.${mac?'':' The built installer was not inspected.'}`);

@@ -93,6 +93,8 @@ export function ResultsView() {
   const splitRef = useRef<HTMLDivElement>(null);
   const resizePointer = useRef<number | null>(null);
   const workspaceKey = `results:${connectionId ?? 'offline'}:${selectedScanId ?? 'none'}`;
+  const activeWorkspace = useRef<string | null>(workspaceKey);
+  activeWorkspace.current = demo ? null : workspaceKey;
   const activePage = demo ? DEMO_RESULTS : page;
   const findings = activePage?.findings ?? [];
   const cves = useMemo(() => [...new Set(findings.map(f => findingCVE(f.cve)).filter((value): value is string => !!value))], [findings]);
@@ -135,16 +137,16 @@ export function ResultsView() {
     });
     return () => {
       current = false;
-      void flushWorkspaceSave().catch((err) => setError(`Could not save workspace: ${err.message}`));
+      void flushWorkspaceSave().catch((err) => { if (activeWorkspace.current === workspaceKey) setError(`Could not save workspace: ${err.message}`); });
     };
   }, [workspaceKey, demo]);
 
   useEffect(() => {
     if (demo || !selectedScanId || workspaceReady !== workspaceKey) return;
-    pendingSave.current = { key: workspaceKey, state: { ...workspace, selectedScanId, linkedFolder } };
+    pendingSave.current = { key: workspaceKey, state: { ...workspace, connectionId: connectionId ?? undefined, selectedScanId, linkedFolder } };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      void flushWorkspaceSave().catch((err) => setError(`Could not save workspace: ${err.message}`));
+      void flushWorkspaceSave().catch((err) => { if (activeWorkspace.current === workspaceKey) setError(`Could not save workspace: ${err.message}`); });
     }, 200);
   }, [workspace, workspaceReady, workspaceKey, linkedFolder, selectedScanId, demo]);
 

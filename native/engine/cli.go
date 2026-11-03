@@ -123,6 +123,7 @@ func (c *CLI) redact(s string) string {
 		s = strings.ReplaceAll(s, secret, "[redacted]")
 	}
 	s = jwtPattern.ReplaceAllString(s, "[redacted]")
+	s = authorizationPattern.ReplaceAllString(s, "$1[redacted]")
 	s = urlCredentialPattern.ReplaceAllString(s, "$1[redacted]@")
 	s = signedURLPattern.ReplaceAllString(s, "$1[redacted]")
 	return credentialPattern.ReplaceAllString(s, "$1[redacted]")
@@ -130,6 +131,7 @@ func (c *CLI) redact(s string) string {
 
 var ansiPattern = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
 var jwtPattern = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`)
+var authorizationPattern = regexp.MustCompile(`(?i)(\b(?:proxy-)?authorization(?:[\t "']*[:=][\t "']*|[\t ]+(?:bearer|basic|token|negotiate)[\t ]+))[^\r\n]+`)
 var urlCredentialPattern = regexp.MustCompile(`(?i)(https?://)[^\s/@]+:[^\s/@]+@`)
 var signedURLPattern = regexp.MustCompile(`(?i)([?&](?:X-Amz-[\w-]+|X-Goog-[\w-]+|token|signature|sig|se|sp|sv)=)[^\s&"<>]+`)
 
@@ -608,7 +610,14 @@ func (c *CLI) report(ctx context.Context, id, format string) ([]byte, error) {
 	return data, nil
 }
 func readBounded(file string, limit int64) ([]byte, error) {
-	f, err := os.Open(file)
+	info, err := os.Stat(file)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > limit {
+		return nil, errors.New("File exceeds size limit or is not regular")
+	}
+	f, err := os.OpenFile(file, regularReadFlags, 0)
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,8 @@ Do not publish API keys, source archives, customer findings, presigned URLs or o
 
 Security fixes target the latest version. A clean dependency audit does not establish that the application is free of vulnerabilities.
 
+See the [November 3, 2026 review](docs/security-review-2026-11-03.md) for dated findings, fixes and verification scope. Authorization-header redaction improvements protect future captured output; they do not remove credentials that may already exist in saved logs or exports.
+
 ## Data handling
 
 - The selected official Checkmarx CLI archives source locally and uploads it to Checkmarx One. Marx does not upload source through its own HTTP implementation. Default exclusions can be overridden; review the files you intend to send.

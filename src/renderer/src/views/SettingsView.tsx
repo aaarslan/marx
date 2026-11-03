@@ -5,12 +5,14 @@ import type { ScanDefaults, Settings, TestConnectionResult } from '@shared/types
 import { api } from '../api';
 import { useApp } from '../store';
 import { IntelligenceSettings } from '../components/IntelligenceSettings';
-import { Banner, LoadingState, Spinner, Toggle, restoreControlFocus } from '../components/ui';
+import { Banner, Empty, LoadingState, Spinner, Toggle, restoreControlFocus } from '../components/ui';
 
 export function SettingsView() {
-  const { settings, init } = useApp(useShallow((state) => ({
+  const { settings, init, workbenchError, workspaceInitialized } = useApp(useShallow((state) => ({
     settings: state.settings,
-    init: state.init
+    init: state.init,
+    workbenchError: state.workbenchError,
+    workspaceInitialized: state.initialized
   })));
   const [cliPath, setCliPath] = useState('');
   const [cliConfigPath, setCliConfigPath] = useState('');
@@ -52,7 +54,9 @@ export function SettingsView() {
     return () => clearTimeout(timer);
   }, [savedFlash, keySaved]);
 
-  if (!settings || !defaults) return <LoadingState label="Loading settings" rows={4} />;
+  if (!settings || !defaults) return !settings && (workspaceInitialized || workbenchError)
+    ? <Empty icon={<Plug size={32} />} title="Settings are unavailable" hint="Retry the workspace to load your saved connection and scan defaults." />
+    : <LoadingState label="Loading settings" rows={4} />;
 
   const save = async () => {
     if (saving) return;
